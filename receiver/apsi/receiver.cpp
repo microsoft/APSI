@@ -495,7 +495,7 @@ namespace apsi {
             NetworkChannel &chl,
             chrono::milliseconds timeout)
         {
-            // No ThreadPoolMgr here: the receiver no longer puts any work on the shared pool.
+            // No ThreadPoolMgr here: the receiver puts no work on the shared pool.
             // Query creation and result decryption run on this thread and on the dedicated
             // result-worker threads below, so a process that only receives holds no pool
             // threads at all.
@@ -854,7 +854,7 @@ namespace apsi {
                 // Wait for a valid ResultPart. A null return either means nothing has arrived
                 // yet, which is worth waiting out, or that the channel consumed a package it
                 // could not parse, which is not: this worker has already claimed a slot in
-                // package_count, and the package that would have filled it no longer exists.
+                // package_count, and the package that would have filled it has been discarded.
                 // Sleeping between attempts keeps an idle wait off the CPU.
                 ResultPart result_part;
                 while (!(result_part = chl.receive_result(seal_context))) {

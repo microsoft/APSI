@@ -487,7 +487,7 @@ The receiver benefits nothing from learning parts (or all) of the encrypted labe
 Furthermore, even if the receiver manages to obtain `nonce | Enc(V_i, LabelKey(s, Y_i), nonce)` by guessing `ItemHash(s, Y_i)`, and in an offline attack enumerates all possible items `Y_i` (or later learns `Y_i` through other means), it still cannot obtain the label because `LabelKey(s, Y_i)` is derived from `OPRF(s, Y_i)` &ndash; not just from `Y_i`.
 Of course at this later point the sender may decide to serve a normal query to the receiver for `Y_i`, in which case the receiver will learn `V_i`, as it is supposed to.
 
-APSI allows the sender can specify the nonce size in bytes.
+APSI allows the sender to specify the nonce size in bytes.
 The default nonce size is set to 16 bytes, but expert users who fully understand the issue may want to use smaller values to achieve improved performance.
 A nonce size of zero is permitted and makes label encryption deterministic, which saves the nonce bytes on every item.
 It is safe only for a `SenderDB` whose labels are never rewritten: encrypting a label for the same item a second time &ndash; by updating it, or by removing the item and reinserting it &ndash; reproduces the same keystream, and the two ciphertexts together reveal the two labels.
@@ -510,40 +510,32 @@ Note that the problem exists only in the labeled mode and can lead to worse *pac
 ### Trust Model
 
 APSI is a *confidentiality* protocol, not an *integrity* protocol, and the difference matters for how it must be deployed.
-
-What the protocol protects is described above: the OPRF hides the receiver's items from the sender, and the homomorphic encryption hides the sender's data from the receiver.
+What the protocol protects is described in [OPRF](#oprf) and [Label Encryption](#label-encryption) above.
 What it does not provide is any assurance about *where a response came from*.
 Nothing in a response binds it to the sender &ndash; there is no MAC, no signature, and no shared secret between the two parties beyond the OPRF itself.
 
 The practical consequence is that **any party able to write to the receiver's connection can make it report an arbitrary set of matches**, using nothing but the publicly known `PSIParams`.
-No key material is required, no traffic needs to be observed, and the real sender need never be involved.
-This follows directly from how BFV decryption works: the receiver recovers a value as `round(t/q * (c0 + c1*s)) mod t`, and the secret key `s` has coefficients in `{-1, 0, 1}`.
-Any response ciphertext whose own coefficients are small therefore decrypts to zero under *every* key, and a zero result is exactly what APSI reads as "this item matched".
-The smallest such forgery sets `c0` to zero and `c1` to the constant polynomial `1`; it is not a degenerate or malformed ciphertext, it carries an ordinary noise budget, and it is indistinguishable from a genuine response by inspection.
+A BFV ciphertext whose own coefficients are small decrypts to zero under every key, and a zero result is what APSI reads as a match, so such a forgery needs no key material, no observed traffic, and no involvement from the real sender.
+The receiver cannot detect it by inspection either: a forged response can match a genuine one on every property the receiver is able to measure.
 
-It is worth being explicit that the receiver cannot defend against this by examining what it receives.
-There is no test on a single ciphertext that separates one produced by a party holding the sender's data from one produced by a party holding nothing, because a forged response can be made to match a genuine one on every property the receiver is able to measure.
 Deployments must therefore run APSI over a channel that authenticates the sender.
 The `network::ZMQChannel` implementations used by the example applications provide no authentication and no encryption; embedders needing either should supply their own transport through `network::StreamChannel`, which is transport-agnostic by design.
 
-Two further limitations follow from the same root and are worth stating plainly.
-Labels carry no integrity protection either: the label ciphertext is a keystream XOR with no authentication tag, so a party on the connection can apply a chosen difference to a delivered label without detection.
-And an authenticated channel does not make the sender *honest* &ndash; it only makes it *identified*.
-A sender remains authoritative for its own data and can always answer as though its database contained any item it likes, which is inherent to the problem APSI solves rather than a defect in it.
+Two further limitations follow from the same root.
+Labels carry no integrity protection: the label ciphertext is a keystream XOR with no authentication tag, so a party on the connection can apply a chosen difference to a delivered label without detection.
+And an authenticated channel makes the sender *identified*, not *honest*: a sender remains authoritative for its own data and can always answer as though its database contained any item it likes.
 
 #### What a Peer Can Learn
 
-Two further exposures are properties of the protocol rather than of the transport, and an authenticated channel bounds them only by bounding *who* may query.
+These two exposures are properties of the protocol rather than of the transport, so an authenticated channel bounds them only by bounding *who* may query.
 
-The size of a request reveals the size of the query behind it.
-An OPRF request is exactly `oprf_query_size` bytes per item, so the receiver's item count follows from dividing the request length &ndash; and it is the exact count, not an upper bound as the underlying construction assumes.
-Padding a query set up to a fixed bucket size hides this from an observer; APSI does not do so automatically.
+An OPRF request is exactly `oprf_query_size` bytes per item, so its length reveals the receiver's exact item count.
+Padding a query set up to a fixed bucket size hides this; APSI does not do so automatically.
 
-More significantly, a peer that is allowed to query repeatedly can extract the sender's data.
-The sender cannot verify that the encrypted query powers it receives are consistent with one another, because it holds no key with which to check them &ndash; and it must evaluate whatever it is given.
-A peer supplying chosen values therefore obtains an evaluation oracle for the sender's matching and label polynomials, and enough queries recover their coefficients outright.
-The sender's item set is documented above as non-secret, but in the labeled mode the labels are not, so a deployment serving labels must treat the right to query as a privilege and limit its volume per peer.
-APSI enforces no such limit itself: it has no notion of a peer identity to attribute queries to, and the routing identifier that appears on a ZeroMQ connection is chosen by the peer and is not authenticated.
+A peer allowed to query repeatedly can extract the sender's data.
+The sender holds no key with which to check that the encrypted query powers it receives are consistent, and must evaluate whatever it is given, so a peer supplying chosen values obtains an evaluation oracle for the matching and label polynomials; enough queries recover their coefficients.
+The sender's item set is non-secret, but in the labeled mode the labels are not, so a deployment serving labels must treat the right to query as a privilege and limit its volume per peer.
+APSI enforces no such limit itself: it has no notion of a peer identity to attribute queries to, and the routing identifier on a ZeroMQ connection is chosen by the peer and is not authenticated.
 
 ## Using APSI
 

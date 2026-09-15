@@ -9,7 +9,6 @@
 #include <stdexcept>
 
 // APSI
-#include "apsi/fourq/random.h"
 #include "apsi/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/util/utils.h"
@@ -687,7 +686,8 @@ namespace apsi {
             // this file runs. The exposure is proportional to concurrent connections rather
             // than to cumulative traffic, so it is bounded at the network layer by limiting
             // concurrent peers, not here.
-            socket->set(sockopt::maxmsgsize, static_cast<int64_t>(numeric_limits<int32_t>::max()));
+            socket->set(
+                sockopt::maxmsgsize, static_cast<int64_t>((numeric_limits<int32_t>::max)()));
 
             // Bound how long closing this socket waits on messages the peer never collected.
             // This is what lets a receiver that has given up on a silent sender actually exit.
@@ -695,9 +695,7 @@ namespace apsi {
 
             string buf;
             buf.resize(32);
-            random_bytes(
-                reinterpret_cast<unsigned char *>(buf.data()),
-                static_cast<unsigned int>(buf.size()));
+            secure_random_bytes(buf.data(), buf.size());
             // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             buf[0] = 'A';
             socket->set(sockopt::routing_id, buf);
@@ -723,7 +721,8 @@ namespace apsi {
             // Reject any single inbound frame larger than INT32_MAX. See the matching comment
             // in ZMQReceiverChannel::set_socket_options, including the note that this does not
             // bound the number of frames in a message.
-            socket->set(sockopt::maxmsgsize, static_cast<int64_t>(numeric_limits<int32_t>::max()));
+            socket->set(
+                sockopt::maxmsgsize, static_cast<int64_t>((numeric_limits<int32_t>::max)()));
 
             // Bound how long closing this socket waits on messages the peer never collected.
             // Generously, unlike the receiver: what is queued here is the answer to a query,

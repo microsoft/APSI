@@ -232,6 +232,87 @@ namespace apsi::util {
     void secure_zero(void *ptr, std::size_t count) noexcept;
 
     /**
+    Number of bytes util::secure_zero_stack overwrites.
+    */
+    constexpr std::size_t stack_scrub_byte_count = 32768;
+
+    /**
+    Overwrites a fixed-size block of stack below the caller's frame, erasing secret-derived
+    values that a completed call tree left in locals it did not clear itself.
+
+    This is best-effort cleanup, not an erasure guarantee. It does not reach the calling frame's
+    own objects, which are still live; wipe those with util::secure_zero or ECPoint::clear. It
+    does not reach registers, other threads' stacks, or any heap copy, so it does nothing against
+    an attacker who can read process memory while the secret is still in use. It covers a fixed
+    window, so a call tree that outgrows it is covered only in part, and unwinding can leave
+    residue above the window. A build that relocates stack buffers, such as one using
+    AddressSanitizer's fake stack, defeats it entirely.
+
+    Call it once per operation rather than per item: the cost is the same whatever the buffer
+    held. Call it on the thread that did the work -- a caller that dispatched to a thread pool
+    must scrub on the worker. Prefer StackScrubGuard, which also covers exceptional exits.
+    */
+    void secure_zero_stack() noexcept;
+
+    /**
+    Calls util::secure_zero over a buffer when it goes out of scope, including while an exception
+    is propagating.
+
+    Secrets that live in a frame the stack scrub cannot reach have to be wiped explicitly, and a
+    wipe written at the end of the scope is skipped exactly when the work was abandoned partway
+    through. Declare one of these as soon as the buffer holds something worth erasing.
+
+    Holds the buffer by address: it must outlive the guard.
+    */
+    class SecureZeroGuard {
+    public:
+        SecureZeroGuard(void *ptr, std::size_t count) noexcept : ptr_(ptr), count_(count)
+        {}
+
+        SecureZeroGuard(const SecureZeroGuard &) = delete;
+
+        SecureZeroGuard &operator=(const SecureZeroGuard &) = delete;
+
+        ~SecureZeroGuard() noexcept
+        {
+            secure_zero(ptr_, count_);
+        }
+
+    private:
+        void *ptr_;
+
+        std::size_t count_;
+    };
+
+    /**
+    Calls util::secure_zero_stack when it goes out of scope, including while an exception is
+    propagating. Declare one before the work it should clean up after.
+    */
+    class StackScrubGuard {
+    public:
+        StackScrubGuard() = default;
+
+        StackScrubGuard(const StackScrubGuard &) = delete;
+
+        StackScrubGuard &operator=(const StackScrubGuard &) = delete;
+
+        ~StackScrubGuard() noexcept
+        {
+            secure_zero_stack();
+        }
+    };
+
+    /**
+    Fills a buffer with cryptographically secure random bytes, throwing if the platform random
+    number generator fails.
+
+    This is the source for every secret APSI generates: OPRF scalars, label nonces and channel
+    identities. Any byte address is a valid destination. A zero count is a no-op; a null pointer
+    with a nonzero count is an error. A failure may leave the buffer partly written.
+    */
+    void secure_random_bytes(void *ptr, std::size_t count);
+
+    /**
     Creates a set of powers (as in monomial degrees) for direct polynomial evaluation (if
     ps_low_degree is zero) or for evaluation using the Paterson-Stockmeyer algorithm (if
     ps_low_degree is non-zero). In the first case the returned set will simply contain each

@@ -1079,6 +1079,10 @@ namespace apsi {
             LabelKey key;
             tie(hashed_item, key) = OPRFSender::GetItemHash(item, oprf_key_);
 
+            // key decrypts this item's label, and the lookups below can throw before reaching
+            // the decryption, so wipe it however this returns.
+            SecureZeroGuard key_guard(key.data(), key.size());
+
             // Lock the database for reading
             auto lock = get_reader_lock();
 

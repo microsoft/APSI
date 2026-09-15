@@ -20,6 +20,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/oprf/oprf_common.h"
+#include "apsi/util/utils.h"
 
 // GSL
 #include "gsl/span"
@@ -52,6 +53,9 @@ namespace apsi::oprf {
 
         void create()
         {
+            // Reducing the key modulo the group order leaves images of it in frames below.
+            util::StackScrubGuard scrub_guard;
+
             // Create a random key
             ECPoint::MakeRandomNonzeroScalar(
                 oprf_key_span_type{ oprf_key_.begin(), oprf_key_size });

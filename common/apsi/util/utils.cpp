@@ -3,27 +3,34 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#endif
-
 // APSI
 #include "apsi/util/utils.h"
 
 // SEAL
+#include "seal/randomgen.h"
 #include "seal/util/common.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
+
+// secure_zero_stack works by placing a frame where the work it scrubs after ran, so it must not
+// be folded into its caller.
+#ifdef _MSC_VER
+#define APSI_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define APSI_NOINLINE __attribute__((noinline))
+#else
+#define APSI_NOINLINE
+#endif
 
 namespace apsi::util {
     vector<uint64_t> conversion_to_digits(const uint64_t input, const uint64_t base)
@@ -61,7 +68,7 @@ namespace apsi::util {
         const size_t first_to_read = 1024;
 
         // How many bytes we read in this round
-        size_t to_read = min(static_cast<size_t>(byte_count), first_to_read);
+        size_t to_read = (min)(static_cast<size_t>(byte_count), first_to_read);
 
         while (byte_count) {
             size_t old_size = destination.size();
@@ -86,7 +93,7 @@ namespace apsi::util {
             byte_count -= static_cast<uint32_t>(to_read);
 
             // Set to_read for next round exactly to right size so we don't read too much
-            to_read = min(2 * to_read, static_cast<size_t>(byte_count));
+            to_read = (min)(2 * to_read, static_cast<size_t>(byte_count));
         }
     }
 
@@ -99,7 +106,7 @@ namespace apsi::util {
         // size prefix of UINT32_MAX (~4 GiB) and force a comparable allocation. The
         // FlatBuffers verifier rejects any buffer larger than INT32_MAX bytes, so anything
         // beyond that is guaranteed to fail verification later anyway.
-        constexpr uint32_t max_byte_count = static_cast<uint32_t>(numeric_limits<int32_t>::max());
+        constexpr uint32_t max_byte_count = static_cast<uint32_t>((numeric_limits<int32_t>::max)());
         if (size > max_byte_count) {
             throw runtime_error("read_from_stream: size prefix exceeds maximum allowed");
         }
@@ -172,15 +179,51 @@ namespace apsi::util {
         if (!ptr || !count) {
             return;
         }
-#ifdef _WIN32
-        // SecureZeroMemory is the Win32 documented zeroizer that the compiler is
-        // contractually required not to optimize away.
-        SecureZeroMemory(ptr, count);
-#else
-        using memset_t = void *(*)(void *, int, size_t);
-        static volatile memset_t memset_volatile = std::memset;
-        memset_volatile(ptr, 0, count);
-#endif
+
+        // SEAL picks whichever zeroizer the platform guarantees is not optimized away, and falls
+        // back to a volatile write loop. It reports a failing memset_s by throwing, which cannot
+        // happen for arguments this has already checked; swallow it rather than terminate, since
+        // callers include destructors.
+        try {
+            seal::util::seal_memzero(ptr, count);
+        } catch (const std::exception &) {
+        }
+    }
+
+    APSI_NOINLINE void secure_zero_stack() noexcept
+    {
+        // Sized to cover the deepest path the curve arithmetic takes, which is leaving a scope by
+        // exception rather than returning from it, with enough margin that the figure does not
+        // have to be retuned per compiler: the depth varies by a factor of three between build
+        // types alone. OPRFTests.StackDepthFitsScrubWindow measures it and fails while there is
+        // still margin. Too small a window scrubs less of the region; it cannot overrun, since
+        // this writes only its own array.
+        array<unsigned char, stack_scrub_byte_count> buf{};
+        secure_zero(buf.data(), buf.size());
+    }
+
+    void secure_random_bytes(void *ptr, size_t count)
+    {
+        if (!count) {
+            return;
+        }
+        if (!ptr) {
+            throw invalid_argument("cannot fill buffer: input is null");
+        }
+
+        // Fill an aligned buffer and copy out of it: the underlying generator writes whole
+        // 32-bit words through a typed pointer and so requires an alignment this function does
+        // not ask its callers for.
+        array<uint32_t, 16> staging{};
+        auto *out = static_cast<unsigned char *>(ptr);
+        while (count) {
+            size_t chunk = (min)(count, sizeof(staging));
+            seal::random_bytes(reinterpret_cast<seal::seal_byte *>(staging.data()), chunk);
+            std::memcpy(out, staging.data(), chunk);
+            out += chunk;
+            count -= chunk;
+        }
+        secure_zero(staging.data(), sizeof(staging));
     }
 
     bool compare_bytes(const void *first, const void *second, std::size_t count)

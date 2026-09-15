@@ -6,22 +6,22 @@
 - Added an optional `timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, and a `--timeout` option to the receiver CLI.
 - Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them.
 - Added `network::ZMQChannel::end_point` and an optional `on_bound` callback to `ZMQSenderDispatcher::run`, so a sender can bind to port 0.
-- Added `util::TaskGroup` and replaced `ThreadPoolMgr::SetPhysThreadCount` with `ThreadPoolMgr::SetPoolWorkerCount`. `TaskGroup` now throws if used from inside a task of the same pool, which would otherwise deadlock.
-- Added `ThreadPoolMgr::GetPoolWorkerCount`; the thread counts now report what the pool obtained rather than what was requested.
-- The receiver runs its result workers on dedicated threads instead of the shared pool, so no APSI code waits on the network from a pool worker and a receiving process creates no pool.
-- `ThreadPoolMgr` is no longer copyable or movable; copying one corrupted the shared pool's reference count.
+- Added `util::TaskGroup`, which throws if used from inside a task of the same pool, and replaced `ThreadPoolMgr::SetPhysThreadCount` with `ThreadPoolMgr::SetPoolWorkerCount`.
+- Added `ThreadPoolMgr::GetPoolWorkerCount`; the thread counts report what the pool obtained rather than what was requested.
+- `ThreadPoolMgr` is no longer copyable or movable.
+- A receiving process creates no thread pool.
+- Added `util::secure_random_bytes`, which throws when the platform random number generator fails. All of APSI's randomness comes from it.
+- Added `util::secure_zero_stack`, `util::StackScrubGuard`, `util::SecureZeroGuard` and `util::stack_scrub_byte_count` for clearing secret material left on the stack.
+- Added `oprf::ECPoint::is_prime_order` and `oprf::ECPoint::clear`. `oprf::ECPoint::scalar_multiply` is now `[[nodiscard]]` and leaves the point unchanged when it fails.
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
-- `SenderDB::insert_or_assign` now validates a labeled batch before modifying anything, and refuses it if a label is longer than the `SenderDB` holds or if an item appears twice. Over-long labels were previously truncated silently, and a repeated item left the database describing items it had not inserted. Repeats in an unlabeled batch are collapsed rather than refused.
-- An OPRF request is now limited to `oprf::oprf_query_count_max` items, refused both when the request is loaded and in `oprf::OPRFSender::ProcessQueries`. The bound is the largest query a receiver could cuckoo-hash into a table of `TableParams::table_size_max` bins, so it cannot refuse a request that could have led to a query.
-- `oprf::ECPoint::load` now requires a canonical point encoding, rejecting coordinates at or above the field prime before they reach scalar multiplication.
-- `SenderDB::Load` now rejects a serialized `SenderDB` that omits a required field instead of dereferencing it.
-- Fixed exception handling in `PowersDag::parallel_apply`.
+- `oprf::OPRFReceiver::process_responses` rejects a response outside the prime-order subgroup, and `oprf::ECPoint::load` rejects a non-canonical point encoding.
+- An OPRF request is limited to `oprf::oprf_query_count_max` items.
+- `SenderDB::insert_or_assign` validates a labeled batch before modifying anything, and refuses it if a label is longer than the `SenderDB` holds or if an item appears twice. Repeats in an unlabeled batch are collapsed rather than refused.
+- `SenderDB::Load` rejects a serialized `SenderDB` that omits a required field.
+- An exception thrown from a `PowersDag::parallel_apply` callback now propagates to the caller instead of hanging the thread pool.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
-- `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time.
-- Fixed [.gitignore](.gitignore) excluding the FourQ ARM64 sources.
+- `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
-- Tests no longer bind fixed ports, so concurrent runs do not collide.
-- Consumers must recompile rather than relink.
 
 ## Version 0.13.1
 

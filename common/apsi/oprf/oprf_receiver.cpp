@@ -3,6 +3,7 @@
 
 // STD
 #include <array>
+#include <stdexcept>
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
@@ -37,26 +38,27 @@ namespace apsi::oprf {
     {
         set_item_count(oprf_items.size());
 
+        StackScrubGuard scrub_guard;
+
         auto *oprf_out_ptr = oprf_queries_.begin();
         for (size_t i = 0; i < item_count(); i++) {
             // Create an elliptic curve point from the item
             ECPoint ecpt(oprf_items[i].value());
 
-            // Create a random scalar for OPRF and save its inverse
+            // Create a random scalar for OPRF and save its inverse. Wipe it however this
+            // iteration ends: generating it can fail after partly filling the buffer.
             ECPoint::scalar_type random_scalar;
+            SecureZeroGuard random_scalar_guard(random_scalar.data(), random_scalar.size());
             ECPoint::MakeRandomNonzeroScalar(random_scalar);
             ECPoint::InvertScalar(random_scalar, inv_factor_data_.get_factor(i));
 
             // Multiply our point with the random scalar
-            ecpt.scalar_multiply(random_scalar, false);
+            if (!ecpt.scalar_multiply(random_scalar, false)) {
+                throw logic_error("failed to blind an item");
+            }
 
             // Save the result to items_buffer
             ecpt.save(ECPoint::point_save_span_type{ oprf_out_ptr, oprf_query_size });
-
-            // Wipe the per-item blinding scalar from the stack before continuing. The
-            // inverted copy in inv_factor_data_ lives in a SEAL mm_force_new pool which
-            // zeroes on free; this is the only stack-resident copy.
-            secure_zero(random_scalar.data(), random_scalar.size());
 
             // Move forward
             advance(oprf_out_ptr, oprf_query_size);
@@ -78,20 +80,29 @@ namespace apsi::oprf {
             throw invalid_argument("oprf_responses size is incompatible with oprf_hashes size");
         }
 
+        StackScrubGuard scrub_guard;
+
         const auto *oprf_in_ptr = oprf_responses.data();
         for (size_t i = 0; i < item_count(); i++) {
             // Load the point from items_buffer
             ECPoint ecpt;
             ecpt.load(ECPoint::point_save_span_const_type{ oprf_in_ptr, oprf_response_size });
 
+            // Check the response as it arrived, before it is used for anything.
+            if (!ecpt.is_prime_order()) {
+                throw runtime_error("OPRF response is not a prime-order point");
+            }
+
             // Multiply with inverse random scalar
-            ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);
+            if (!ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false)) {
+                throw runtime_error("failed to unblind an OPRF response");
+            }
 
             // Extract the item hash and the label encryption key
             array<unsigned char, ECPoint::hash_size> item_hash_and_label_key{};
             ecpt.extract_hash(item_hash_and_label_key);
 
-            // The first 16 bytes represent the item hash; the next 32 bytes represent the label
+            // The first 16 bytes represent the item hash; the next 16 bytes represent the label
             // encryption key
             copy_bytes(
                 item_hash_and_label_key.data(), oprf_hash_size, oprf_hashes[i].value().data());
@@ -105,6 +116,9 @@ namespace apsi::oprf {
             // is about to receive); the hashed-item half is destined for the wire later but
             // has no reason to linger on the stack either.
             secure_zero(item_hash_and_label_key.data(), item_hash_and_label_key.size());
+
+            // The unblinded point reproduces both, and is in this frame.
+            ecpt.clear();
 
             // Move forward
             advance(oprf_in_ptr, oprf_response_size);

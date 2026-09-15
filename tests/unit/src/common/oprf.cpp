@@ -13,6 +13,7 @@
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/randomgen.h"
@@ -242,5 +243,175 @@ namespace APSITests {
             ECPoint loaded;
             ASSERT_THROW(loaded.load(ss), logic_error);
         }
+    }
+    TEST(OPRFTests, ProcessResponsesRejectsPointsOutsidePrimeOrderSubgroup)
+    {
+        // Only a point of the curve's large prime order is a legitimate response. The vectors
+        // below cover what the alternatives look like: the identity, a cofactor-order point with
+        // a nonzero x coordinate, an order-eight point, and a point carrying a small-order
+        // component alongside a prime-order one. The last is the case a cofactor test alone
+        // accepts, since clearing the cofactor leaves its prime-order part behind.
+        auto reject = [](const array<unsigned char, ECPoint::save_size> &encoding) {
+            vector<Item> items(4);
+            for (size_t i = 0; i < items.size(); i++) {
+                items[i].value()[0] = static_cast<unsigned char>(i);
+            }
+            OPRFReceiver receiver(items);
+
+            vector<unsigned char> responses(items.size() * oprf_response_size);
+            for (size_t i = 0; i < items.size(); i++) {
+                copy_n(
+                    encoding.data(), encoding.size(), responses.data() + (i * oprf_response_size));
+            }
+
+            vector<HashedItem> hashes(items.size());
+            vector<LabelKey> keys(items.size());
+            receiver.process_responses(responses, hashes, keys);
+        };
+
+        // The neutral element: y = 1, x = 0.
+        array<unsigned char, ECPoint::save_size> neutral{};
+        neutral[0] = 1;
+        ASSERT_THROW(reject(neutral), runtime_error);
+
+        // A cofactor-order point with x != 0.
+        array<unsigned char, ECPoint::save_size> small_order{
+            0xcf, 0x57, 0x51, 0x3b, 0x1b, 0xd2, 0xb9, 0x3f, 0xbc, 0x6d, 0x29,
+            0x9e, 0xd8, 0x1a, 0x3e, 0x69, 0x5d, 0xc9, 0x11, 0x0c, 0x40, 0xd5,
+            0x58, 0x87, 0xeb, 0xce, 0xfb, 0x66, 0x22, 0x24, 0x97, 0x3f,
+        };
+        ASSERT_THROW(reject(small_order), runtime_error);
+
+        // An order-eight point. Unblinding maps this onto a degenerate value that answers the
+        // order test differently, so it is caught only while the test is applied to the received
+        // point.
+        array<unsigned char, ECPoint::save_size> order_eight{
+            0xeb, 0xc3, 0x99, 0x6e, 0xc2, 0x88, 0xaa, 0x1d, 0x2c, 0xd0, 0xb2,
+            0x9f, 0xea, 0x9c, 0xaf, 0x3c, 0x60, 0x67, 0xc0, 0x79, 0x70, 0x1b,
+            0xfc, 0x8f, 0x04, 0xb4, 0x2f, 0xf0, 0xb8, 0xe1, 0xcb, 0x17,
+        };
+        ASSERT_THROW(reject(order_eight), runtime_error);
+
+        // A point with both a prime-order and a small-order component.
+        array<unsigned char, ECPoint::save_size> mixed_order{
+            0xc7, 0x93, 0x7e, 0x8c, 0xa0, 0x69, 0x3f, 0xcd, 0xc7, 0xb6, 0x73,
+            0x6c, 0x3c, 0xe9, 0x0a, 0x1b, 0x0b, 0x46, 0xbc, 0xcd, 0x69, 0x3b,
+            0xf9, 0xdc, 0x22, 0xd4, 0xee, 0x7b, 0xeb, 0x35, 0xdc, 0x79,
+        };
+        ASSERT_THROW(reject(mixed_order), runtime_error);
+    }
+
+    TEST(OPRFTests, ProcessResponsesAcceptsHonestResponses)
+    {
+        // Honest responses must still be accepted and still agree with the sender.
+        vector<Item> items(16);
+        for (size_t i = 0; i < items.size(); i++) {
+            items[i].value()[0] = static_cast<unsigned char>(i);
+            items[i].value()[15] = static_cast<unsigned char>(0xFF - i);
+        }
+        OPRFKey key;
+        OPRFReceiver receiver(items);
+
+        auto responses = OPRFSender::ProcessQueries(receiver.query_data(), key);
+
+        vector<HashedItem> hashes(items.size());
+        vector<LabelKey> keys(items.size());
+        ASSERT_NO_THROW(receiver.process_responses(responses, hashes, keys));
+
+        // The sender computing the same hashes directly must agree.
+        auto direct = OPRFSender::ComputeHashes(items, key);
+        ASSERT_EQ(direct.size(), hashes.size());
+        for (size_t i = 0; i < hashes.size(); i++) {
+            ASSERT_EQ(direct[i], hashes[i]);
+        }
+    }
+
+    namespace {
+        // Painting a region of stack, letting the frame that held it die, and then looking at
+        // what a later call disturbed is how the depth of that call is measured. The canvas is
+        // four times the scrub window so that a call tree which has outgrown the window is still
+        // measurable rather than merely off the end of the ruler.
+        constexpr size_t depth_canvas_byte_count = 4 * apsi::util::stack_scrub_byte_count;
+        constexpr unsigned char depth_canvas_pattern = 0x5A;
+
+        volatile unsigned char *depth_canvas = nullptr;
+
+#ifdef _MSC_VER
+        __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+        __attribute__((noinline))
+#endif
+        void paint_depth_canvas()
+        {
+            array<unsigned char, depth_canvas_byte_count> buf{};
+            volatile unsigned char *painted = buf.data();
+            for (size_t i = 0; i < depth_canvas_byte_count; i++) {
+                painted[i] = depth_canvas_pattern;
+            }
+            depth_canvas = painted;
+        }
+
+        // Bytes below the top of the canvas that something disturbed after the painting frame
+        // died. The canvas runs low address to high, and the stack grows down, so the first
+        // disturbed byte is the deepest point reached.
+        size_t depth_reached()
+        {
+            for (size_t i = 0; i < depth_canvas_byte_count; i++) {
+                if (depth_canvas[i] != depth_canvas_pattern) {
+                    return depth_canvas_byte_count - i;
+                }
+            }
+            return 0;
+        }
+    } // namespace
+
+    TEST(OPRFTests, StackDepthFitsScrubWindow)
+    {
+        // The scrub window is a fixed size chosen to cover the curve arithmetic, and nothing
+        // checks that at run time: a call tree that outgrows it is simply covered in part. This
+        // measures the depth so that becomes a build failure. It measures the primitives rather
+        // than the OPRF entry points, which scrub internally and would report the window back.
+        OPRFKey key;
+        array<unsigned char, 16> raw{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+
+        paint_depth_canvas();
+        {
+            ECPoint pt(ECPoint::input_span_const_type(raw.data(), raw.size()));
+            ASSERT_TRUE(pt.scalar_multiply(key.key_span(), true));
+        }
+        size_t normal_depth = depth_reached();
+
+        // Leaving a scope by exception is the deeper path, so it is the one that sizes the
+        // window.
+        bool threw = false;
+        paint_depth_canvas();
+        try {
+            ECPoint pt(ECPoint::input_span_const_type(raw.data(), raw.size()));
+            ASSERT_TRUE(pt.scalar_multiply(key.key_span(), true));
+            throw runtime_error("unwind with curve state on the stack");
+        } catch (const runtime_error &) {
+            threw = true;
+        }
+        size_t throwing_depth = depth_reached();
+        ASSERT_TRUE(threw);
+
+        // The measurement has to have worked at all before its value means anything.
+        ASSERT_GT(normal_depth, 0);
+        ASSERT_GT(throwing_depth, 0);
+
+        // Fail while there is still margin rather than once coverage is already lost. The depth
+        // varies by a factor of three between build types, so the margin has to absorb that
+        // without the figure being retuned per compiler.
+        constexpr size_t depth_budget = (apsi::util::stack_scrub_byte_count * 3) / 4;
+        ASSERT_LT(normal_depth, depth_budget)
+            << "the curve arithmetic now reaches " << normal_depth << " bytes, against a "
+            << apsi::util::stack_scrub_byte_count << "-byte scrub window. Raise "
+            << "util::stack_scrub_byte_count; the scrub is otherwise covering only part of what "
+            << "it is meant to erase.";
+        ASSERT_LT(throwing_depth, depth_budget)
+            << "unwinding now reaches " << throwing_depth << " bytes, against a "
+            << apsi::util::stack_scrub_byte_count << "-byte scrub window. Raise "
+            << "util::stack_scrub_byte_count; the scrub is otherwise covering only part of what "
+            << "it is meant to erase.";
     }
 } // namespace APSITests
