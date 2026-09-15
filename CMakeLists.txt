@@ -120,7 +120,7 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # Microsoft SEAL
 # The version range is checked here rather than passed to find_package, because SEAL installs a
 # SameMinorVersion config file that would reject any minor version other than its own.
-set(APSI_SEAL_MINIMUM_VERSION 4.4.4)
+set(APSI_SEAL_MINIMUM_VERSION 4.4.5)
 set(APSI_SEAL_MAXIMUM_VERSION_EXCLUSIVE 5.0.0)
 find_package(SEAL CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)

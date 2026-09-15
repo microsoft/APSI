@@ -19,10 +19,6 @@ steps:
   displayName: 'Bootstrap vcpkg'
   workingDirectory: '$(Build.SourcesDirectory)'
 
-# Configure and build through CMakePresets.json rather than a hand-written command line, so that
-# CI builds what a contributor following the README builds. Anything CI needs to differ on
-# belongs in a preset, where both see it. Dependencies are resolved from vcpkg.json by the
-# toolchain file the preset names, which reads VCPKG_ROOT from the job.
 - bash: cmake --preset ${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}
   displayName: 'Configure APSI'
   workingDirectory: '$(Build.SourcesDirectory)'
@@ -35,13 +31,7 @@ steps:
   displayName: 'Run unit tests'
   workingDirectory: '$(Build.SourcesDirectory)/out/build/${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}/bin'
 
-# Integration tests are Release-only: a Debug build links vcpkg's unoptimized SEAL, which
-# makes the homomorphic operations 10-20x slower and the suite impractical as a gate.
-# The Large and Huge cases are DISABLED_ in the source, so only the small and medium ones
-# run here. Add --gtest_also_run_disabled_tests before tagging a release.
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - bash: ./integration_tests
     displayName: 'Run integration tests'
     workingDirectory: '$(Build.SourcesDirectory)/out/build/${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}/bin'
-
-# No build artifacts are published; see the note in windows.yml.

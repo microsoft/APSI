@@ -12,7 +12,7 @@
         "zstd",
         "no-throw-tran"
       ],
-      "version>=": "4.4.4"
+      "version>=": "4.4.5"
     },
     "ms-gsl",
     "kuku",
@@ -60,5 +60,5 @@
       ]
     }
   },
-  "builtin-baseline": "30ef65cad98f08e7197c9a1656fbd871bcb72f2d"
+  "builtin-baseline": "f299b5f6a89ff0e6869458758cad3aadb7c23ae7"
 }
