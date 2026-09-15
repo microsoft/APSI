@@ -16,7 +16,7 @@
 #include "apsi/fourq/FourQ.h"
 #include "apsi/fourq/FourQ_api.h"
 #include "apsi/fourq/FourQ_internal.h"
-#include "apsi/fourq/random.h"
+#include "apsi/fourq/FourQ_params.h"
 
 // SEAL
 #include "seal/randomgen.h"
@@ -33,6 +33,24 @@ namespace apsi::oprf {
 
     namespace {
         constexpr point_t neutral = { { { { 0 } }, { { 1 } } } }; // { {.x = { 0 }, .y = { 1 } }};
+
+        bool is_neutral_point(const point_t pt)
+        {
+            // Coordinates are values modulo p = 2^127 - 1, and one value can be stored as more
+            // than one bit pattern: zero is either 0 or p. Reduce to the canonical form before
+            // comparing bytes, or a neutral point stored the second way is not recognized.
+            point_t reduced;
+            copy_n(
+                reinterpret_cast<const unsigned char *>(pt),
+                ECPoint::point_size,
+                reinterpret_cast<unsigned char *>(reduced));
+            mod1271(reduced->x[0]);
+            mod1271(reduced->x[1]);
+            mod1271(reduced->y[0]);
+            mod1271(reduced->y[1]);
+
+            return std::memcmp(reduced, neutral, sizeof(point_t)) == 0;
+        }
 
         void set_neutral_point(ECPoint::point_span_type pt)
         {
@@ -88,7 +106,7 @@ namespace apsi::oprf {
 
         void random_scalar(ECPoint::scalar_span_type value)
         {
-            random_bytes(value.data(), seal::util::safe_cast<unsigned int>(value.size()));
+            util::secure_random_bytes(value.data(), value.size());
             modulo_order(
                 reinterpret_cast<digit_t *>(value.data()),
                 reinterpret_cast<digit_t *>(value.data()));
@@ -161,17 +179,52 @@ namespace apsi::oprf {
 
     bool ECPoint::scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor)
     {
-        // The ecc_mul functions returns false when the input point is not a valid curve point
         point_t pt_P;
         point_t pt_Q;
         point_type_to_fourq_point(pt_, pt_P);
-        bool ret = ecc_mul(
-            pt_P,
-            const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())),
-            pt_Q,
-            clear_cofactor);
+        if (!ecc_mul(
+                pt_P,
+                const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())),
+                pt_Q,
+                clear_cofactor)) {
+            // ecc_mul rejects a point that is not on the curve, and returns without having
+            // written pt_Q. Leave this point as it was: copying that buffer out would put
+            // uninitialized stack into it, and from there onto the wire.
+            return false;
+        }
+
         fourq_point_to_point_type(pt_Q, pt_);
-        return ret;
+        return true;
+    }
+
+    bool ECPoint::is_prime_order() const
+    {
+        point_t pt;
+        point_type_to_fourq_point(pt_, pt);
+
+        // The identity satisfies the subgroup test trivially, so exclude it first.
+        if (is_neutral_point(pt)) {
+            return false;
+        }
+
+        // FourQ's curve_order is the order of the large prime subgroup, not of the whole curve.
+        // Multiplying by it maps a point of that order to the identity, and leaves anything with
+        // a component outside the subgroup as some other point.
+        point_t multiplied;
+        if (!ecc_mul(
+                pt,
+                const_cast<digit_t *>(reinterpret_cast<const digit_t *>(curve_order)),
+                multiplied,
+                false)) {
+            return false;
+        }
+
+        return is_neutral_point(multiplied);
+    }
+
+    void ECPoint::clear() noexcept
+    {
+        util::secure_zero(pt_.data(), pt_.size());
     }
 
     ECPoint &ECPoint::operator=(const ECPoint &assign)

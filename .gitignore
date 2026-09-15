@@ -49,7 +49,7 @@ build/
 *.tmp
 
 #### Git ####
-*.patch
+# *.patch is not ignored: third_party/fourq/apsi-changes.patch is tracked.
 *.diff
 
 #### Windows ####
@@ -607,6 +607,6 @@ FodyWeavers.xsd
 # directories, and it also matches the vendored FourQ ARM64 implementation. Without
 # these exceptions those sources are not tracked at all and a fresh clone fails to
 # configure on any ARM64 target.
-!common/apsi/fourq/arm64
-!third_party/fourq/arm64
-!third_party/fourq/arm64/**
+!common/apsi/fourq/ARM64
+!third_party/fourq/ARM64
+!third_party/fourq/ARM64/**

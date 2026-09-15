@@ -62,7 +62,24 @@ namespace apsi::oprf {
 
         static void InvertScalar(scalar_span_const_type in, scalar_span_type out);
 
-        bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
+        /**
+        Multiplies this point by a scalar, optionally clearing the cofactor first, and returns
+        whether it succeeded. It fails only if this point is not on the curve, in which case the
+        point is left unchanged.
+        */
+        [[nodiscard]] bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
+
+        /**
+        Returns whether this point has the large prime order of the curve's main subgroup, which
+        every value the protocol produces does. Costs a scalar multiplication.
+        */
+        [[nodiscard]] bool is_prime_order() const;
+
+        /**
+        Overwrites this point with zeros. A point that held an OPRF result is secret, so clear
+        it once it is no longer needed.
+        */
+        void clear() noexcept;
 
         void save(std::ostream &stream) const;
 

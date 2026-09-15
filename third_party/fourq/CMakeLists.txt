@@ -14,7 +14,6 @@ set(APSI_FOURQ_HEADERS
     FourQ_internal.h
     FourQ_params.h
     FourQ_tables.h
-    random.h
     table_lookup.h
 )
 
@@ -32,13 +31,12 @@ set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/eccp2_no_endo.c
     ${CMAKE_CURRENT_LIST_DIR}/eccp2.c
     ${CMAKE_CURRENT_LIST_DIR}/hash_to_curve.c
-    ${CMAKE_CURRENT_LIST_DIR}/random.c
 )
 
 if(APSI_FOURQ_AMD64)
-    add_subdirectory(amd64)
+    add_subdirectory(AMD64)
 elseif(APSI_FOURQ_ARM64)
-    add_subdirectory(arm64)
+    add_subdirectory(ARM64)
 else()
     add_subdirectory(generic)
 endif()

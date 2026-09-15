@@ -44,6 +44,4 @@ steps:
     displayName: 'Run integration tests'
     workingDirectory: '$(Build.SourcesDirectory)/out/build/${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}/bin'
 
-# No build artifacts are published; see the note in windows.yml. The step that used to be here
-# published the staging directory without anything ever having been copied into it, so what it
-# actually produced was an empty artifact.
+# No build artifacts are published; see the note in windows.yml.

@@ -88,6 +88,8 @@ namespace apsi::oprf {
         TaskGroup tasks(tpm.thread_pool());
 
         auto ProcessQueriesLambda = [&](size_t start_idx, size_t step) {
+            StackScrubGuard scrub_guard;
+
             for (size_t idx = start_idx; idx < query_count; idx += step) {
                 // Load the point from input buffer
                 ECPoint ecpt;
@@ -116,32 +118,48 @@ namespace apsi::oprf {
         return oprf_responses;
     }
 
+    namespace {
+        // The hashing without the stack scrub that the public entry point adds. Batch callers
+        // scrub once per worker, since the scrub costs the same whatever it covers.
+        pair<HashedItem, LabelKey> get_item_hash(const Item &item, const OPRFKey &oprf_key)
+        {
+            // Create an elliptic curve point from the item
+            ECPoint ecpt(item.value());
+
+            // Multiply with key
+            if (!ecpt.scalar_multiply(oprf_key.key_span(), true)) {
+                throw logic_error("failed to hash an item");
+            }
+
+            // Extract the item hash and the label encryption key
+            array<unsigned char, ECPoint::hash_size> item_hash_and_label_key{};
+            ecpt.extract_hash(item_hash_and_label_key);
+
+            // The first 128 bits represent the item hash; the next 128 bits represent the
+            // label encryption key.
+            pair<HashedItem, LabelKey> result;
+            copy_bytes(item_hash_and_label_key.data(), oprf_hash_size, result.first.value().data());
+            copy_bytes(
+                item_hash_and_label_key.data() + oprf_hash_size,
+                label_key_byte_count,
+                result.second.data());
+
+            // Wipe the stack copy of the OPRF output. The label-key half is the encryption
+            // key for per-item labels; we do not leave it on the stack after returning.
+            secure_zero(item_hash_and_label_key.data(), item_hash_and_label_key.size());
+
+            // The point the hash came from reproduces it, and it belongs to this frame.
+            ecpt.clear();
+
+            return result;
+        }
+    } // namespace
+
     pair<HashedItem, LabelKey> OPRFSender::GetItemHash(const Item &item, const OPRFKey &oprf_key)
     {
-        // Create an elliptic curve point from the item
-        ECPoint ecpt(item.value());
+        StackScrubGuard scrub_guard;
 
-        // Multiply with key
-        ecpt.scalar_multiply(oprf_key.key_span(), true);
-
-        // Extract the item hash and the label encryption key
-        array<unsigned char, ECPoint::hash_size> item_hash_and_label_key{};
-        ecpt.extract_hash(item_hash_and_label_key);
-
-        // The first 128 bits represent the item hash; the next 128 bits represent the
-        // label encryption key.
-        pair<HashedItem, LabelKey> result;
-        copy_bytes(item_hash_and_label_key.data(), oprf_hash_size, result.first.value().data());
-        copy_bytes(
-            item_hash_and_label_key.data() + oprf_hash_size,
-            label_key_byte_count,
-            result.second.data());
-
-        // Wipe the stack copy of the OPRF output. The label-key half is the encryption
-        // key for per-item labels; we do not leave it on the stack after returning.
-        secure_zero(item_hash_and_label_key.data(), item_hash_and_label_key.size());
-
-        return result;
+        return get_item_hash(item, oprf_key);
     }
 
     vector<HashedItem> OPRFSender::ComputeHashes(
@@ -156,8 +174,14 @@ namespace apsi::oprf {
         TaskGroup tasks(tpm.thread_pool());
 
         auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
+            StackScrubGuard scrub_guard;
+
             for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
-                oprf_hashes[idx] = GetItemHash(oprf_items[idx], oprf_key).first;
+                // Wipe the label key this overload has no use for; it is in this frame, which
+                // the scrub does not reach.
+                auto hash_and_key = get_item_hash(oprf_items[idx], oprf_key);
+                oprf_hashes[idx] = hash_and_key.first;
+                secure_zero(hash_and_key.second.data(), hash_and_key.second.size());
             }
         };
 
@@ -193,13 +217,19 @@ namespace apsi::oprf {
         TaskGroup tasks(tpm.thread_pool());
 
         auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
+            StackScrubGuard scrub_guard;
+
             for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
                 const Item &item = oprf_item_labels[idx].first;
                 const Label &label = oprf_item_labels[idx].second;
 
                 HashedItem hashed_item;
                 LabelKey key;
-                tie(hashed_item, key) = GetItemHash(item, oprf_key);
+                tie(hashed_item, key) = get_item_hash(item, oprf_key);
+
+                // Wipe the per-item label encryption key however this iteration ends: the
+                // encryption below draws a nonce, and that can fail.
+                SecureZeroGuard key_guard(key.data(), key.size());
 
                 // Encrypt here
                 EncryptedLabel encrypted_label =
@@ -207,9 +237,6 @@ namespace apsi::oprf {
 
                 // Set result
                 oprf_hashes[idx] = make_pair(hashed_item, std::move(encrypted_label));
-
-                // Wipe the per-item label encryption key from the stack.
-                secure_zero(key.data(), key.size());
             }
         };
 

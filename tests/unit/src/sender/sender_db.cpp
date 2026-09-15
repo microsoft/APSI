@@ -155,10 +155,8 @@ namespace APSITests {
         sender_db.insert_or_assign(good);
         ASSERT_EQ(size_t(2), sender_db.get_item_count());
 
-        // A batch naming the same item twice: the two labels cannot both be meant, so neither is
-        // chosen. Previously the second occurrence was classified as an item to overwrite, and
-        // the overwrite ran before the new items were inserted, so it threw partway and left
-        // every genuinely new item in the batch registered but absent from any bin bundle.
+        // A batch naming the same item twice: the two labels cannot both be meant, so the batch
+        // is refused before anything in it is inserted.
         vector<pair<Item, Label>> duplicated;
         duplicated.push_back(make_pair(Item(7, 7), create_label(7, 8)));
         duplicated.push_back(make_pair(Item(9, 9), create_label(9, 8)));

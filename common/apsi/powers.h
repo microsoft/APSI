@@ -219,8 +219,12 @@ namespace apsi {
                         node_states[power_idx].compare_exchange_strong(state, NodeState::Computing);
 
                     if (!cmp) {
-                        // Either done or already being processed
+                        // Either done or already being processed. Yield before trying the next
+                        // node: when few nodes remain, every worker but one lands here on each
+                        // pass and would otherwise spin the loop hot against the workers that
+                        // are making progress.
                         power_idx = (power_idx + 1) % target_powers_count;
+                        std::this_thread::yield();
                         continue;
                     }
 

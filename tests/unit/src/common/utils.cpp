@@ -2,10 +2,12 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -227,5 +229,105 @@ namespace APSITests {
         array<unsigned char, 5> res{ 0x3, 0x3, 0x3, 0x3, 0x3 };
         xor_buffers(arr1_5.data(), arr2_5.data(), arr1_5.size());
         ASSERT_TRUE(equal(arr1_5.begin(), arr1_5.end(), res.begin()));
+    }
+
+    TEST(UtilsTests, SecureRandomBytes)
+    {
+        // Every secret APSI generates comes from here, so check that it fills what it is asked
+        // to fill and rejects the arguments it cannot honour.
+        array<unsigned char, 64> buf{};
+        ASSERT_NO_THROW(secure_random_bytes(buf.data(), buf.size()));
+
+        // A filled buffer is not all zeros. This is a sanity check on the generator being wired
+        // up at all, not a test of randomness quality.
+        ASSERT_FALSE(all_of(buf.begin(), buf.end(), [](unsigned char b) { return b == 0; }));
+
+        // Two draws differ. With 64 bytes a collision has probability 2^-512.
+        array<unsigned char, 64> other{};
+        secure_random_bytes(other.data(), other.size());
+        ASSERT_FALSE(equal(buf.begin(), buf.end(), other.begin()));
+
+        // Only the requested prefix is written.
+        array<unsigned char, 8> partial{};
+        secure_random_bytes(partial.data(), 4);
+        ASSERT_TRUE(
+            all_of(partial.begin() + 4, partial.end(), [](unsigned char b) { return b == 0; }));
+
+        // Zero count is a no-op even with a null pointer, matching secure_zero.
+        ASSERT_NO_THROW(secure_random_bytes(nullptr, 0));
+
+        // A null buffer with a nonzero count is a caller error, not a silent no-op.
+        ASSERT_THROW(secure_random_bytes(nullptr, 1), invalid_argument);
+
+        // Any byte address is a valid destination. The generator underneath writes whole 32-bit
+        // words, so an odd offset is the case that would break if that were passed straight
+        // through, and a request longer than one staging buffer is the case that would break if
+        // the chunking were wrong.
+        array<unsigned char, 300> unaligned{};
+        secure_random_bytes(unaligned.data() + 1, unaligned.size() - 2);
+        ASSERT_EQ(0, unaligned.front());
+        ASSERT_EQ(0, unaligned.back());
+        ASSERT_FALSE(all_of(
+            unaligned.begin() + 1, unaligned.end() - 1, [](unsigned char b) { return b == 0; }));
+    }
+
+    namespace {
+        // Dirties a region of stack below its caller and records where. Must not be inlined:
+        // the region has to be a real frame below the caller, where the scrub will later land.
+        constexpr size_t stack_probe_byte_count = 8192;
+        constexpr unsigned char stack_probe_pattern = 0xA5;
+
+        // Where the dirtied region was. Recorded rather than returned so that no function
+        // returns the address of its own local.
+        volatile unsigned char *stack_probe_location = nullptr;
+
+#ifdef _MSC_VER
+        __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+        __attribute__((noinline))
+#endif
+        void dirty_stack_below_caller()
+        {
+            array<unsigned char, stack_probe_byte_count> buf{};
+            volatile unsigned char *dirtied = buf.data();
+            for (size_t i = 0; i < stack_probe_byte_count; i++) {
+                dirtied[i] = stack_probe_pattern;
+            }
+            stack_probe_location = dirtied;
+        }
+    } // namespace
+
+    TEST(UtilsTests, SecureZeroStack)
+    {
+        // A scrub whose buffer the compiler elided, or that someone shrank, would still link
+        // and still be called with nothing to notice. Check that it writes zeros where a
+        // previous call left data. Inspecting a frame that has been returned from is
+        // platform-specific by nature, so the assertion is loose: most of the probed region, not
+        // a byte-exact layout.
+        volatile unsigned char *probe = nullptr;
+        dirty_stack_below_caller();
+        probe = stack_probe_location;
+        ASSERT_NE(nullptr, probe);
+
+        size_t dirty_before = 0;
+        for (size_t i = 0; i < stack_probe_byte_count; i++) {
+            if (probe[i] == stack_probe_pattern) {
+                dirty_before++;
+            }
+        }
+        // The probe must actually have left something behind, or the test proves nothing.
+        ASSERT_GT(dirty_before, stack_probe_byte_count / 2);
+
+        secure_zero_stack();
+
+        size_t cleared = 0;
+        for (size_t i = 0; i < stack_probe_byte_count; i++) {
+            if (probe[i] == 0) {
+                cleared++;
+            }
+        }
+        // Demand most of the probe rather than half, so that a window shrunk to a fraction
+        // fails. The probe is smaller than the window to leave room for layout differences.
+        ASSERT_GT(cleared, (stack_probe_byte_count * 3) / 4);
     }
 } // namespace APSITests

@@ -9,7 +9,6 @@
 #include <vector>
 
 // APSI
-#include "apsi/fourq/random.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/utils.h"
 
@@ -37,7 +36,7 @@ namespace apsi::util {
         // Set up the result and create the nonce
         size_t encrypted_label_byte_count = nonce_byte_count + label_byte_count;
         EncryptedLabel result(encrypted_label_byte_count);
-        random_bytes(result.data(), static_cast<unsigned int>(nonce_byte_count));
+        secure_random_bytes(result.data(), nonce_byte_count);
 
         // Fill result with mask from Blake2xb
         APSI_blake2xb(

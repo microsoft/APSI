@@ -301,11 +301,14 @@ target_compile_options(apsi PRIVATE -DHAVE_CONFIG)
 target_compile_options(apsi PRIVATE -DUSE_SECURE_SEED)
 target_compile_options(apsi PRIVATE -DUSE_ENDO=true)
 
-# Set system
-if(MSVC)
+# Set system. The vendored FourQ sources require one of these to select an OS_TARGET.
+if(WIN32)
     target_compile_options(apsi PRIVATE -D__WINDOWS__)
 elseif (UNIX)
     target_compile_options(apsi PRIVATE -D__LINUX__)
+else()
+    message(FATAL_ERROR "Unsupported platform: APSI's vendored FourQ sources build only on "
+                        "Windows or a UNIX-like system.")
 endif()
 
 # Detect architecture
@@ -356,7 +359,7 @@ endif()
 #
 # Restricted to AMD64 because that is the only architecture the vendored FourQ ships assembly
 # for. Without that condition an aarch64 Linux build defines _ASM_, so eccp2_core.c calls
-# fp2mul1271_a and friends, while third_party/fourq/arm64 contributes no sources to define
+# fp2mul1271_a and friends, while third_party/fourq/ARM64 contributes no sources to define
 # them: the build fails at link time. A failure to detect an assembler is handled the same way,
 # rather than leaving APSI_USE_ASM on with nothing to assemble.
 if(APSI_USE_ASM AND APSI_FOURQ_AMD64 AND UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW)
