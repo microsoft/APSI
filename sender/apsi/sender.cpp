@@ -145,12 +145,36 @@ namespace apsi {
 
             uint32_t bundle_idx_count = params.bundle_idx_count();
             uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
+            uint32_t ps_low_degree = params.query_params().ps_low_degree;
 
             // Extract the PowersDag
             const PowersDag &pd = query.pd();
 
-            // The query response only tells how many ResultPackages to expect; send this first
-            uint32_t package_count = safe_cast<uint32_t>(sender_db->get_bin_bundle_count());
+            // The Query checked its data and configured its PowersDag against its own read of
+            // these parameters. Everything below indexes by counts taken from the read above and
+            // does so without bounds checks: the per-bundle power vectors are sized from
+            // max_items_per_bin and then indexed by the DAG's node powers, and each query power's
+            // ciphertext vector is indexed by bundle index. The two reads must therefore agree.
+            if (pd.target_powers() != create_powers_set(ps_low_degree, max_items_per_bin)) {
+                APSI_LOG_ERROR(
+                    "Failed to process query request: the query's PowersDag does not match the "
+                    "current SenderDB parameters");
+                throw invalid_argument("query is invalid");
+            }
+            for (const auto &q : query.data()) {
+                if (q.second.size() != bundle_idx_count ||
+                    static_cast<size_t>(q.first) > static_cast<size_t>(max_items_per_bin)) {
+                    APSI_LOG_ERROR(
+                        "Failed to process query request: query does not match the current "
+                        "SenderDB parameters");
+                    throw invalid_argument("query is invalid");
+                }
+            }
+
+            // The query response only tells how many ResultPackages to expect; send this first.
+            // The reader lock is already held, so the count is read without taking it again.
+            uint32_t package_count =
+                safe_cast<uint32_t>(sender_db->get_bin_bundle_count_unlocked());
             QueryResponse response_query = make_unique<QueryResponse::element_type>();
             response_query->package_count = package_count;
 

@@ -211,19 +211,7 @@ namespace apsi::util {
             throw invalid_argument("cannot fill buffer: input is null");
         }
 
-        // Fill an aligned buffer and copy out of it: the underlying generator writes whole
-        // 32-bit words through a typed pointer and so requires an alignment this function does
-        // not ask its callers for.
-        array<uint32_t, 16> staging{};
-        auto *out = static_cast<unsigned char *>(ptr);
-        while (count) {
-            size_t chunk = (min)(count, sizeof(staging));
-            seal::random_bytes(reinterpret_cast<seal::seal_byte *>(staging.data()), chunk);
-            std::memcpy(out, staging.data(), chunk);
-            out += chunk;
-            count -= chunk;
-        }
-        secure_zero(staging.data(), sizeof(staging));
+        seal::random_bytes(static_cast<seal::seal_byte *>(ptr), count);
     }
 
     bool compare_bytes(const void *first, const void *second, std::size_t count)

@@ -4,9 +4,11 @@
 // STD
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <sstream>
 #include <unordered_set>
 
@@ -597,22 +599,29 @@ namespace apsi {
         // unrecoverable, so terminating (rather than dropping noexcept) is acceptable here.
         // NOLINTNEXTLINE(bugprone-exception-escape)
         SenderDB::SenderDB(SenderDB &&source) noexcept
+            : SenderDB(std::move(source), source.get_writer_lock())
+        {}
+
+        // NOLINTNEXTLINE(bugprone-exception-escape)
+        SenderDB::SenderDB(
+            SenderDB &&source, unique_lock<shared_mutex> source_lock [[maybe_unused]]) noexcept
             : hashed_items_(std::move(source.hashed_items_)), params_(source.params_),
               crypto_context_(source.crypto_context_), label_byte_count_(source.label_byte_count_),
               nonce_byte_count_(source.nonce_byte_count_), item_count_(source.item_count_),
               compressed_(source.compressed_), stripped_(source.stripped_),
               bin_bundles_(std::move(source.bin_bundles_)), oprf_key_(std::move(source.oprf_key_))
         {
-            // Lock the source before moving stuff over
-            auto lock = source.get_writer_lock();
-
+            // source_lock is held for the whole of this constructor, including the member
+            // initializers above: it was acquired when the delegating constructor's arguments
+            // were evaluated. The destination is not yet reachable by another thread and needs
+            // no lock of its own.
             source.oprf_key_ = OPRFKey();
 
             // Reset the source data structures
             source.clear_internal();
         }
 
-        // Acquiring the writer lock can in principle throw; a lock failure is unrecoverable, so
+        // Acquiring the writer locks can in principle throw; a lock failure is unrecoverable, so
         // terminating (rather than dropping noexcept) is acceptable here.
         // NOLINTNEXTLINE(bugprone-exception-escape)
         SenderDB &SenderDB::operator=(SenderDB &&source) noexcept
@@ -622,8 +631,10 @@ namespace apsi {
                 return *this;
             }
 
-            // Lock the current SenderDB
-            auto this_lock = get_writer_lock();
+            // Both objects must be locked before either is read or written. scoped_lock takes
+            // both without imposing an order, so two threads assigning in opposite directions
+            // cannot each end up holding the lock the other waits for.
+            scoped_lock lock(db_lock_, source.db_lock_);
 
             params_ = source.params_;
             crypto_context_ = source.crypto_context_;
@@ -632,9 +643,6 @@ namespace apsi {
             item_count_ = source.item_count_;
             compressed_ = source.compressed_;
             stripped_ = source.stripped_;
-
-            // Lock the source before moving stuff over
-            auto source_lock = source.get_writer_lock();
 
             hashed_items_ = std::move(source.hashed_items_);
             bin_bundles_ = std::move(source.bin_bundles_);
@@ -655,10 +663,9 @@ namespace apsi {
             return bin_bundles_.at(safe_cast<size_t>(bundle_idx)).size();
         }
 
-        size_t SenderDB::get_bin_bundle_count() const
+        size_t SenderDB::get_bin_bundle_count_unlocked() const
         {
-            // Lock the database for reading
-            auto lock = get_reader_lock();
+            // Assume the SenderDB is already locked
 
             // Compute the total number of BinBundles
             return accumulate(
@@ -668,16 +675,24 @@ namespace apsi {
                 [&](auto &a, auto &b) { return a + b.size(); });
         }
 
+        size_t SenderDB::get_bin_bundle_count() const
+        {
+            // Lock the database for reading
+            auto lock = get_reader_lock();
+
+            return get_bin_bundle_count_unlocked();
+        }
+
         double SenderDB::get_packing_rate() const
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
 
             uint64_t item_count = mul_safe(
-                static_cast<uint64_t>(get_item_count()),
+                static_cast<uint64_t>(item_count_),
                 static_cast<uint64_t>(params_.table_params().hash_func_count));
             uint64_t max_item_count = mul_safe(
-                static_cast<uint64_t>(get_bin_bundle_count()),
+                static_cast<uint64_t>(get_bin_bundle_count_unlocked()),
                 static_cast<uint64_t>(params_.items_per_bundle()),
                 static_cast<uint64_t>(params_.table_params().max_items_per_bin));
 
@@ -704,12 +719,12 @@ namespace apsi {
 
         void SenderDB::clear()
         {
+            // Lock the database for writing
+            auto lock = get_writer_lock();
+
             if (!hashed_items_.empty()) {
                 APSI_LOG_INFO("Removing " << hashed_items_.size() << " items pairs from SenderDB");
             }
-
-            // Lock the database for writing
-            auto lock = get_writer_lock();
 
             clear_internal();
         }
@@ -776,6 +791,10 @@ namespace apsi {
 
         OPRFKey SenderDB::get_oprf_key() const
         {
+            // Lock the database for reading. strip() clears oprf_key_ under the writer lock, so
+            // the check and the copy must both happen under this lock.
+            auto lock = get_reader_lock();
+
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot return the OPRF key from a stripped SenderDB");
                 throw logic_error("failed to return OPRF key");
@@ -785,6 +804,12 @@ namespace apsi {
 
         void SenderDB::insert_or_assign(const vector<pair<Item, Label>> &data)
         {
+            // Lock the database for writing. The lock must span the stripped_ check, the hashing
+            // and the insertion: strip() clears oprf_key_ under this same lock, so hashing
+            // outside it can read a key that is being destroyed, and items hashed under a key
+            // the database no longer holds would be committed under hashes no receiver can match.
+            auto lock = get_writer_lock();
+
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
                 throw logic_error("failed to insert data");
@@ -826,12 +851,9 @@ namespace apsi {
                 }
             }
 
-            // First compute the hashes for the input data
+            // Compute the hashes for the input data
             auto hashed_data =
                 OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_);
-
-            // Lock the database for writing
-            auto lock = get_writer_lock();
 
             // We need to know which items are new and which are old, since we have to tell
             // dispatch_insert_or_assign when to have an overwrite-on-collision versus
@@ -912,6 +934,10 @@ namespace apsi {
 
         void SenderDB::insert_or_assign(const vector<Item> &data)
         {
+            // Lock the database for writing. See the labeled overload above for why the lock must
+            // span the stripped_ check, the hashing and the insertion.
+            auto lock = get_writer_lock();
+
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
                 throw logic_error("failed to insert data");
@@ -924,11 +950,8 @@ namespace apsi {
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
-            // First compute the hashes for the input data
+            // Compute the hashes for the input data
             auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
-
-            // Lock the database for writing
-            auto lock = get_writer_lock();
 
             // We are not going to insert items that already appear in the database. Partition
             // without recording anything: an item registered in hashed_items_ before it is
@@ -995,6 +1018,10 @@ namespace apsi {
 
         void SenderDB::remove(const vector<Item> &data)
         {
+            // Lock the database for writing. See insert_or_assign for why the lock must span the
+            // stripped_ check, the hashing and the removal.
+            auto lock = get_writer_lock();
+
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot remove data from a stripped SenderDB");
                 throw logic_error("failed to remove data");
@@ -1003,11 +1030,8 @@ namespace apsi {
             STOPWATCH(sender_stopwatch, "SenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
-            // First compute the hashes for the input data
+            // Compute the hashes for the input data
             auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
-
-            // Lock the database for writing
-            auto lock = get_writer_lock();
 
             // Remove items that do not exist in the database.
             auto existing_data_end =
@@ -1049,22 +1073,31 @@ namespace apsi {
 
         bool SenderDB::has_item(const Item &item) const
         {
+            // Lock the database for reading. The lock must span the stripped_ check, the hashing
+            // and the lookup: strip() clears oprf_key_ under the writer lock, so hashing outside
+            // the lock can read a key that is being destroyed, and a hash computed under one key
+            // cannot be looked up in an item set built under another.
+            auto lock = get_reader_lock();
+
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot retrieve the presence of an item from a stripped SenderDB");
                 throw logic_error("failed to retrieve the presence of item");
             }
 
-            // First compute the hash for the input item
+            // Compute the hash for the input item
             auto hashed_item = OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
-
-            // Lock the database for reading
-            auto lock = get_reader_lock();
 
             return hashed_items_.find(hashed_item) != hashed_items_.end();
         }
 
         Label SenderDB::get_label(const Item &item) const
         {
+            // Lock the database for reading. The lock must span the stripped_ check, the hashing
+            // and the lookup: strip() clears oprf_key_ under the writer lock, so hashing outside
+            // the lock can read a key that is being destroyed, and a hash computed under one key
+            // cannot be looked up in an item set built under another.
+            auto lock = get_reader_lock();
+
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot retrieve a label from a stripped SenderDB");
                 throw logic_error("failed to retrieve label");
@@ -1074,7 +1107,7 @@ namespace apsi {
                 throw logic_error("failed to retrieve label");
             }
 
-            // First compute the hash for the input item
+            // Compute the hash for the input item
             HashedItem hashed_item;
             LabelKey key;
             tie(hashed_item, key) = OPRFSender::GetItemHash(item, oprf_key_);
@@ -1082,9 +1115,6 @@ namespace apsi {
             // key decrypts this item's label, and the lookups below can throw before reaching
             // the decryption, so wipe it however this returns.
             SecureZeroGuard key_guard(key.data(), key.size());
-
-            // Lock the database for reading
-            auto lock = get_reader_lock();
 
             // Check if this item is in the DB. If not, throw an exception
             if (hashed_items_.find(hashed_item) == hashed_items_.end()) {
@@ -1180,7 +1210,7 @@ namespace apsi {
                 return ret;
             }());
 
-            auto bin_bundle_count = get_bin_bundle_count();
+            auto bin_bundle_count = get_bin_bundle_count_unlocked();
 
             fbs::SenderDBBuilder sender_db_builder(fbs_builder);
             sender_db_builder.add_params(params);

@@ -10,13 +10,6 @@
 #   APSI_VERSION_MINOR : the minor version number
 #   APSI_VERSION_PATCH : the patch version number
 #   APSI_USE_ZMQ : Set to non-zero value if library is compiled with ZeroMQ and cppzmq for networking
-#
-# Note there is deliberately no variable reporting whether this is a debug build. This file is
-# generated once at configure time, whereas a multi-configuration generator such as Visual Studio
-# or Xcode builds every configuration from that single generated file, so no value written here
-# can describe the configuration a consumer ends up linking against. CMake already solves this
-# properly: the imported target APSI::apsi carries per-configuration locations, and a consumer's
-# own $<CONFIG> selects among them.
 
 @PACKAGE_INIT@
 

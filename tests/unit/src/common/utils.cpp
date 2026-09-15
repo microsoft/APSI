@@ -259,10 +259,10 @@ namespace APSITests {
         // A null buffer with a nonzero count is a caller error, not a silent no-op.
         ASSERT_THROW(secure_random_bytes(nullptr, 1), invalid_argument);
 
-        // Any byte address is a valid destination. The generator underneath writes whole 32-bit
-        // words, so an odd offset is the case that would break if that were passed straight
-        // through, and a request longer than one staging buffer is the case that would break if
-        // the chunking were wrong.
+        // Any byte address is a valid destination and a request may be any length. An odd offset
+        // is the case that breaks if the destination has to be aligned for the generator
+        // underneath, and a length that is not a multiple of four exercises its final partial
+        // word.
         array<unsigned char, 300> unaligned{};
         secure_random_bytes(unaligned.data() + 1, unaligned.size() - 2);
         ASSERT_EQ(0, unaligned.front());

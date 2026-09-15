@@ -2,7 +2,7 @@
 
 ## Version 1.0.0
 
-- Require Microsoft SEAL 4.4.4 or a newer 4.x release, and update the vcpkg baseline.
+- Require Microsoft SEAL 4.4.5 or a newer 4.x release, and update the vcpkg baseline.
 - Added an optional `timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, and a `--timeout` option to the receiver CLI.
 - Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them.
 - Added `network::ZMQChannel::end_point` and an optional `on_bound` callback to `ZMQSenderDispatcher::run`, so a sender can bind to port 0.
@@ -17,6 +17,10 @@
 - `oprf::OPRFReceiver::process_responses` rejects a response outside the prime-order subgroup, and `oprf::ECPoint::load` rejects a non-canonical point encoding.
 - An OPRF request is limited to `oprf::oprf_query_count_max` items.
 - `SenderDB::insert_or_assign` validates a labeled batch before modifying anything, and refuses it if a label is longer than the `SenderDB` holds or if an item appears twice. Repeats in an unlabeled batch are collapsed rather than refused.
+- `SenderDB` holds its lock across the whole of each operation, so hashing no longer runs outside it. Concurrent updates block queries for longer than before. Moving a `SenderDB` must not overlap any other use of it.
+- Added `SenderDB::get_bin_bundle_count_unlocked` for callers that already hold a lock on the `SenderDB`.
+- `SenderDB::get_reader_lock` returns a `std::shared_lock`. The `SenderDB` lock is now a `std::shared_mutex` rather than Microsoft SEAL's, whose implementation depended on how SEAL itself was built.
+- `Sender::RunQuery` rejects a query that the `SenderDB` parameters no longer describe.
 - `SenderDB::Load` rejects a serialized `SenderDB` that omits a required field.
 - An exception thrown from a `PowersDag::parallel_apply` callback now propagates to the caller instead of hanging the thread pool.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.

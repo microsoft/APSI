@@ -18,9 +18,6 @@ struct SenderDBInfo {
     stripped:bool;
 }
 
-// info is required for the same reason the fields in psi_params.fbs are: SenderDB::Load reads it
-// unconditionally, so a buffer that omits it would be dereferenced as a null pointer. Marking it
-// required is what lets the FlatBuffers verifier reject such a buffer before any field is read.
 table SenderDB {
     params:[ubyte] (required);
     info:SenderDBInfo (required);

@@ -18,13 +18,6 @@ steps:
       .\bootstrap-vcpkg.bat -disableMetrics
     workingDirectory: '$(Build.SourcesDirectory)'
 
-# Configure and build through CMakePresets.json rather than a hand-written command line, so that
-# CI builds what a contributor following the README builds. Anything CI needs to differ on
-# belongs in a preset, where both see it.
-#
-# windows-latest carries Visual Studio 2022, so this is the vs2022 preset; the vs2026 presets
-# additionally need CMake 4.2, which the image does not have either. Dependencies are resolved
-# from vcpkg.json by the toolchain file the preset names, which reads VCPKG_ROOT from the job.
 - script: cmake --preset win-vs2022-x64
   workingDirectory: '$(Build.SourcesDirectory)'
   displayName: 'Configure APSI'
@@ -32,8 +25,6 @@ steps:
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: CodeQL3000Init@0
 
-# CodeQL observes the compiler invocations themselves, so driving the build through CMake rather
-# than the MSBuild task does not hide anything from it.
 - script: cmake --build --preset win-vs2022-x64-${{ lower(parameters.configuration) }}
   workingDirectory: '$(Build.SourcesDirectory)'
   displayName: 'Build APSI'
@@ -54,9 +45,6 @@ steps:
     workingDirectory: '$(Build.SourcesDirectory)\out\build\win-vs2022-x64\bin\${{ parameters.configuration }}'
     displayName: 'Run integration tests'
 
-# No build artifacts are published. APSI is consumed as source or through vcpkg, so a drop of
-# unsigned CI binaries has no consumer and only invites someone to use one. The security
-# analysis logs below are a different matter and are still published.
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: CredScan@3
     displayName: 'Credential Scan'

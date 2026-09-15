@@ -2,10 +2,13 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <numeric>
 #include <sstream>
+#include <thread>
 
 // APSI
 #include "apsi/log.h"
@@ -903,5 +906,162 @@ namespace APSITests {
 
         test_fun(get_params1());
         test_fun(get_params2());
+    }
+
+    TEST(SenderDBTests, PackingRateAndSaveDoNotDeadlockAgainstAWriter)
+    {
+        // get_packing_rate and save hold the reader lock and read the bin bundle count while
+        // holding it. Reading it through the locking accessor takes the lock a second time on
+        // that thread, which blocks once a writer queues between the two acquisitions; the writer
+        // then waits on the reader that is blocked on itself. Both must use the unlocked
+        // accessor, as must Sender::RunQuery, which reads the count under its own lock. A writer
+        // runs alongside throughout so that such a window is available.
+        //
+        // This reproduces only where a queued writer bars new readers, which is the case for
+        // libc++ and for MSVC's SRWLOCK. libstdc++ wraps a reader-preferring pthread_rwlock_t on
+        // which the second acquisition succeeds, so a pass there says nothing either way.
+        //
+        // The threads are detached and every piece of state they touch is owned by a shared_ptr
+        // they each hold, so a wedged run fails on the deadline rather than hanging the binary.
+        struct State {
+            shared_ptr<SenderDB> db;
+            atomic<bool> stop{ false };
+            atomic<bool> done{ false };
+        };
+
+        auto state = make_shared<State>();
+        state->db = make_shared<SenderDB>(*get_params1(), 0);
+        state->db->insert_or_assign(Item(0, 0));
+
+        thread writer([state]() {
+            for (uint64_t i = 1; !state->stop && i < 400; i++) {
+                state->db->insert_or_assign(Item(i, 0));
+            }
+        });
+        writer.detach();
+
+        thread reader([state]() {
+            for (int i = 0; i < 400; i++) {
+                state->db->get_packing_rate();
+                stringstream ss;
+                state->db->save(ss);
+            }
+            state->done = true;
+        });
+        reader.detach();
+
+        auto deadline = chrono::steady_clock::now() + chrono::seconds(60);
+        while (!state->done && chrono::steady_clock::now() < deadline) {
+            this_thread::sleep_for(chrono::milliseconds(10));
+        }
+        state->stop = true;
+
+        ASSERT_TRUE(state->done.load())
+            << "get_packing_rate or save deadlocked against a concurrent writer";
+    }
+
+    TEST(SenderDBTests, KeyConsumersAreSafeAgainstAConcurrentStrip)
+    {
+        // strip() moves out of oprf_key_ and then replaces it, both under the writer lock. A key
+        // consumer that reads oprf_key_ before taking its own lock can therefore observe the
+        // moved-from key, whose key_span() is a span of 32 bytes over a null pointer. That span
+        // violates gsl::span's precondition, so the process aborts on a thread pool worker.
+        // Every consumer must read the key under the lock, so each call either completes
+        // normally or reports the stripped database.
+        //
+        // The window between the move and the replacement is a few instructions wide, so a single
+        // round is very unlikely to land in it. Many rounds are run, each with readers already
+        // hammering the key when the strip begins.
+        constexpr int round_count = 50;
+        constexpr int reader_count = 4;
+
+        for (int round = 0; round < round_count; round++) {
+            // A labeled database so that get_label is exercised alongside has_item; both read
+            // the key before looking the item up.
+            auto db = make_shared<SenderDB>(*get_params1(), 20);
+            Label original_label = create_label(7, 20);
+            db->insert_or_assign(make_pair(Item(0, 0), original_label));
+            auto original_key = db->get_oprf_key();
+
+            atomic<bool> start{ false };
+            atomic<bool> stripped{ false };
+            atomic<int> readers_running{ 0 };
+            atomic<bool> saw_missing_item{ false };
+            atomic<bool> saw_wrong_key{ false };
+            atomic<bool> saw_missing_label{ false };
+            atomic<bool> saw_wrong_label{ false };
+
+            vector<thread> readers;
+            readers.reserve(reader_count);
+            for (int i = 0; i < reader_count; i++) {
+                readers.emplace_back([&]() {
+                    readers_running++;
+                    while (!start) {
+                        this_thread::yield();
+                    }
+                    while (!stripped) {
+                        // The item is in the database until strip() removes it, and strip()
+                        // removes it under the same lock that makes the database report itself
+                        // stripped. A reader therefore either finds the item or is refused;
+                        // reporting the item absent means it looked in a database that the key
+                        // it hashed with no longer describes.
+                        try {
+                            if (!db->has_item(Item(0, 0))) {
+                                saw_missing_item = true;
+                            }
+                        } catch (const logic_error &) {
+                        }
+
+                        // Likewise the key is either the one the database was built with, or the
+                        // database refuses to hand it over.
+                        try {
+                            if (!(db->get_oprf_key() == original_key)) {
+                                saw_wrong_key = true;
+                            }
+                        } catch (const logic_error &) {
+                        }
+
+                        // get_label answers for the same item, so it is subject to the same rule:
+                        // the stored label, or a refusal. Reporting the item absent means the
+                        // lookup ran against a database the key it hashed with does not describe.
+                        // invalid_argument derives from logic_error, so it is caught first.
+                        try {
+                            if (db->get_label(Item(0, 0)) != original_label) {
+                                saw_wrong_label = true;
+                            }
+                        } catch (const invalid_argument &) {
+                            saw_missing_label = true;
+                        } catch (const logic_error &) {
+                        }
+                    }
+                });
+            }
+
+            // Release the readers first and let them get into the key before stripping, so the
+            // strip lands while calls are in flight rather than before any have started.
+            while (readers_running < reader_count) {
+                this_thread::yield();
+            }
+            start = true;
+            this_thread::sleep_for(chrono::microseconds(200));
+
+            db->strip();
+            stripped = true;
+
+            for (auto &reader : readers) {
+                reader.join();
+            }
+
+            ASSERT_FALSE(saw_missing_item.load())
+                << "has_item reported an item absent that was in the database";
+            ASSERT_FALSE(saw_wrong_key.load())
+                << "get_oprf_key returned a key other than the database's";
+            ASSERT_FALSE(saw_missing_label.load())
+                << "get_label reported an item absent that was in the database";
+            ASSERT_FALSE(saw_wrong_label.load())
+                << "get_label returned a label other than the stored one";
+            ASSERT_TRUE(db->is_stripped());
+            ASSERT_THROW(db->get_oprf_key(), logic_error);
+        }
     }
 } // namespace APSITests

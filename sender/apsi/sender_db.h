@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -25,7 +27,6 @@
 
 // SEAL
 #include "seal/plaintext.h"
-#include "seal/util/locks.h"
 
 namespace apsi::sender {
     /**
@@ -71,11 +72,18 @@ namespace apsi::sender {
 
         /**
         Creates a new SenderDB by moving from an existing one.
+
+        Moving must not overlap any other use of either SenderDB, including a query in progress.
+        A move replaces the PSI parameters and the CryptoContext, and those are read through
+        accessors that take no lock, because query worker threads call them while the calling
+        thread holds the reader lock. The lock taken here therefore orders a move against other
+        moves and against the locked operations, but not against those accessors.
         */
         SenderDB(SenderDB &&source) noexcept;
 
         /**
-        Moves an existing SenderDB to the current one.
+        Moves an existing SenderDB to the current one. As with the move constructor, this must not
+        overlap any other use of either SenderDB.
         */
         SenderDB &operator=(SenderDB &&source) noexcept;
 
@@ -219,8 +227,15 @@ namespace apsi::sender {
 
         /**
         Returns a set of cache references corresponding to the bundles at the given bundle
-        index. Even though this function returns a vector, the order has no significance. This
-        function is meant for internal use.
+        index. Even though this function returns a vector, the order has no significance. Throws
+        std::out_of_range if bundle_idx is not a valid bundle index.
+
+        This function is meant for internal use. It acquires no lock, and the references it
+        returns point into the SenderDB's own storage: the caller must hold the reader lock
+        before calling and keep holding it for as long as any of the returned references is
+        used, including by any task it hands them to. An insert, removal, clear or strip
+        reallocates or destroys the underlying bundles, and holding a shared_ptr to the SenderDB
+        does not keep an individual bundle or its cache alive.
         */
         auto get_cache_at(std::uint32_t bundle_idx)
             -> std::vector<std::reference_wrapper<const BinBundleCache>>;
@@ -276,6 +291,15 @@ namespace apsi::sender {
         std::size_t get_bin_bundle_count() const;
 
         /**
+        Returns the total number of bin bundles. The caller must already hold a lock on this
+        SenderDB; this function acquires none. Acquiring the reader lock a second time on a
+        thread that already holds it is undefined behavior and deadlocks against a waiting
+        writer, so a caller holding the lock must use this function rather than
+        get_bin_bundle_count. This function is meant for internal use.
+        */
+        std::size_t get_bin_bundle_count_unlocked() const;
+
+        /**
         Returns how efficiently the SenderDB is packaged. A higher rate indicates better
         performance and a lower communication cost in a query execution.
         */
@@ -284,9 +308,9 @@ namespace apsi::sender {
         /**
         Obtains a scoped lock preventing the SenderDB from being changed.
         */
-        seal::util::ReaderLock get_reader_lock() const
+        std::shared_lock<std::shared_mutex> get_reader_lock() const
         {
-            return db_lock_.acquire_read();
+            return std::shared_lock<std::shared_mutex>(db_lock_);
         }
 
         /**
@@ -300,10 +324,22 @@ namespace apsi::sender {
         static std::pair<SenderDB, std::size_t> Load(std::istream &in);
 
     private:
-        seal::util::WriterLock get_writer_lock()
+        std::unique_lock<std::shared_mutex> get_writer_lock()
         {
-            return db_lock_.acquire_write();
+            return std::unique_lock<std::shared_mutex>(db_lock_);
         }
+
+        /**
+        Moves the contents of source into a newly constructed SenderDB. The move constructor
+        delegates here, passing a writer lock on source: the arguments of a delegating
+        mem-initializer are evaluated before the target constructor is entered, so source is
+        locked before any of its state is read. The lock is taken by value so that it outlives
+        this constructor; do not replace the parameter with a local, which would be constructed
+        only after the member initializers have already run.
+        */
+        SenderDB(
+            SenderDB &&source,
+            std::unique_lock<std::shared_mutex> source_lock [[maybe_unused]]) noexcept;
 
         void clear_internal();
 
@@ -327,7 +363,7 @@ namespace apsi::sender {
         /**
         A read-write lock to protect the database from modification while in use.
         */
-        mutable seal::util::ReaderWriterLocker db_lock_;
+        mutable std::shared_mutex db_lock_;
 
         /**
         Indicates the size of the label in bytes. A zero value indicates an unlabeled SenderDB.

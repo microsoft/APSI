@@ -115,27 +115,7 @@ namespace apsi::receiver {
         socket. The clock starts when the request is handed to the channel, not when the sender
         receives it, because sending is asynchronous and returns as soon as the message is
         queued. The first window therefore has to cover uploading the request as well as waiting
-        for the answer, which makes it depend on link speed and not only on the sender: a query
-        built from the largest shipped parameter set serializes to roughly 11 MiB, which needs
-        about 95 seconds to upload on a 1 Mbit/s link. Parameters are bounded such that a query
-        cannot exceed PSIParams::query_byte_count_max, so the slowest link a given timeout can
-        tolerate follows from that bound.
-
-        The default is chosen against the one silence an honest sender genuinely produces. The
-        sender sends its query response before it begins the homomorphic work, and then computes
-        the query powers for every bundle index as a serial barrier, emitting nothing until the
-        first result package. That barrier is the whole honest gap, and it is not small: measured
-        over the shipped parameter sets it runs from roughly 17 seconds on ten fast cores to
-        around 100 seconds on one, and those figures count only the multiply-and-relinearize work,
-        not the transforms in the same phase. A sender on a small virtual machine is therefore
-        plausibly in the low hundreds of seconds.
-
-        Thirty minutes is sized so that such a sender finishes with room to spare, because the
-        cost of being wrong in that direction is a correctly-computing query discarded, while the
-        cost of being wrong in the other direction is only that a hostile sender holds one
-        receiver thread for longer before it gives up. A deployment that knows its sender is fast
-        should pass something shorter; the guarantee that matters is that the wait is bounded at
-        all.
+        for the answer, which makes it depend on link speed and not only on the sender.
 
         Pass exactly std::chrono::milliseconds::zero() to wait indefinitely. Only do that when the
         peer is trusted, since it gives a hostile or broken sender an unbounded hold on the
