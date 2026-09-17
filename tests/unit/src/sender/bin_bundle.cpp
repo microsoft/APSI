@@ -619,14 +619,18 @@ namespace APSITests {
             ASSERT_FALSE(bb.cache_invalid());
 
             values.clear();
-            values = { make_pair(1, create_label(label_size, 1)),
-                       make_pair(2, create_label(label_size, 2)),
-                       make_pair(3, create_label(label_size, 3)) };
+            values = {
+                make_pair(1, create_label(label_size, 1)),
+                make_pair(2, create_label(label_size, 2)),
+                make_pair(3, create_label(label_size, 3)),
+            };
             bb.clear();
             res = bb.multi_insert_for_real(values, 0);
-            values = { make_pair(4, create_label(label_size, 4)),
-                       make_pair(5, create_label(label_size, 5)),
-                       make_pair(6, create_label(label_size, 6)) };
+            values = {
+                make_pair(4, create_label(label_size, 4)),
+                make_pair(5, create_label(label_size, 5)),
+                make_pair(6, create_label(label_size, 6)),
+            };
             res = bb.multi_insert_for_real(values, 0);
             ASSERT_EQ(2 /* largest bin size after insert */, res);
 
@@ -645,16 +649,20 @@ namespace APSITests {
             ASSERT_FALSE(bb.cache_invalid());
 
             // Item sequence doesn't match
-            values = { make_pair(1, create_label(label_size, 1)),
-                       make_pair(4, create_label(label_size, 4)),
-                       make_pair(3, create_label(label_size, 3)) };
+            values = {
+                make_pair(1, create_label(label_size, 1)),
+                make_pair(4, create_label(label_size, 4)),
+                make_pair(3, create_label(label_size, 3)),
+            };
             bres = bb.try_multi_overwrite(values, 0);
             ASSERT_FALSE(bres);
 
             // Overwriting labels
-            values = { make_pair(1, create_label(label_size, 6)),
-                       make_pair(5, create_label(label_size, 7)),
-                       make_pair(3, create_label(label_size, 8)) };
+            values = {
+                make_pair(1, create_label(label_size, 6)),
+                make_pair(5, create_label(label_size, 7)),
+                make_pair(3, create_label(label_size, 8)),
+            };
             bres = bb.try_multi_overwrite(values, 0);
             ASSERT_TRUE(bres);
 
@@ -887,8 +895,10 @@ namespace APSITests {
             ASSERT_FALSE(bb2.empty());
 
             res = bb.multi_insert_for_real(
-                AlgItemLabel{ make_pair(2, create_label(label_size, 3)),
-                              make_pair(3, create_label(label_size, 4)) },
+                AlgItemLabel{
+                    make_pair(2, create_label(label_size, 3)),
+                    make_pair(3, create_label(label_size, 4)),
+                },
                 0);
             ASSERT_EQ(2 /* largest bin size after insert */, res);
             ASSERT_TRUE(bb.cache_invalid());
@@ -1146,4 +1156,54 @@ namespace APSITests {
         // Non-power-of-two felts_per_item
         test_fun(get_params2());
     }
+
+    TEST(BinBundleTests, AnItemTheFilterRefusesIsStillFound)
+    {
+        // A cuckoo filter is probabilistic and can refuse an item while holding fewer than the
+        // bin does, when enough of them share a fingerprint. These nine values all carry the same
+        // 12-bit fingerprint, which saturates both of the buckets it can occupy plus the single
+        // overflow slot, so a filter sized well above ten refuses the last of them.
+        //
+        // The item still belongs in the bin, so what has to hold is that it remains findable.
+        // A filter that has refused an item no longer knows everything the bin holds, and a
+        // lookup that took its negative as conclusive would never find that item again.
+        // The first nine share a 12-bit fingerprint, which saturates both buckets that
+        // fingerprint can occupy plus the single overflow slot. Once the overflow slot is taken
+        // the filter refuses everything, so the tenth value is dropped even though its own
+        // fingerprint is nowhere in the filter -- which is what makes it report absent rather
+        // than giving a false positive that would mask the problem.
+        const vector<felt_t> colliding{ 1, 252, 11389, 12874, 17547, 21064, 37127, 40541, 41546 };
+        constexpr felt_t dropped_item = 100000;
+
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+
+        constexpr size_t label_size = 1;
+        BinBundle bb(context, label_size, 50, 0, params->bins_per_bundle(), true, false);
+
+        vector<felt_t> all_items = colliding;
+        all_items.push_back(dropped_item);
+
+        // Every item goes into bin 0, so they share one filter.
+        for (felt_t item : all_items) {
+            vector<pair<felt_t, vector<felt_t>>> one{ { item, { item } } };
+            ASSERT_LE(0, bb.multi_insert_for_real(one, 0))
+                << "item " << item << " was rejected outright";
+        }
+
+        // The bin and its labels stay in step.
+        ASSERT_EQ(all_items.size(), bb.get_item_bins()[0].size());
+        ASSERT_EQ(all_items.size(), bb.get_label_bins()[0][0].size());
+
+        // Every item is findable, including the one the filter refused.
+        for (felt_t item : all_items) {
+            vector<felt_t> labels;
+            ASSERT_TRUE(bb.try_get_multi_label({ item }, 0, labels))
+                << "item " << item << " is in the bin but cannot be found";
+            ASSERT_EQ(size_t(1), labels.size());
+            ASSERT_EQ(item, labels[0]);
+        }
+    }
+
 } // namespace APSITests

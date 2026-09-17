@@ -3,6 +3,7 @@
 
 // STD
 #include <sstream>
+#include <stdexcept>
 
 // APSI
 #include "apsi/util/cuckoo_filter.h"
@@ -32,10 +33,35 @@ CuckooFilter::CuckooFilter(
     size_t table_num_items,
     size_t overflow_index,
     uint64_t overflow_tag,
-    bool overflow_used)
-    : num_items_(table_num_items)
+    bool overflow_used,
+    bool dropped_items)
+    : num_items_(table_num_items), dropped_items_(dropped_items)
 {
     table_ = make_unique<CuckooFilterTable>(std::move(table));
+
+    // An overflow slot in use names a bucket and a tag, and try_eliminate_overflow hands both
+    // straight to the table on the next successful removal. A bucket past the end of the table,
+    // or a tag wider than the table stores, would surface there as a failure of an unrelated
+    // operation rather than here, where the values arrived. A zero tag marks an empty slot, so
+    // it cannot be the contents of one that is in use.
+    // num_items_ is decremented on every successful removal, so a count smaller than the number
+    // of tags actually present would wrap it. A table holds at most tags_per_bucket per bucket,
+    // plus the one in the overflow slot.
+    size_t max_num_items = (table_->get_num_buckets() * CuckooFilterTable::get_tags_per_bucket()) +
+                           (overflow_used ? 1 : 0);
+    if (table_num_items > max_num_items) {
+        throw invalid_argument("num_items is larger than the table can hold");
+    }
+
+    if (overflow_used) {
+        if (overflow_index >= table_->get_num_buckets()) {
+            throw invalid_argument("overflow index is out of range");
+        }
+        if (overflow_tag == 0 ||
+            overflow_tag >= (static_cast<uint64_t>(1) << table_->get_bits_per_tag())) {
+            throw invalid_argument("overflow tag is not a valid tag");
+        }
+    }
 
     overflow_ = OverflowCache();
     overflow_.index = overflow_index;
@@ -70,7 +96,9 @@ bool CuckooFilter::contains(gsl::span<const uint64_t> item) const
 bool CuckooFilter::add(gsl::span<const uint64_t> item)
 {
     if (overflow_.used) {
-        // No more space
+        // No more space. Remember it: the item is not recorded anywhere, so this filter no
+        // longer knows everything it was asked to hold.
+        dropped_items_ = true;
         return false;
     }
 
@@ -211,6 +239,7 @@ size_t CuckooFilter::save(ostream &out) const
     cuckoo_filter_builder.add_table(cuckoo_filter_table);
     cuckoo_filter_builder.add_num_items(num_items_);
     cuckoo_filter_builder.add_overflow(cuckoo_filter_overflow_cache);
+    cuckoo_filter_builder.add_no_items_dropped(!dropped_items_);
 
     auto cuckoo_filter = cuckoo_filter_builder.Finish();
     fbs_builder.FinishSizePrefixed(cuckoo_filter);
@@ -235,12 +264,6 @@ CuckooFilter CuckooFilter::Load(istream &in, size_t &bytes_read)
     const auto *cuckoo_filter_table_fbs = cuckoo_filter_fbs->table();
     const auto *cuckoo_filter_table_data_fbs = cuckoo_filter_table_fbs->table();
 
-    // Check that bits_per_tag is within bounds
-    size_t bits_per_tag = cuckoo_filter_table_fbs->bits_per_tag();
-    if (bits_per_tag == 0 || bits_per_tag > 64) {
-        throw runtime_error("bits_per_tag cannot be 0 or bigger than 64");
-    }
-
     vector<uint64_t> cuckoo_filter_table_data;
     cuckoo_filter_table_data.reserve(cuckoo_filter_table_data_fbs->size());
     copy(
@@ -248,15 +271,28 @@ CuckooFilter CuckooFilter::Load(istream &in, size_t &bytes_read)
         cuckoo_filter_table_data_fbs->cend(),
         back_inserter(cuckoo_filter_table_data));
 
-    auto cuckoo_filter_table = CuckooFilterTable(
-        std::move(cuckoo_filter_table_data),
-        cuckoo_filter_table_fbs->num_buckets(),
-        cuckoo_filter_table_fbs->bits_per_tag());
+    // The constructors are what enforce the relationships between these fields, so that every
+    // caller is held to them and not just this one. Report a violation the way this function
+    // reports the rest of its input checks.
+    auto make_filter = [&] {
+        try {
+            CuckooFilterTable cuckoo_filter_table(
+                std::move(cuckoo_filter_table_data),
+                cuckoo_filter_table_fbs->num_buckets(),
+                cuckoo_filter_table_fbs->bits_per_tag());
+
+            return CuckooFilter{ std::move(cuckoo_filter_table),
+                                 static_cast<size_t>(cuckoo_filter_fbs->num_items()),
+                                 static_cast<size_t>(cuckoo_filter_fbs->overflow()->index()),
+                                 cuckoo_filter_fbs->overflow()->tag(),
+                                 cuckoo_filter_fbs->overflow()->used(),
+                                 !cuckoo_filter_fbs->no_items_dropped() };
+        } catch (const invalid_argument &ex) {
+            throw runtime_error(string("failed to load CuckooFilter: ") + ex.what());
+        }
+    };
+    CuckooFilter cuckoo_filter = make_filter();
 
     bytes_read = in_data.size();
-    return CuckooFilter{ std::move(cuckoo_filter_table),
-                         static_cast<size_t>(cuckoo_filter_fbs->num_items()),
-                         static_cast<size_t>(cuckoo_filter_fbs->overflow()->index()),
-                         cuckoo_filter_fbs->overflow()->tag(),
-                         cuckoo_filter_fbs->overflow()->used() };
+    return cuckoo_filter;
 }

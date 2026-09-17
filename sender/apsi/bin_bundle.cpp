@@ -40,8 +40,10 @@ namespace apsi {
             */
             bool is_present(const vector<felt_t> &bin, const CuckooFilter &filter, felt_t element)
             {
-                // Check if the key is already in the current bin.
-                if (filter.contains(element)) {
+                // A filter that has refused an item does not know everything the bin holds, so
+                // its negative answers stop being conclusive and the bin has to be searched
+                // either way. Bins are small, so this costs a scan rather than correctness.
+                if (filter.contains(element) || filter.has_dropped_items()) {
                     // Perform a linear search to determine true/false positives
                     return is_present(bin, element);
                 }
@@ -56,7 +58,8 @@ namespace apsi {
             template <typename BinT>
             auto get_iterator(BinT &bin, const CuckooFilter &filter, felt_t element)
             {
-                if (filter.contains(element)) {
+                // See is_present for why a dropped item makes a negative inconclusive.
+                if (filter.contains(element) || filter.has_dropped_items()) {
                     return find(bin.begin(), bin.end(), element);
                 }
 
@@ -496,9 +499,18 @@ namespace apsi {
                 // Insert if not dry run
                 if (!dry_run) {
                     // Insert the new item
+                    // A filter is probabilistic and can refuse an item while holding fewer than
+                    // the bin does, when enough of them share a fingerprint. The item still goes
+                    // into the bin; the filter records that it no longer knows everything the
+                    // bin holds, which is what stops is_present from trusting its negatives.
                     CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                    if (!curr_filter.add(curr_item)) {
+                        APSI_LOG_DEBUG(
+                            "Cuckoo filter for the bin at index "
+                            << curr_bin_idx << " refused an item with " << curr_bin.size()
+                            << " already in the bin; lookups in this bin now search it directly");
+                    }
                     curr_bin.push_back(curr_item);
-                    curr_filter.add(curr_item);
 
                     // Indicate that the polynomials need to be recomputed
                     cache_invalid_ = true;
@@ -582,10 +594,16 @@ namespace apsi {
 
                 // Insert if not dry run
                 if (!dry_run) {
-                    // Insert the new item
+                    // See the unlabeled overload: a refusal is recorded rather than refused, so
+                    // that the item and its labels stay in step.
                     CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                    if (!curr_filter.add(curr_item)) {
+                        APSI_LOG_DEBUG(
+                            "Cuckoo filter for the bin at index "
+                            << curr_bin_idx << " refused an item with " << curr_bin.size()
+                            << " already in the bin; lookups in this bin now search it directly");
+                    }
                     curr_bin.push_back(curr_item);
-                    curr_filter.add(curr_item);
 
                     // Insert the new label; loop over each label part
                     for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
@@ -786,8 +804,18 @@ namespace apsi {
             // We got to this point, so all of the items were found. Now just erase them.
             curr_bin_idx = start_bin_idx;
             for (auto to_remove_item_it : to_remove_item_its) {
-                // Remove the item
-                filters_[curr_bin_idx].remove(*to_remove_item_it);
+                // Remove the item. A filter that has refused something holds no tag for what it
+                // refused, so finding nothing to remove is expected there and nothing is wrong.
+                // A filter that has refused nothing holds a tag for every item in its bin, so
+                // finding nothing to remove means the two have drifted apart, which is worth
+                // saying even though it costs only a fruitless search later: a tag left behind
+                // is a false positive, and those are checked against the bin.
+                CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                if (!curr_filter.remove(*to_remove_item_it) && !curr_filter.has_dropped_items()) {
+                    APSI_LOG_WARNING(
+                        "Cuckoo filter for the bin at index "
+                        << curr_bin_idx << " held no tag for an item being removed from the bin");
+                }
                 item_bins_[curr_bin_idx].erase(to_remove_item_it);
 
                 // Indicate that the polynomials need to be recomputed
@@ -1223,7 +1251,16 @@ namespace apsi {
                         }
 #endif
                         // Add to the cuckoo filter
-                        filters_[bin_idx].add(felt_item);
+                        // A refusal is recorded rather than refused, exactly as during
+                        // insertion: the filter marks itself incomplete and lookups in this bin
+                        // search it directly.
+                        if (!filters_[bin_idx].add(felt_item)) {
+                            APSI_LOG_DEBUG(
+                                "Cuckoo filter for the bin at index "
+                                << bin_idx
+                                << " refused an item while loading; lookups in this bin now "
+                                   "search it directly");
+                        }
 
                         // Return to add the item to item_bins_[bin_idx]
                         return felt_item;
