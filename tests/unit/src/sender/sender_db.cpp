@@ -198,32 +198,32 @@ namespace APSITests {
         SenderDB sender_db(*params, 8, 16);
 
         vector<pair<Item, Label>> good;
-        good.push_back(make_pair(Item(1, 1), create_label(1, 8)));
-        good.push_back(make_pair(Item(2, 2), create_label(2, 8)));
+        good.emplace_back(Item(1, 1), create_label(1, 8));
+        good.emplace_back(Item(2, 2), create_label(2, 8));
         sender_db.insert_or_assign(good);
         ASSERT_EQ(size_t(2), sender_db.get_item_count());
 
         // A batch naming the same item twice: the two labels cannot both be meant, so the batch
         // is refused before anything in it is inserted.
         vector<pair<Item, Label>> duplicated;
-        duplicated.push_back(make_pair(Item(7, 7), create_label(7, 8)));
-        duplicated.push_back(make_pair(Item(9, 9), create_label(9, 8)));
-        duplicated.push_back(make_pair(Item(7, 7), create_label(11, 8)));
+        duplicated.emplace_back(Item(7, 7), create_label(7, 8));
+        duplicated.emplace_back(Item(9, 9), create_label(9, 8));
+        duplicated.emplace_back(Item(7, 7), create_label(11, 8));
         ASSERT_THROW(sender_db.insert_or_assign(duplicated), invalid_argument);
 
         // A label longer than the database holds. Truncating it would store something the
         // receiver cannot tell apart from a correct label.
         vector<pair<Item, Label>> too_long;
-        too_long.push_back(make_pair(Item(3, 3), create_label(3, 9)));
+        too_long.emplace_back(Item(3, 3), create_label(3, 9));
         ASSERT_THROW(sender_db.insert_or_assign(too_long), invalid_argument);
 
         // Nothing from either rejected batch reached the database, and the items that were
         // already there are still whole: present, and with retrievable labels.
         ASSERT_EQ(size_t(2), sender_db.get_item_count());
-        for (auto &bad : { Item(7, 7), Item(9, 9), Item(3, 3) }) {
+        for (const auto &bad : { Item(7, 7), Item(9, 9), Item(3, 3) }) {
             ASSERT_FALSE(sender_db.has_item(bad));
         }
-        for (uint64_t i : { uint64_t(1), uint64_t(2) }) {
+        for (uint64_t i : { static_cast<uint64_t>(1), static_cast<uint64_t>(2) }) {
             Item item(i, i);
             ASSERT_TRUE(sender_db.has_item(item));
             ASSERT_NO_THROW((void)sender_db.get_label(item));
@@ -231,8 +231,8 @@ namespace APSITests {
 
         // A batch that is merely rejected must not poison later inserts.
         vector<pair<Item, Label>> retry;
-        retry.push_back(make_pair(Item(7, 7), create_label(7, 8)));
-        retry.push_back(make_pair(Item(9, 9), create_label(9, 8)));
+        retry.emplace_back(Item(7, 7), create_label(7, 8));
+        retry.emplace_back(Item(9, 9), create_label(9, 8));
         ASSERT_NO_THROW(sender_db.insert_or_assign(retry));
         ASSERT_EQ(size_t(4), sender_db.get_item_count());
         ASSERT_NO_THROW((void)sender_db.get_label(Item(7, 7)));
@@ -246,9 +246,9 @@ namespace APSITests {
         // Unlike a labeled batch, a repeat here carries no ambiguity: inserting the same item
         // twice is idempotent, so it is collapsed rather than refused.
         vector<Item> repeated;
-        repeated.push_back(Item(1, 1));
-        repeated.push_back(Item(2, 2));
-        repeated.push_back(Item(1, 1));
+        repeated.emplace_back(1, 1);
+        repeated.emplace_back(2, 2);
+        repeated.emplace_back(1, 1);
         ASSERT_NO_THROW(sender_db.insert_or_assign(repeated));
 
         ASSERT_EQ(size_t(2), sender_db.get_item_count());
