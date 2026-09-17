@@ -4,6 +4,7 @@
 #pragma once
 
 // STD
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -155,9 +156,10 @@ namespace apsi::sender {
             std::reference_wrapper<const BinBundleCache> cache,
             std::vector<CiphertextPowers> &all_powers,
             network::Channel &chl,
-            const std::function<void(network::Channel &, ResultPart)> &send_rp_fun,
+            const std::function<void(network::Channel &, ResultPart)> &guarded_send_rp_fun,
             std::uint32_t bundle_idx,
             seal::compr_mode_type compr_mode,
-            seal::MemoryPoolHandle &pool);
+            seal::MemoryPoolHandle &pool,
+            std::atomic<bool> &send_failed);
     }; // class Sender
 } // namespace apsi::sender

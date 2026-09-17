@@ -2,6 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
+#include <mutex>
 #include <sstream>
 
 // APSI
@@ -232,6 +234,33 @@ namespace apsi {
             APSI_LOG_DEBUG("Finished computing powers for all bundle indices");
             APSI_LOG_DEBUG("Start processing bin bundle caches");
 
+            // Stop sending once one package cannot be sent. The receiver needs every package of
+            // a query, so the rest are worthless, and each would cost another send timeout.
+            //
+            // The check runs under the lock that serializes sends, because a check made any
+            // earlier is one a running task is already past. Holding it there is free.
+            //
+            // A task that finds the gate closed returns rather than throwing, so what reaches
+            // the caller is the send that actually failed: TaskGroup::join rethrows by the
+            // order tasks were added, not the order they failed in.
+            atomic<bool> send_failed(false);
+            mutex send_gate;
+            function<void(Channel &, ResultPart)> guarded_send_rp_fun =
+                [&send_failed, &send_gate, &send_rp_fun](Channel &c, ResultPart rp) {
+                    lock_guard<mutex> lock(send_gate);
+
+                    if (send_failed.load(memory_order_relaxed)) {
+                        return;
+                    }
+
+                    try {
+                        send_rp_fun(c, std::move(rp));
+                    } catch (...) {
+                        send_failed.store(true, memory_order_relaxed);
+                        throw;
+                    }
+                };
+
             TaskGroup tasks(tpm.thread_pool());
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
                 auto bundle_caches = sender_db->get_cache_at(static_cast<uint32_t>(bundle_idx));
@@ -243,10 +272,11 @@ namespace apsi {
                             cache,
                             all_powers,
                             chl,
-                            send_rp_fun,
+                            guarded_send_rp_fun,
                             static_cast<uint32_t>(bundle_idx),
                             query.compr_mode(),
-                            pool);
+                            pool,
+                            send_failed);
                     });
                 }
             }
@@ -356,12 +386,19 @@ namespace apsi {
             reference_wrapper<const BinBundleCache> cache,
             vector<CiphertextPowers> &all_powers,
             Channel &chl,
-            const function<void(Channel &, ResultPart)> &send_rp_fun,
+            const function<void(Channel &, ResultPart)> &guarded_send_rp_fun,
             uint32_t bundle_idx,
             compr_mode_type compr_mode,
-            MemoryPoolHandle &pool)
+            MemoryPoolHandle &pool,
+            atomic<bool> &send_failed)
         {
             STOPWATCH(sender_stopwatch, "Sender::ProcessBinBundleCache");
+
+            // Skip the evaluation as well, for a task that had not started when a send failed.
+            // This only saves work; the gate around the send is what bounds the wait.
+            if (send_failed.load(memory_order_relaxed)) {
+                return;
+            }
 
             // Package for the result data
             auto rp = make_unique<ResultPackage>();
@@ -397,9 +434,11 @@ namespace apsi {
                 }
             }
 
-            // Send this result part
+            // Send this result part. RunQuery wraps the caller's function in the gate that
+            // stops a query once one package could not be sent, so this is that wrapper and
+            // not the caller's function.
             try {
-                send_rp_fun(chl, std::move(rp));
+                guarded_send_rp_fun(chl, std::move(rp));
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
                     "Failed to send result part; function threw an exception: " << ex.what());

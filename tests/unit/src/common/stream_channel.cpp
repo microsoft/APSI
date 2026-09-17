@@ -328,4 +328,111 @@ namespace APSITests {
         ASSERT_EQ(nullptr, clt.receive_result(nullptr));
         ASSERT_TRUE(clt.receive_failed());
     }
+
+    TEST_F(StreamChannelTests, SendingToAStreamThatCannotTakeItFails)
+    {
+        // The save functions return the number of bytes they meant to write, and an ostream
+        // that cannot take them says nothing, so a send has to ask the stream rather than trust
+        // the count. A sender tells a receiver how many result packages to expect and then
+        // writes them; one that went nowhere leaves the receiver waiting for it, and the sender
+        // recording a query it answered in full.
+        stringstream in;
+        stringstream out;
+        StreamChannel svr(in, out);
+
+        out.setstate(ios_base::badbit);
+
+        auto sop_response = make_unique<SenderOperationResponseParms>();
+        sop_response->params = make_unique<PSIParams>(*get_params());
+        ASSERT_THROW(
+            svr.send(unique_ptr<SenderOperationResponse>(std::move(sop_response))), runtime_error);
+
+        auto rp = make_unique<ResultPackage>();
+        rp->bundle_idx = 0;
+        rp->label_byte_count = 0;
+        rp->nonce_byte_count = 0;
+        Ciphertext ct;
+        get_context()->encryptor()->encrypt_zero_symmetric(ct);
+        rp->psi_result = std::move(ct);
+        ASSERT_THROW(svr.send(std::move(rp)), runtime_error);
+
+        auto sop = make_unique<SenderOperationParms>();
+        ASSERT_THROW(svr.send(unique_ptr<SenderOperation>(std::move(sop))), runtime_error);
+    }
+
+    namespace {
+        /**
+        A stream buffer large enough to hold a whole message, whose sink always refuses. This is
+        what an ordinary buffered stream over a failing sink looks like: writes land in the
+        buffer and the sink is not consulted until something flushes.
+        */
+        class RefusingBuf : public streambuf {
+        public:
+            RefusingBuf() : buffer_(std::size_t{ 1 } << 20U)
+            {
+                setp(buffer_.data(), buffer_.data() + buffer_.size());
+            }
+
+            [[nodiscard]] size_t sync_calls() const noexcept
+            {
+                return sync_calls_;
+            }
+
+            [[nodiscard]] size_t overflow_calls() const noexcept
+            {
+                return overflow_calls_;
+            }
+
+        protected:
+            int overflow(int) override
+            {
+                overflow_calls_++;
+                return traits_type::eof();
+            }
+
+            int sync() override
+            {
+                sync_calls_++;
+                return -1;
+            }
+
+        private:
+            vector<char> buffer_;
+            size_t sync_calls_ = 0;
+            size_t overflow_calls_ = 0;
+        };
+    } // namespace
+
+    TEST_F(StreamChannelTests, SendingToABufferedStreamWhoseSinkRefusesFails)
+    {
+        // A buffered stream takes a whole message without consulting its sink, so asking the
+        // stream how it is directly after writing tells you nothing. A sender writes a fixed
+        // number of result packages and then stops, so were the failure left to surface at some
+        // later write, the last package of every query would be lost with nobody the wiser: the
+        // receiver waits for a package it was promised, and the sender records a query it
+        // answered in full.
+        stringstream in;
+        RefusingBuf buf;
+        ostream out(&buf);
+        StreamChannel svr(in, out);
+
+        auto rp = make_unique<ResultPackage>();
+        rp->bundle_idx = 0;
+        rp->label_byte_count = 0;
+        rp->nonce_byte_count = 0;
+        Ciphertext ct;
+        get_context()->encryptor()->encrypt_zero_symmetric(ct);
+        rp->psi_result = std::move(ct);
+
+        ASSERT_THROW(svr.send(std::move(rp)), runtime_error);
+
+        // The sink was asked because the message was flushed, not because it outgrew the
+        // buffer. Counted separately so that a larger message later cannot quietly turn this
+        // into a test of something else.
+        ASSERT_EQ(size_t(0), buf.overflow_calls());
+        ASSERT_LT(size_t(0), buf.sync_calls());
+
+        // Nothing reached the peer, so nothing is counted as having been sent.
+        ASSERT_EQ(size_t(0), svr.bytes_sent());
+    }
 } // namespace APSITests

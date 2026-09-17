@@ -6,6 +6,7 @@
 - Added an optional `timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, and a `--timeout` option to the receiver CLI.
 - Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them.
 - Added `network::ZMQChannel::end_point` and an optional `on_bound` callback to `ZMQSenderDispatcher::run`, so a sender can bind to port 0.
+- A `network::Channel` send throws when it cannot hand the data over, as its documentation always said it would. `ZMQChannel` no longer discards a message for a receiver ZeroMQ has no route to, or one whose queue is full, and stops waiting once a bounded send timeout expires; `StreamChannel` flushes and reports a stream that would not take what was written. Neither can make a send that returns mean the peer received the data. A sender that cannot send one result package sends no more of that query.
 - Added `util::TaskGroup`, which throws if used from inside a task of the same pool, and replaced `ThreadPoolMgr::SetPhysThreadCount` with `ThreadPoolMgr::SetPoolWorkerCount`.
 - Added `ThreadPoolMgr::GetPoolWorkerCount`; the thread counts report what the pool obtained rather than what was requested.
 - `ThreadPoolMgr` is no longer copyable or movable.

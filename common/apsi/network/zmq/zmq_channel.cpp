@@ -61,6 +61,15 @@ namespace apsi {
             // shutting down cannot be pinned indefinitely by a receiver that has gone away.
             constexpr int sender_linger_ms = 60000;
 
+            // How long a send waits for a peer that has stopped collecting. ZeroMQ waits
+            // forever by default, which on the sending side lets one receiver that has gone
+            // quiet pin a thread pool worker; a sender serves queries one at a time, so a
+            // handful of those stops it serving anyone. A peer that is reading at all drains
+            // its queue far faster than the other fills it, and the sender's high water mark
+            // leaves a large cushion before this bound is consulted, so reaching it means the
+            // peer has stopped rather than fallen behind.
+            constexpr int send_timeout_ms = 30000;
+
             template <typename T>
             size_t load_from_string(string data, T &obj)
             {
@@ -640,10 +649,27 @@ namespace apsi {
         {
             lock_guard<mutex> lock(send_mutex_);
 
-            send_result_t result = send_multipart(*get_socket(), msg, send_flags::none);
-            bool sent = result.has_value();
-            if (!sent) {
-                throw runtime_error("failed to send message");
+            // Two failure signals have to reach the caller. ZeroMQ throws when it has no route
+            // to the peer, and returns nothing when it could not hand the message over before
+            // the send timeout expired. Neither is distinguishable to anything upstream, so
+            // both are reported the same way.
+            //
+            // A send that does not fail means ZeroMQ accepted the message for a peer it
+            // believes in, not that the peer received it. A message handed to a pipe that dies
+            // immediately afterwards is still lost silently, which no setting here can change.
+            // What this does rule out is a message discarded for a peer already known to be
+            // gone, or for one whose queue was already full.
+            send_result_t result;
+            try {
+                result = send_multipart(*get_socket(), msg, send_flags::none);
+            } catch (const zmq::error_t &ex) {
+                APSI_LOG_ERROR("Failed to send message: " << ex.what());
+                throw runtime_error(string("failed to send message: ") + ex.what());
+            }
+
+            if (!result.has_value()) {
+                APSI_LOG_ERROR("Failed to send message: timed out under backpressure");
+                throw runtime_error("failed to send message: timed out under backpressure");
             }
         }
 
@@ -677,6 +703,13 @@ namespace apsi {
             // while its siblings, and the join that waits for them, are stuck behind it.
             socket->set(sockopt::rcvtimeo, receive_poll_interval_ms);
 
+            // Bound a send for the same reason. This says nothing about whether a sender is
+            // there: a DEALER queues into a pipe it creates at connect time, so a request goes
+            // out without complaint whether or not anything is listening. What it bounds is a
+            // receiver whose own outbound queue has filled, which takes a great many
+            // undelivered requests and so should not happen at all.
+            socket->set(sockopt::sndtimeo, send_timeout_ms);
+
             // Reject any single inbound frame larger than INT32_MAX. This matches the
             // FlatBuffers verifier's per-buffer maximum, so anything beyond that would fail
             // verification later anyway. Note that this bounds each frame on its own and says
@@ -708,8 +741,31 @@ namespace apsi {
 
         void ZMQSenderChannel::set_socket_options(socket_t *socket)
         {
-            // Ensure messages are not dropped
+            // Report a message a peer cannot take rather than discarding it. A ROUTER drops
+            // silently by default, and returns success for the drop, so a result package
+            // addressed to a receiver that has gone away, or to one whose queue is full, simply
+            // ceases to exist. The receiver has already been told how many packages to expect
+            // and waits out its deadline for one that was never sent, while the sender records
+            // a query it answered in full. With this set the send fails instead, which the
+            // dispatcher reports and the query abandons.
+            socket->set(sockopt::router_mandatory, 1);
+
+            // How much a peer may fall behind before the send above starts to fail. One query's
+            // answer is many result packages, and a receiver reads them while the sender is
+            // still computing the rest, so the queue has to be deep enough that an ordinary
+            // difference in pace never registers. The cost is that ZeroMQ will hold this many
+            // messages per peer, and it holds them until they are read rather than until the
+            // query that produced them ends, so a peer that stops reading can retain the whole
+            // amount. The value is inherited rather than derived from a measured requirement,
+            // and how many packages a query produces depends on how the database is populated
+            // as well as on its parameters, so treat it as a figure to measure rather than one
+            // that bounds anything.
             socket->set(sockopt::sndhwm, 70000);
+
+            // Bound the wait that router_mandatory introduces on a full queue. Without this the
+            // send blocks until the peer reads, which a peer that has stopped reading never
+            // does.
+            socket->set(sockopt::sndtimeo, send_timeout_ms);
 
             // Wake a blocking receive periodically rather than letting it park in the kernel
             // indefinitely, so that every channel honours the bounded-blocking obligation the

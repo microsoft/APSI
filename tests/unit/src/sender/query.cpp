@@ -2,10 +2,12 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -232,5 +234,72 @@ namespace APSITests {
         StreamChannel chl(ss);
         ASSERT_THROW(Sender::RunQuery(query, chl), invalid_argument);
         ASSERT_TRUE(ss.str().empty());
+    }
+
+    namespace {
+        /**
+        Refuses every result package and counts how many it was offered.
+        */
+        class RefusingChannel : public StreamChannel {
+        public:
+            explicit RefusingChannel(stringstream &ss) : StreamChannel(ss)
+            {}
+
+            void send(unique_ptr<ResultPackage> rp) override
+            {
+                (void)rp;
+                attempts_++;
+                throw runtime_error("refused");
+            }
+
+            size_t attempts() const noexcept
+            {
+                return attempts_;
+            }
+
+        private:
+            atomic<size_t> attempts_{ 0 };
+        };
+    } // namespace
+
+    TEST(QueryTests, RunQueryStopsSendingAfterAResultPackageFails)
+    {
+        // A receiver needs every package of a query or none of them, so once one cannot be
+        // delivered the rest are worth nothing. They are not free, though: each would wait out
+        // the channel's own send timeout, one after another because a channel serializes its
+        // sends, so an unreachable receiver would cost that timeout once per package left.
+        //
+        // The guard has to sit around the send rather than at the start of the work, or a task
+        // already running is past it before any failure can happen. This runs on however many
+        // workers the pool has, which is the case that distinguishes the two: with a check at
+        // the start and a worker for each task, every task is past its check before the first
+        // send is even attempted.
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        for (uint64_t i = 0; i < 16; i++) {
+            sender_db->insert_or_assign(Item(i, i));
+        }
+
+        Query query(make_honest_query(sender_db->get_params()), sender_db);
+        ASSERT_TRUE(query.is_valid());
+
+        stringstream ss;
+        RefusingChannel chl(ss);
+
+        // Whichever task reaches the channel first is the one that fails, and the others stop
+        // rather than reporting that somebody else did. That is what the caller must be told:
+        // TaskGroup::join rethrows the first exception by the order tasks were added, not by
+        // the order they failed in, so a task that threw on another's behalf would just as
+        // often be the one that surfaced, and the reason the query failed would be gone.
+        string reported;
+        try {
+            Sender::RunQuery(query, chl);
+            FAIL() << "RunQuery should have thrown";
+        } catch (const runtime_error &ex) {
+            reported = ex.what();
+        }
+        ASSERT_EQ(string("refused"), reported);
+
+        // The parameters give two bundle indices, so without the guard there would be two.
+        ASSERT_EQ(size_t(1), chl.attempts());
     }
 } // namespace APSITests
