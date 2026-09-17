@@ -19,6 +19,12 @@ table CuckooFilter {
     table: CuckooFilterTable (required);
     num_items: uint64;
     overflow: CuckooFilterOverflowCache (required);
+
+    // Asserts that every item added to this filter was stored. Its absence means no such
+    // assertion was made, as in a filter written before this field existed, and the reader
+    // must assume items were dropped. Stated positively so that it is written only when true:
+    // a filter that dropped items encodes the same as one that never claimed otherwise.
+    no_items_dropped: bool;
 }
 
 root_type CuckooFilter;

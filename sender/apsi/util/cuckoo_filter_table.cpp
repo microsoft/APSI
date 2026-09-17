@@ -9,6 +9,9 @@
 #include "apsi/util/cuckoo_filter_table.h"
 #include "apsi/util/utils.h"
 
+// SEAL
+#include "seal/util/common.h"
+
 using namespace std;
 using namespace apsi::util;
 using namespace apsi::sender::util;
@@ -44,8 +47,39 @@ CuckooFilterTable::CuckooFilterTable(
     vector<uint64_t> table, size_t num_buckets, size_t bits_per_tag)
     : bits_per_tag_(bits_per_tag), table_(std::move(table)), num_buckets_(num_buckets)
 {
-    if (bits_per_tag == 0 || bits_per_tag > 64) {
-        throw invalid_argument("bits_per_tag cannot be 0 or bigger than 64");
+    // 64 is excluded along with 0: the tag mask below shifts by bits_per_tag, and a shift by the
+    // full width of the type is undefined. Nothing here needs a tag that wide.
+    if (bits_per_tag == 0 || bits_per_tag >= 64) {
+        throw invalid_argument("bits_per_tag must be between 1 and 63");
+    }
+    // The alternate bucket for a tag is found by masking with num_buckets - 1, which only reaches
+    // every bucket when num_buckets is a power of two. The sizing constructor produces one, so a
+    // table that does not have one did not come from this class.
+    if (num_buckets == 0 || next_power_of_2(num_buckets) != num_buckets) {
+        throw invalid_argument("num_buckets must be a nonzero power of two");
+    }
+
+    // The table must be exactly the size these parameters call for. Every read and write below
+    // bounds the bucket against num_buckets_ and then indexes table_ at a position derived from
+    // it, so a table smaller than num_buckets_ calls for turns those bounds checks into no-ops
+    // and indexes past the end of the vector. This constructor takes all three from whatever
+    // produced them, which for CuckooFilter::Load is a serialized filter that may be hostile.
+    //
+    // The multiplication is checked because num_buckets is not: bits_per_bucket is at most 256,
+    // so a num_buckets above 2^56 would wrap and yield a small required size that almost any
+    // table satisfies.
+    size_t bits_per_bucket = tags_per_bucket_ * bits_per_tag;
+    size_t required_words = 0;
+    try {
+        required_words =
+            seal::util::add_safe(
+                seal::util::mul_safe(bits_per_bucket, num_buckets), static_cast<size_t>(63)) /
+            64;
+    } catch (const logic_error &) {
+        throw invalid_argument("num_buckets is too large for bits_per_tag");
+    }
+    if (table_.size() != required_words) {
+        throw invalid_argument("table size does not match num_buckets and bits_per_tag");
     }
 
     // This is used to check that tags are not too big
@@ -55,8 +89,10 @@ CuckooFilterTable::CuckooFilterTable(
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     : bits_per_tag_(bits_per_tag)
 {
-    if (bits_per_tag == 0 || bits_per_tag > 64) {
-        throw invalid_argument("bits_per_tag cannot be 0 or bigger than 64");
+    // 64 is excluded along with 0: the tag mask below shifts by bits_per_tag, and a shift by the
+    // full width of the type is undefined. Nothing here needs a tag that wide.
+    if (bits_per_tag == 0 || bits_per_tag >= 64) {
+        throw invalid_argument("bits_per_tag must be between 1 and 63");
     }
 
     // This is used to check that tags are not too big

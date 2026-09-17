@@ -22,6 +22,8 @@
 - `SenderDB::get_reader_lock` returns a `std::shared_lock`. The `SenderDB` lock is now a `std::shared_mutex` rather than Microsoft SEAL's, whose implementation depended on how SEAL itself was built.
 - `Sender::RunQuery` rejects a query that the `SenderDB` parameters no longer describe.
 - `SenderDB::Load` rejects a serialized `SenderDB` that omits a required field.
+- `sender::util::CuckooFilter::add` and `remove` are `[[nodiscard]]`. An item the filter cannot store is not stored anywhere, so `has_dropped_items` reports that its negative answers are no longer conclusive, and a `BinBundle` whose filter says so searches the bin instead.
+- `sender::util::CuckooFilter::Load` rejects a serialized filter whose table size, bucket count, tag width or overflow slot are inconsistent, including a `bits_per_tag` of 64, which earlier versions accepted. A filter written by an earlier version is loaded as one that may have dropped items.
 - An exception thrown from a `PowersDag::parallel_apply` callback now propagates to the caller instead of hanging the thread pool.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.

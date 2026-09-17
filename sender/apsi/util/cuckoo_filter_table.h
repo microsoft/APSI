@@ -73,6 +73,14 @@ namespace apsi::sender::util {
         }
 
         /**
+        Get how many tags each bucket holds.
+        */
+        [[nodiscard]] constexpr static std::size_t get_tags_per_bucket()
+        {
+            return tags_per_bucket_;
+        }
+
+        /**
         Find a tag in the given bucket
         */
         [[nodiscard]] bool find_tag_in_bucket(std::size_t bucket, std::uint64_t tag) const;
