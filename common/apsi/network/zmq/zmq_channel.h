@@ -268,12 +268,14 @@ namespace apsi::network {
 
     protected:
         /**
-        The only difference from a receiver is the socket type.
+        A sender binds a ROUTER, and sets it up differently from a receiver's DEALER.
         */
         zmq::socket_type get_socket_type() override;
 
         /**
-        The sender needs to set a couple of socket options to ensure messages are not dropped.
+        Sets the socket options a sender needs. A ROUTER socket discards a message it cannot
+        route and reports success for the discard, so these make it report the failure instead,
+        and bound how long it waits for a peer that has stopped reading.
         */
         void set_socket_options(zmq::socket_t *socket) override;
     };
@@ -295,12 +297,13 @@ namespace apsi::network {
 
     protected:
         /**
-        The only difference from a sender is the socket type.
+        A receiver connects a DEALER, and sets it up differently from a sender's ROUTER.
         */
         zmq::socket_type get_socket_type() override;
 
         /**
-        The receiver needs to set a couple of socket options to ensure messages are not dropped.
+        Sets the socket options a receiver needs, bounding how long a receive parks and how long
+        a send waits on a sender that has stopped reading.
         */
         void set_socket_options(zmq::socket_t *socket) override;
     };

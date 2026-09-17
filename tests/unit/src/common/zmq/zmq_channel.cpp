@@ -281,6 +281,106 @@ namespace APSITests {
         ASSERT_TRUE(clt.receive_failed());
     }
 
+    TEST_F(ZMQChannelTests, SendingToAPeerThatIsNotThereFails)
+    {
+        // A ROUTER hands a message to the pipe named by its first frame. Asked for a peer it
+        // does not have, it must say so: a sender announces how many result packages a receiver
+        // should expect, and a package that went nowhere leaves that receiver waiting for one
+        // it will never get, with nothing on either side reporting a problem.
+        ZMQSenderChannel svr;
+        svr.bind(any_port_bind_address());
+
+        auto rp = make_unique<ResultPackage>();
+        rp->compr_mode = seal::Serialization::compr_mode_default;
+        rp->bundle_idx = 0;
+        rp->nonce_byte_count = 0;
+        rp->label_byte_count = 0;
+        Ciphertext ct;
+        get_context()->encryptor()->encrypt_zero_symmetric(ct);
+        rp->psi_result = std::move(ct);
+
+        auto nrp = make_unique<ZMQResultPackage>();
+        nrp->client_id = vector<unsigned char>{ 'A', 'b', 's', 'e', 'n', 't' };
+        nrp->rp = std::move(rp);
+
+        ASSERT_THROW(svr.send(std::move(nrp)), runtime_error);
+    }
+
+    namespace {
+        /**
+        The shipped channels queue tens of thousands of messages before a peer that has stopped
+        reading is noticed, which is the right figure in production and far too many to drive
+        through a test. These shrink the queue and the timeout so that the same code path is
+        reached in a fraction of a second.
+        */
+        class SmallQueueSenderChannel : public ZMQSenderChannel {
+        protected:
+            void set_socket_options(zmq::socket_t *socket) override
+            {
+                ZMQSenderChannel::set_socket_options(socket);
+                socket->set(zmq::sockopt::sndhwm, 4);
+                socket->set(zmq::sockopt::sndtimeo, 200);
+
+                // This test leaves messages queued for a peer that will never read them, and
+                // closing a socket waits out its linger for exactly those. The shipped sender
+                // waits a minute, which is right when the queue holds an answer somebody is
+                // still waiting for and is a minute of dead test otherwise.
+                socket->set(zmq::sockopt::linger, 0);
+            }
+        };
+
+        class SmallQueueReceiverChannel : public ZMQReceiverChannel {
+        protected:
+            void set_socket_options(zmq::socket_t *socket) override
+            {
+                ZMQReceiverChannel::set_socket_options(socket);
+                socket->set(zmq::sockopt::rcvhwm, 1);
+            }
+        };
+    } // namespace
+
+    TEST_F(ZMQChannelTests, SendingToAPeerThatHasStoppedReadingFails)
+    {
+        // The other way a ROUTER discards a message: the peer is connected but has not read for
+        // long enough to fill its queue. This is a different path from an absent peer -- ZeroMQ
+        // reports it by returning nothing rather than by throwing -- and it is the one a
+        // receiver reaches by simply going away mid-query while its connection stays up.
+        SmallQueueSenderChannel svr;
+        SmallQueueReceiverChannel clt;
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
+
+        // One request, so that the sender learns who the peer is. The receiver reads nothing
+        // after this.
+        clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
+        auto nsop = svr.receive_network_operation(get_context()->seal_context(), true);
+        ASSERT_NE(nullptr, nsop);
+
+        Ciphertext ct;
+        get_context()->encryptor()->encrypt_zero_symmetric(ct);
+
+        bool threw = false;
+        for (size_t i = 0; i < 1000 && !threw; i++) {
+            auto rp = make_unique<ResultPackage>();
+            rp->bundle_idx = 0;
+            rp->label_byte_count = 0;
+            rp->nonce_byte_count = 0;
+            rp->psi_result = ct;
+
+            auto nrp = make_unique<ZMQResultPackage>();
+            nrp->client_id = nsop->client_id;
+            nrp->rp = std::move(rp);
+
+            try {
+                svr.send(std::move(nrp));
+            } catch (const runtime_error &) {
+                threw = true;
+            }
+        }
+
+        ASSERT_TRUE(threw);
+    }
+
     TEST_F(ZMQChannelTests, ClientServerFullSession)
     {
         ZMQSenderChannel svr;

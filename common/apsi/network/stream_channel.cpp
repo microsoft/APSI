@@ -17,6 +17,27 @@ using namespace std;
 using namespace seal;
 
 namespace apsi::network {
+    namespace {
+        /**
+        Hands a message to the stream's sink and reports one that could not take it. Both halves
+        are necessary. The save functions return the number of bytes they meant to write rather
+        than the number that arrived, and a failed ostream swallows a write without complaint,
+        so the stream has to be asked. Asking is only meaningful once the bytes have been
+        offered to the sink: a buffered stream holds a whole message without consulting its sink
+        at all, and a sender writes a fixed number of result packages and then stops, so a
+        failure on the last of them would otherwise never be observed by anything.
+        */
+        void flush_or_throw(ostream &out, const char *what)
+        {
+            out.flush();
+            if (!out) {
+                APSI_LOG_ERROR("Failed to send " << what << ": the stream would not take it");
+                throw runtime_error(
+                    string("failed to send ") + what + ": the stream would not take it");
+            }
+        }
+    } // namespace
+
     void StreamChannel::send(unique_ptr<SenderOperation> sop)
     {
         // Need to have the SenderOperation package
@@ -33,8 +54,12 @@ namespace apsi::network {
         lock_guard<mutex> lock(send_mutex_);
         size_t old_bytes_sent = bytes_sent_;
 
-        bytes_sent_ += sop_header.save(out_);
-        bytes_sent_ += sop->save(out_);
+        // Counted only once the stream has taken them, so that bytes_sent reports what was sent
+        // rather than what was attempted.
+        size_t bytes = sop_header.save(out_);
+        bytes += sop->save(out_);
+        flush_or_throw(out_, "an operation");
+        bytes_sent_ += bytes;
 
         APSI_LOG_DEBUG(
             "Sent an operation of type " << sender_operation_type_str(sop_header.type) << " ("
@@ -157,8 +182,10 @@ namespace apsi::network {
         lock_guard<mutex> lock(send_mutex_);
         size_t old_bytes_sent = bytes_sent_;
 
-        bytes_sent_ += sop_header.save(out_);
-        bytes_sent_ += sop_response->save(out_);
+        size_t bytes = sop_header.save(out_);
+        bytes += sop_response->save(out_);
+        flush_or_throw(out_, "a response");
+        bytes_sent_ += bytes;
 
         APSI_LOG_DEBUG(
             "Sent a response of type " << sender_operation_type_str(sop_header.type) << " ("
@@ -268,7 +295,9 @@ namespace apsi::network {
         lock_guard<mutex> lock(send_mutex_);
         size_t old_bytes_sent = bytes_sent_;
 
-        bytes_sent_ += rp->save(out_);
+        size_t bytes = rp->save(out_);
+        flush_or_throw(out_, "a result package");
+        bytes_sent_ += bytes;
 
         APSI_LOG_DEBUG("Sent a result package (" << bytes_sent_ - old_bytes_sent << " bytes)");
     }
