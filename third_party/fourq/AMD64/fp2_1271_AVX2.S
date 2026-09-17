@@ -445,3 +445,10 @@ table_lookup_1x8_a:
   vmovdqu      YMMWORD PTR [reg_p2+64], ymm2
   vmovdqu      YMMWORD PTR [reg_p2+96], ymm3
   ret
+
+// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
+// executable when any input object lacks this section, which silently disables NX for
+// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
+#if defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif

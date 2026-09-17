@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <sstream>
 #include <thread>
 
@@ -93,6 +94,50 @@ namespace APSITests {
             Label label(byte_count);
             iota(label.begin(), label.end(), start);
             return label;
+        }
+
+        /**
+        A known OPRF key, so that a test whose shape depends on where items hash behaves the same
+        on every run. The key is a scalar read as native-endian machine words: it must be nonzero
+        and below the group order, and OPRFKey::load checks neither. The low bytes make it
+        nonzero; the top eight must stay zero, because the order is just under 2^246 and filling
+        the whole buffer would give a value near 2^253.
+        */
+        oprf::OPRFKey fixed_oprf_key()
+        {
+            constexpr size_t set_byte_count = oprf::oprf_key_size - 8;
+
+            oprf::OPRFKey key;
+            array<unsigned char, oprf::oprf_key_size> bytes{};
+            for (size_t i = 0; i < set_byte_count; i++) {
+                bytes[i] = static_cast<unsigned char>(i + 1);
+            }
+            key.load(oprf::oprf_key_span_const_type(bytes));
+            return key;
+        }
+
+        /**
+        The given parameters with a smaller max_items_per_bin, so that a test inserting one item
+        at a time reaches a second bin bundle after tens of items rather than hundreds. Each
+        insert regenerates the bundle's cache, so that count dominates the test's cost.
+        */
+        PSIParams with_shallow_bins(const PSIParams &params, uint32_t max_items_per_bin)
+        {
+            PSIParams::TableParams table_params = params.table_params();
+            table_params.max_items_per_bin = max_items_per_bin;
+
+            // No query is run here, but the parameters still have to be consistent: a query power
+            // may not exceed max_items_per_bin, so drop the ones that no longer fit.
+            PSIParams::QueryParams query_params = params.query_params();
+            set<uint32_t> query_powers;
+            for (uint32_t power : query_params.query_powers) {
+                if (power <= max_items_per_bin) {
+                    query_powers.insert(power);
+                }
+            }
+            query_params.query_powers = std::move(query_powers);
+
+            return { params.item_params(), table_params, query_params, params.seal_params() };
         }
     } // namespace
 
@@ -555,11 +600,16 @@ namespace APSITests {
 
     TEST(SenderDBTests, Remove)
     {
-        auto test_fun = [](const shared_ptr<PSIParams> &params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &base_params) {
             // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This
             // happens because in the labeled case BinBundles cannot tolerate repetitions of item
             // parts (felts) in bins.
-            SenderDB sender_db(*params, 20, 16, true);
+            //
+            // Shallow bins and a known key, so the loops below reach a second BinBundle after a
+            // fixed, small number of items. The bookkeeping under test does not depend on how
+            // many that takes.
+            PSIParams params = with_shallow_bins(*base_params, 3);
+            SenderDB sender_db(params, fixed_oprf_key(), 20, 16, true);
 
             // Insert a single item
             sender_db.insert_or_assign({ Item(0, 0), create_label(0, 20) });
@@ -581,7 +631,6 @@ namespace APSITests {
                 sender_db.insert_or_assign(
                     { Item(val, ~val), create_label(static_cast<unsigned char>(val), 20) });
                 val++;
-                APSI_LOG_ERROR(val << " " << sender_db.get_bin_bundle_count());
             }
 
             // Check that everything was inserted
@@ -933,15 +982,28 @@ namespace APSITests {
         state->db = make_shared<SenderDB>(*get_params1(), 0);
         state->db->insert_or_assign(Item(0, 0));
 
-        thread writer([state]() {
-            for (uint64_t i = 1; !state->stop && i < 400; i++) {
+        // What the deadlock needs is a writer queued between the two acquisitions, not a large
+        // database: get_packing_rate and save read the bin bundle count whatever the contents.
+        // Inserting one item and clearing it keeps the database at one item, so each round stays
+        // short enough that a Debug build finishes well inside the deadline, while still
+        // exercising a bin bundle's own save path.
+        thread writer([state] {
+            for (uint64_t i = 1; !state->stop; i++) {
+                // Yield after each acquisition, not only at the end of the pair: a writer that
+                // never yields can starve the reader where a queued writer bars new readers, and
+                // yielding only after the clear would leave the reader serializing an empty
+                // database nearly every time.
                 state->db->insert_or_assign(Item(i, 0));
+                this_thread::yield();
+                state->db->clear();
+                this_thread::yield();
             }
         });
         writer.detach();
 
-        thread reader([state]() {
-            for (int i = 0; i < 400; i++) {
+        thread reader([state] {
+            constexpr int reader_rounds = 300;
+            for (int i = 0; i < reader_rounds; i++) {
                 state->db->get_packing_rate();
                 stringstream ss;
                 state->db->save(ss);
@@ -972,8 +1034,24 @@ namespace APSITests {
         // The window between the move and the replacement is a few instructions wide, so a single
         // round is very unlikely to land in it. Many rounds are run, each with readers already
         // hammering the key when the strip begins.
+        //
+        // A reader stops on the strip or on its own deadline, whichever comes first. The deadline
+        // is what guarantees termination: where a queued writer does not bar new readers, as with
+        // libstdc++'s reader-preferring pthread_rwlock_t, readers waiting only for the strip
+        // starve it indefinitely. The sleep is what lets the strip land while calls are still in
+        // flight; a yield is not enough, because four readers cycling through one leave no gap.
         constexpr int round_count = 50;
         constexpr int reader_count = 4;
+        constexpr auto reader_time_limit = chrono::milliseconds(250);
+
+        // A call refused because the database is stripped is one that took the lock after the
+        // strip committed, so a round that records none had no reader still looping by the time
+        // the strip got the lock. That is a liveness check on the test itself, not proof that a
+        // call was in flight when the strip began: every assertion above passes trivially on a
+        // run where the readers finish first, so without this the test can quietly stop covering
+        // anything.
+        atomic<int> refusals{ 0 };
+        int rounds_with_refusal = 0;
 
         for (int round = 0; round < round_count; round++) {
             // A labeled database so that get_label is exercised alongside has_item; both read
@@ -984,8 +1062,10 @@ namespace APSITests {
             auto original_key = db->get_oprf_key();
 
             atomic<bool> start{ false };
+            atomic<bool> strip_pending{ false };
             atomic<bool> stripped{ false };
             atomic<int> readers_running{ 0 };
+            const int refusals_before_round = refusals.load();
             atomic<bool> saw_missing_item{ false };
             atomic<bool> saw_wrong_key{ false };
             atomic<bool> saw_missing_label{ false };
@@ -994,12 +1074,13 @@ namespace APSITests {
             vector<thread> readers;
             readers.reserve(reader_count);
             for (int i = 0; i < reader_count; i++) {
-                readers.emplace_back([&]() {
+                readers.emplace_back([&] {
                     readers_running++;
                     while (!start) {
                         this_thread::yield();
                     }
-                    while (!stripped) {
+                    auto reader_deadline = chrono::steady_clock::now() + reader_time_limit;
+                    while (!stripped && chrono::steady_clock::now() < reader_deadline) {
                         // The item is in the database until strip() removes it, and strip()
                         // removes it under the same lock that makes the database report itself
                         // stripped. A reader therefore either finds the item or is refused;
@@ -1010,6 +1091,7 @@ namespace APSITests {
                                 saw_missing_item = true;
                             }
                         } catch (const logic_error &) {
+                            refusals++;
                         }
 
                         // Likewise the key is either the one the database was built with, or the
@@ -1019,6 +1101,7 @@ namespace APSITests {
                                 saw_wrong_key = true;
                             }
                         } catch (const logic_error &) {
+                            refusals++;
                         }
 
                         // get_label answers for the same item, so it is subject to the same rule:
@@ -1032,7 +1115,16 @@ namespace APSITests {
                         } catch (const invalid_argument &) {
                             saw_missing_label = true;
                         } catch (const logic_error &) {
+                            refusals++;
                         }
+
+                        // Leave the lock free between calls so the strip can land while the
+                        // readers are still looping. Where a queued writer does not bar new
+                        // readers the writer only gets in when every reader happens to be out of
+                        // the lock at once, which a short sleep makes rare and a slow build makes
+                        // rarer still, so back off once the strip is known to be waiting.
+                        this_thread::sleep_for(
+                            strip_pending ? chrono::microseconds(1000) : chrono::microseconds(50));
                     }
                 });
             }
@@ -1045,6 +1137,7 @@ namespace APSITests {
             start = true;
             this_thread::sleep_for(chrono::microseconds(200));
 
+            strip_pending = true;
             db->strip();
             stripped = true;
 
@@ -1062,6 +1155,13 @@ namespace APSITests {
                 << "get_label returned a label other than the stored one";
             ASSERT_TRUE(db->is_stripped());
             ASSERT_THROW(db->get_oprf_key(), logic_error);
+            if (refusals.load() > refusals_before_round) {
+                rounds_with_refusal++;
+            }
         }
+
+        ASSERT_LT(0, rounds_with_refusal)
+            << "no round had a reader still looping when the strip took the lock, so the readers "
+               "always finished first and this test covered nothing";
     }
 } // namespace APSITests

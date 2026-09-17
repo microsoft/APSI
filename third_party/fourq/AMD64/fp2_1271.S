@@ -352,3 +352,10 @@ fp2addsub1271_a:
   sbb    r9, 0
   mov    [reg_p3+24], r9
   ret
+
+// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
+// executable when any input object lacks this section, which silently disables NX for
+// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
+#if defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif
