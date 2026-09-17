@@ -36,38 +36,27 @@ namespace apsi {
 
     namespace network {
         namespace {
-            // How long a blocking receive parks before returning empty-handed so the caller can
-            // re-examine shared state and decide whether waiting is still worthwhile. Large
-            // enough that idle polling costs nothing, small enough that a stuck exchange
-            // unwinds promptly.
+            // ZeroMQ waits indefinitely wherever it waits at all. The bounds below replace that,
+            // so that nothing here can be held forever by what a peer does.
+
+            // A blocking receive gives up and returns empty-handed after this. It is a poll
+            // interval rather than a deadline: a caller still waiting legitimately just
+            // receives again, having had the chance to re-examine its own state in between.
             constexpr int receive_poll_interval_ms = 1000;
 
-            // How long closing a receiver socket waits for messages it has queued but not yet
-            // handed to the peer. ZeroMQ waits forever by default, which turns a peer that has
-            // gone away into a process that cannot exit: the request sits in the outbound queue
-            // with nobody to take it, and the close blocks on it. A receiver only ever has a
-            // small request outstanding, and that request is worthless once the receiver has
-            // stopped waiting for its answer, so a short bound costs nothing and caps what a
-            // vanished sender can charge the receiver at shutdown.
+            // How long closing a socket waits for messages it has queued but not yet handed
+            // over. A receiver has only its own small request outstanding, and that request is
+            // worthless once it has stopped waiting for the answer.
             constexpr int receiver_linger_ms = 1000;
 
-            // The same bound for a sender socket, which is a very different proposition. A
-            // sender hands its whole result stream to ZeroMQ asynchronously and returns while
-            // the bytes are still in flight, so at close time the outbound queue can hold the
-            // entire answer to a query. Discarding it truncates a legitimate response, and the
-            // receiver then waits out its own deadline and reports a timeout instead of the
-            // result it had already earned. The bound therefore has to be generous enough to
-            // push a large response over a slow link, and only exists at all so that a sender
-            // shutting down cannot be pinned indefinitely by a receiver that has gone away.
+            // A sender's queue can hold the entire answer to a query instead, which may still
+            // be streaming out when the sender is asked to stop. Cutting that short truncates a
+            // legitimate response, so this is generous enough to push one over a slow link.
             constexpr int sender_linger_ms = 60000;
 
-            // How long a send waits for a peer that has stopped collecting. ZeroMQ waits
-            // forever by default, which on the sending side lets one receiver that has gone
-            // quiet pin a thread pool worker; a sender serves queries one at a time, so a
-            // handful of those stops it serving anyone. A peer that is reading at all drains
-            // its queue far faster than the other fills it, and the sender's high water mark
-            // leaves a large cushion before this bound is consulted, so reaching it means the
-            // peer has stopped rather than fallen behind.
+            // How long a send waits before reporting failure. The sender's high water mark
+            // leaves a wide cushion first, so reaching this means a peer has stopped reading
+            // rather than fallen behind.
             constexpr int send_timeout_ms = 30000;
 
             template <typename T>
@@ -690,40 +679,33 @@ namespace apsi {
 
         void ZMQReceiverChannel::set_socket_options(socket_t *socket)
         {
-            // Ensure messages are not dropped
+            // How far ahead a sender may get while this receiver is still working through what
+            // has arrived. A DEALER whose queue is full stops reading rather than discarding,
+            // so this throttles the sender instead of losing anything.
             socket->set(sockopt::rcvhwm, 70000);
 
-            // Wake a blocking receive periodically instead of letting it park in the kernel
-            // indefinitely. This is a poll interval, not a deadline: a caller that is still
-            // waiting legitimately just loops and receives again, so a sender that takes many
-            // minutes over a large database is unaffected. What it buys is the chance to
-            // re-examine shared state between attempts. The receiver runs several result
-            // workers over this one socket, serialized by the receive mutex, so without this a
-            // worker could hold the mutex parked forever on a package the sender never sends,
-            // while its siblings, and the join that waits for them, are stuck behind it.
+            // The receiver runs several result workers over this one socket, serialized by the
+            // receive mutex. Without a bound, a worker could hold that mutex parked forever on
+            // a package the sender never sends, with its siblings and the join that waits for
+            // them stuck behind it.
             socket->set(sockopt::rcvtimeo, receive_poll_interval_ms);
 
-            // Bound a send for the same reason. This says nothing about whether a sender is
-            // there: a DEALER queues into a pipe it creates at connect time, so a request goes
-            // out without complaint whether or not anything is listening. What it bounds is a
-            // receiver whose own outbound queue has filled, which takes a great many
-            // undelivered requests and so should not happen at all.
+            // Bound a send too, though it says nothing about whether a sender is there: a
+            // DEALER queues into a pipe it creates at connect time, so a request goes out
+            // whether or not anything is listening.
             socket->set(sockopt::sndtimeo, send_timeout_ms);
 
-            // Reject any single inbound frame larger than INT32_MAX. This matches the
-            // FlatBuffers verifier's per-buffer maximum, so anything beyond that would fail
-            // verification later anyway. Note that this bounds each frame on its own and says
-            // nothing about how many frames a message may contain. Nothing here can: ZeroMQ
-            // buffers a message in full before offering it to a reader, so the cost of a
-            // message made of very many tiny frames is already paid by the time any code in
-            // this file runs. The exposure is proportional to concurrent connections rather
-            // than to cumulative traffic, so it is bounded at the network layer by limiting
-            // concurrent peers, not here.
+            // Reject an inbound frame larger than INT32_MAX, the FlatBuffers verifier's own
+            // maximum, so anything bigger would fail verification later anyway.
+            //
+            // This bounds one frame, not how many frames a message may hold, and nothing here
+            // can bound that: ZeroMQ assembles a message in full before offering it to a
+            // reader. That exposure grows with the number of concurrent peers rather than with
+            // traffic, so it belongs at the network layer.
             socket->set(
                 sockopt::maxmsgsize, static_cast<int64_t>((numeric_limits<int32_t>::max)()));
 
-            // Bound how long closing this socket waits on messages the peer never collected.
-            // This is what lets a receiver that has given up on a silent sender actually exit.
+            // What lets a receiver that has given up on a silent sender actually exit.
             socket->set(sockopt::linger, receiver_linger_ms);
 
             string buf;
@@ -750,41 +732,33 @@ namespace apsi {
             // dispatcher reports and the query abandons.
             socket->set(sockopt::router_mandatory, 1);
 
-            // How much a peer may fall behind before the send above starts to fail. One query's
-            // answer is many result packages, and a receiver reads them while the sender is
-            // still computing the rest, so the queue has to be deep enough that an ordinary
-            // difference in pace never registers. The cost is that ZeroMQ will hold this many
-            // messages per peer, and it holds them until they are read rather than until the
-            // query that produced them ends, so a peer that stops reading can retain the whole
-            // amount. The value is inherited rather than derived from a measured requirement,
-            // and how many packages a query produces depends on how the database is populated
-            // as well as on its parameters, so treat it as a figure to measure rather than one
-            // that bounds anything.
+            // How far a peer may fall behind before the send above starts to fail. A receiver
+            // reads packages while the sender is still computing the rest, so this has to be
+            // deep enough that an ordinary difference in pace never registers.
+            //
+            // ZeroMQ holds this many messages per peer until they are read, not until the
+            // query that produced them ends, so a peer that stops reading retains the lot. The
+            // value is inherited rather than measured, and how many packages a query produces
+            // depends on how the database was populated as well as on its parameters. Treat it
+            // as a figure to measure, not one that bounds anything.
             socket->set(sockopt::sndhwm, 70000);
 
-            // Bound the wait that router_mandatory introduces on a full queue. Without this the
-            // send blocks until the peer reads, which a peer that has stopped reading never
-            // does.
+            // router_mandatory makes a full queue block instead of discarding, so without this
+            // a send waits on a peer that has stopped reading for as long as it stays stopped.
             socket->set(sockopt::sndtimeo, send_timeout_ms);
 
-            // Wake a blocking receive periodically rather than letting it park in the kernel
-            // indefinitely, so that every channel honours the bounded-blocking obligation the
-            // Channel contract states. The dispatcher never takes a blocking receive, so this
-            // has no effect on the serving path; it matters for callers that use the blocking
-            // overload directly, which would otherwise have no way back out.
+            // The dispatcher never takes a blocking receive, so this has no effect on the
+            // serving path. It is for callers that use the blocking overload directly, which
+            // would otherwise have no way back out.
             socket->set(sockopt::rcvtimeo, receive_poll_interval_ms);
 
-            // Reject any single inbound frame larger than INT32_MAX. See the matching comment
-            // in ZMQReceiverChannel::set_socket_options, including the note that this does not
-            // bound the number of frames in a message.
+            // See ZMQReceiverChannel::set_socket_options, including why this does not bound
+            // the number of frames in a message.
             socket->set(
                 sockopt::maxmsgsize, static_cast<int64_t>((numeric_limits<int32_t>::max)()));
 
-            // Bound how long closing this socket waits on messages the peer never collected.
-            // Generously, unlike the receiver: what is queued here is the answer to a query,
-            // which may still be streaming out over a slow link when the sender is asked to
-            // stop. Cutting that short would silently truncate a legitimate response and leave
-            // the receiver to time out on an answer that had in fact been computed.
+            // Generous, unlike the receiver's: cutting this short would truncate an answer that
+            // had in fact been computed, leaving the receiver to time out on it.
             socket->set(sockopt::linger, sender_linger_ms);
         }
     } // namespace network
