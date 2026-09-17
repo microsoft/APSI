@@ -6,7 +6,7 @@ upstream sources exactly, which is the check to run afterwards:
 
     git apply --check --reverse third_party/fourq/apsi-changes.patch
 
-Four changes, in descending order of how much they matter.
+Five changes, in descending order of how much they matter.
 
   * eccp2_core.c, generic/fp.h and AMD64/fp_x64.h drop the __inline qualifier from 31 definitions.
     Do not skip this one. Twenty of them are non-static and called from other translation units,
@@ -19,6 +19,12 @@ Four changes, in descending order of how much they matter.
     constants are linked in rather than textually included. Without this the AVX2 build fails,
     and only on a target that assembles it, which is neither Windows nor macOS.
 
+  * Both AMD64/*.S files gain a .note.GNU-stack section. GNU ld marks the stack of the whole
+    output executable when any input object lacks one, so without this every ELF binary that
+    links APSI loses NX. The linker warns on each link, and the deprecation it mentions is of
+    the inference itself, so a future version stops silently guessing rather than starting to
+    refuse. Upstream has the same omission.
+
   * Every #include of a header in this same directory gains an "apsi/fourq/" prefix, so that it
     resolves through the mirrored build-tree layout described in README.md. The "../" includes in
     the architecture headers already resolve through that layout and are left alone.
@@ -30,6 +36,19 @@ Four changes, in descending order of how much they matter.
 
 To regenerate, diff the pinned upstream sources against this tree and keep this header.
 
+--- a/third_party/fourq/AMD64/fp2_1271.S
++++ b/third_party/fourq/AMD64/fp2_1271.S
+@@ -352,3 +352,10 @@
+   sbb    r9, 0
+   mov    [reg_p3+24], r9
+   ret
++
++// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
++// executable when any input object lacks this section, which silently disables NX for
++// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
++#if defined(__ELF__)
++.section .note.GNU-stack,"",%progbits
++#endif
 --- a/third_party/fourq/AMD64/fp2_1271_AVX2.S
 +++ b/third_party/fourq/AMD64/fp2_1271_AVX2.S
 @@ -6,7 +6,8 @@
@@ -42,6 +61,17 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  .intel_syntax noprefix 
  
+@@ -444,3 +445,10 @@
+   vmovdqu      YMMWORD PTR [reg_p2+64], ymm2
+   vmovdqu      YMMWORD PTR [reg_p2+96], ymm3
+   ret
++
++// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
++// executable when any input object lacks this section, which silently disables NX for
++// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
++#if defined(__ELF__)
++.section .note.GNU-stack,"",%progbits
++#endif
 --- a/third_party/fourq/AMD64/fp_x64.h
 +++ b/third_party/fourq/AMD64/fp_x64.h
 @@ -51,21 +51,21 @@
