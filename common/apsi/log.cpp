@@ -85,7 +85,7 @@ namespace apsi {
                 std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) %
                 1000;
             std::tm tm{};
-#ifdef _MSC_VER
+#ifdef _WIN32
             localtime_s(&tm, &t);
 #else
             localtime_r(&t, &tm);
