@@ -169,6 +169,13 @@ endif()
 find_package(jsoncpp REQUIRED)
 if (NOT jsoncpp_FOUND)
     message(FATAL_ERROR "jsoncpp: not found")
+elseif (NOT TARGET JsonCpp::JsonCpp)
+    # APSI links the namespaced target, which forwards to whichever of jsoncpp_static or
+    # jsoncpp_lib was installed. jsoncpp only began exporting it in 1.9.5, and an older
+    # package satisfies find_package and then leaves the link unresolved, so say so here
+    # rather than at link time.
+    message(FATAL_ERROR "jsoncpp: found, but it does not define JsonCpp::JsonCpp; "
+                        "jsoncpp 1.9.5 or newer is required")
 else()
     message(STATUS "jsoncpp: found")
 endif()
@@ -280,12 +287,15 @@ apsi_install_target(apsi APSITargets)
 # against an installed APSI must not have its own build flip a macro inside APSI's headers.
 target_compile_definitions(apsi PRIVATE $<BUILD_INTERFACE:$<$<CONFIG:Debug>:APSI_DEBUG>>)
 
+# JsonCpp::JsonCpp rather than jsoncpp_static: the namespaced target forwards to whichever of
+# jsoncpp_static or jsoncpp_lib the installed jsoncpp actually provides, and only the static
+# triplets provide the former. Naming it directly cannot link against a shared jsoncpp.
 target_link_libraries(apsi
     PUBLIC SEAL::seal
     PUBLIC Microsoft.GSL::GSL
     PUBLIC Kuku::kuku
     PUBLIC flatbuffers::flatbuffers
-    PUBLIC jsoncpp_static)
+    PUBLIC JsonCpp::JsonCpp)
 if(APSI_USE_ZMQ)
     target_link_libraries(apsi PUBLIC libzmq-static cppzmq-static)
 endif()
