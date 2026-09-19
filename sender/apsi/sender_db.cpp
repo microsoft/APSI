@@ -672,7 +672,7 @@ namespace apsi {
                 bin_bundles_.cbegin(),
                 bin_bundles_.cend(),
                 static_cast<size_t>(0),
-                [&](auto &a, auto &b) { return a + b.size(); });
+                [](auto a, const auto &b) { return a + b.size(); });
         }
 
         size_t SenderDB::get_bin_bundle_count() const
