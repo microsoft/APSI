@@ -6,7 +6,20 @@ upstream sources exactly, which is the check to run afterwards:
 
     git apply --check --reverse third_party/fourq/apsi-changes.patch
 
-Five changes, in descending order of how much they matter.
+Six changes, in descending order of how much they matter.
+
+  * AMD64/fp_x64.h and ARM64/fp_arm64.h stop reading and writing field elements through a
+    uint128_t pointer. A field element is an array of digit_t, so mod1271, fpadd1271, fpsub1271
+    and fpneg1271 casting &a[0] to uint128_t* and assigning through it is undefined: the two
+    types do not alias, and the array carries only the alignment digit_t requires. GCC 16 acts
+    on the aliasing assumption and drops stores, which silently yields wrong curve points --
+    OPRFTests.Hash2Curve is the known-answer test that catches it. Every GCC or Clang build
+    that selects one of these two architecture headers compiles this, which is Linux and macOS
+    as well as MinGW; assembly support does not replace these routines. MSVC escapes because it
+    takes the intrinsic path instead, and a generic build escapes because it includes
+    generic/fp.h, which is already free of the pattern. The replacement copies in and out with
+    memcpy, which cost nothing in the configurations tested here: diffing the generated
+    assembly for all four functions showed GCC 16 emitting an identical instruction sequence.
 
   * eccp2_core.c, generic/fp.h and AMD64/fp_x64.h drop the __inline qualifier from 31 definitions.
     Do not skip this one. Twenty of them are non-static and called from other translation units,
@@ -25,6 +38,7 @@ Five changes, in descending order of how much they matter.
     the inference itself, so a future version stops silently guessing rather than starting to
     refuse. Upstream has the same omission.
 
+
   * Every #include of a header in this same directory gains an "apsi/fourq/" prefix, so that it
     resolves through the mirrored build-tree layout described in README.md. The "../" includes in
     the architecture headers already resolve through that layout and are left alone.
@@ -36,19 +50,6 @@ Five changes, in descending order of how much they matter.
 
 To regenerate, diff the pinned upstream sources against this tree and keep this header.
 
---- a/third_party/fourq/AMD64/fp2_1271.S
-+++ b/third_party/fourq/AMD64/fp2_1271.S
-@@ -352,3 +352,10 @@
-   sbb    r9, 0
-   mov    [reg_p3+24], r9
-   ret
-+
-+// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
-+// executable when any input object lacks this section, which silently disables NX for
-+// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
-+#if defined(__ELF__)
-+.section .note.GNU-stack,"",%progbits
-+#endif
 --- a/third_party/fourq/AMD64/fp2_1271_AVX2.S
 +++ b/third_party/fourq/AMD64/fp2_1271_AVX2.S
 @@ -6,7 +6,8 @@
@@ -72,9 +73,53 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
 +#if defined(__ELF__)
 +.section .note.GNU-stack,"",%progbits
 +#endif
+--- a/third_party/fourq/AMD64/fp2_1271.S
++++ b/third_party/fourq/AMD64/fp2_1271.S
+@@ -352,3 +352,10 @@
+   sbb    r9, 0
+   mov    [reg_p3+24], r9
+   ret
++
++// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
++// executable when any input object lacks this section, which silently disables NX for
++// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
++#if defined(__ELF__)
++.section .note.GNU-stack,"",%progbits
++#endif
 --- a/third_party/fourq/AMD64/fp_x64.h
 +++ b/third_party/fourq/AMD64/fp_x64.h
-@@ -51,21 +51,21 @@
+@@ -16,6 +16,8 @@
+ #endif
+ 
+ 
++#include <string.h>
++
+ #include "../table_lookup.h"
+ #include "../FourQ_params.h"
+ 
+@@ -32,10 +34,17 @@
+ { // Modular correction, a = a mod (2^127-1)
+     
+ #if defined(UINT128_SUPPORT)
+-    uint128_t* r = (uint128_t*)&a[0];
+-
+-    *r = *r - prime1271;
+-    *r = *r + (((uint128_t)0 - (*r >> 127)) & prime1271);
++    // A field element is an array of digit_t, so reading or writing it through a uint128_t
++    // lvalue is undefined: the two types do not alias, and the array is not guaranteed to carry
++    // the alignment uint128_t requires. Copying in and out keeps the 128-bit arithmetic while
++    // leaving every access to the element at its own type. Compilers fold these copies into the
++    // same pair of 64-bit loads and stores the cast produced.
++    uint128_t r;
++
++    memcpy(&r, a, sizeof(r));
++    r = r - prime1271;
++    r = r + (((uint128_t)0 - (r >> 127)) & prime1271);
++    memcpy(a, &r, sizeof(r));
+ #elif defined(SCALAR_INTRIN_SUPPORT)
+     uint64_t mask;
+     uint128_t prime;
+@@ -51,31 +60,32 @@
  }
  
  
@@ -99,7 +144,25 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field addition, c = a+b mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
-@@ -89,7 +89,7 @@
+-    uint128_t* r = (uint128_t*)&a[0];
+-    uint128_t* s = (uint128_t*)&b[0];
+-    uint128_t* t = (uint128_t*)&c[0];
+-
+-    *t = *r + *s;
+-    *t += (*t >> 127);
+-    *t &= prime1271;
++    uint128_t r, s, t;
++
++    memcpy(&r, a, sizeof(r));
++    memcpy(&s, b, sizeof(s));
++    t = r + s;
++    t += (t >> 127);
++    t &= prime1271;
++    memcpy(c, &t, sizeof(t));
+ #elif defined(SCALAR_INTRIN_SUPPORT)
+     uint64_t temp;
+     unsigned char _carry;
+@@ -89,17 +99,18 @@
  }
  
  
@@ -108,7 +171,38 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field subtraction, c = a-b mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
-@@ -126,7 +126,7 @@
+-    uint128_t* r = (uint128_t*)&a[0];
+-    uint128_t* s = (uint128_t*)&b[0];
+-    uint128_t* t = (uint128_t*)&c[0];
+-
+-    *t = *r - *s;
+-    *t -= (*t >> 127);
+-    *t &= prime1271;
++    uint128_t r, s, t;
++
++    memcpy(&r, a, sizeof(r));
++    memcpy(&s, b, sizeof(s));
++    t = r - s;
++    t -= (t >> 127);
++    t &= prime1271;
++    memcpy(c, &t, sizeof(t));
+ #elif defined(SCALAR_INTRIN_SUPPORT)
+     uint64_t temp;
+     unsigned char _borrow;
+@@ -117,16 +128,18 @@
+ { // Field negation, a = -a mod (2^127-1)
+     
+ #if defined(UINT128_SUPPORT)
+-    uint128_t* r = (uint128_t*)&a[0];
++    uint128_t r;
+ 
+-    *r = prime1271 - *r;
++    memcpy(&r, a, sizeof(r));
++    r = prime1271 - r;
++    memcpy(a, &r, sizeof(r));
+ #elif defined(SCALAR_INTRIN_SUPPORT)
+     SUB128(prime1271, a, a);
+ #endif
  }
  
  
@@ -117,7 +211,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field multiplication, c = a*b mod (2^127-1)
      uint128_t tt1, tt2, tt3 = {0};
      
-@@ -191,7 +191,7 @@
+@@ -191,7 +204,7 @@
  }
  
  
@@ -126,7 +220,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Exponentiation over GF(p), af = a^(125-1)
      int i;
      felm_t t1, t2, t3, t4, t5;
-@@ -240,7 +240,7 @@
+@@ -240,7 +253,7 @@
  }
  
  
@@ -135,7 +229,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Schoolbook multiprecision multiply, c = a*b   
      unsigned int i, j;
      digit_t u, v, UV[2];
-@@ -263,7 +263,7 @@
+@@ -263,7 +276,7 @@
  }
  
  
@@ -144,39 +238,93 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Multiprecision addition, c = a+b. Returns the carry bit 
      unsigned int i;
      unsigned char carry = 0;
---- a/third_party/fourq/FourQ_api.h
-+++ b/third_party/fourq/FourQ_api.h
-@@ -21,7 +21,7 @@
+--- a/third_party/fourq/ARM64/fp_arm64.h
++++ b/third_party/fourq/ARM64/fp_arm64.h
+@@ -16,6 +16,8 @@
  #endif
  
  
--#include "FourQ.h"
-+#include "apsi/fourq/FourQ.h"
++#include <string.h>
++
+ #include "../table_lookup.h"
+ #include "../FourQ_params.h"
+ 
+@@ -26,10 +28,17 @@
+ 
+ void mod1271(felm_t a)
+ { // Modular correction, a = a mod (2^127-1)    
+-    uint128_t* r = (uint128_t*)&a[0];
+-
+-    *r = *r - prime1271;
+-    *r = *r + (((uint128_t)0 - (*r >> 127)) & prime1271);
++    // A field element is an array of digit_t, so reading or writing it through a uint128_t
++    // lvalue is undefined: the two types do not alias, and the array is not guaranteed to carry
++    // the alignment uint128_t requires. Copying in and out keeps the 128-bit arithmetic while
++    // leaving every access to the element at its own type. Compilers fold these copies into the
++    // same pair of 64-bit loads and stores the cast produced.
++    uint128_t r;
++
++    memcpy(&r, a, sizeof(r));
++    r = r - prime1271;
++    r = r + (((uint128_t)0 - (r >> 127)) & prime1271);
++    memcpy(a, &r, sizeof(r));
+ }
  
  
- /**************** Public ECC API ****************/
---- a/third_party/fourq/FourQ_internal.h
-+++ b/third_party/fourq/FourQ_internal.h
-@@ -21,7 +21,7 @@
- #endif
+@@ -49,33 +58,37 @@
  
-     
--#include "FourQ_api.h"
-+#include "apsi/fourq/FourQ_api.h"
+ __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
+ { // Field addition, c = a+b mod (2^127-1)
+-    uint128_t* r = (uint128_t*)&a[0];
+-    uint128_t* s = (uint128_t*)&b[0];
+-    uint128_t* t = (uint128_t*)&c[0];
+-
+-    *t = *r + *s;
+-    *t += (*t >> 127);
+-    *t &= prime1271;
++    uint128_t r, s, t;
++
++    memcpy(&r, a, sizeof(r));
++    memcpy(&s, b, sizeof(s));
++    t = r + s;
++    t += (t >> 127);
++    t &= prime1271;
++    memcpy(c, &t, sizeof(t));
+ }
  
  
- // Extended datatype support
---- a/third_party/fourq/FourQ_params.h
-+++ b/third_party/fourq/FourQ_params.h
-@@ -15,7 +15,7 @@
- #ifndef __FOURQ_PARAMS_H__
- #define __FOURQ_PARAMS_H__
+ __inline void fpsub1271(felm_t a, felm_t b, felm_t c)
+ { // Field subtraction, c = a-b mod (2^127-1)
+-    uint128_t* r = (uint128_t*)&a[0];
+-    uint128_t* s = (uint128_t*)&b[0];
+-    uint128_t* t = (uint128_t*)&c[0];
+-
+-    *t = *r - *s;
+-    *t -= (*t >> 127);
+-    *t &= prime1271;
++    uint128_t r, s, t;
++
++    memcpy(&r, a, sizeof(r));
++    memcpy(&s, b, sizeof(s));
++    t = r - s;
++    t -= (t >> 127);
++    t &= prime1271;
++    memcpy(c, &t, sizeof(t));
+ } 
  
--#include "FourQ_internal.h"
-+#include "apsi/fourq/FourQ_internal.h"
+ 
+ void fpneg1271(felm_t a)
+ { // Field negation, a = -a mod (2^127-1)
+-    uint128_t* r = (uint128_t*)&a[0];
++    uint128_t r;
+ 
+-    *r = prime1271 - *r;
++    memcpy(&r, a, sizeof(r));
++    r = prime1271 - r;
++    memcpy(a, &r, sizeof(r));
+ }
  
  
- // Encoding of field elements, elements over Z_r and elements over GF(p^2):
 --- a/third_party/fourq/crypto_util.c
 +++ b/third_party/fourq/crypto_util.c
 @@ -6,8 +6,8 @@
@@ -372,6 +520,39 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  
  #if (USE_ENDO == false)
+--- a/third_party/fourq/FourQ_api.h
++++ b/third_party/fourq/FourQ_api.h
+@@ -21,7 +21,7 @@
+ #endif
+ 
+ 
+-#include "FourQ.h"
++#include "apsi/fourq/FourQ.h"
+ 
+ 
+ /**************** Public ECC API ****************/
+--- a/third_party/fourq/FourQ_internal.h
++++ b/third_party/fourq/FourQ_internal.h
+@@ -21,7 +21,7 @@
+ #endif
+ 
+     
+-#include "FourQ_api.h"
++#include "apsi/fourq/FourQ_api.h"
+ 
+ 
+ // Extended datatype support
+--- a/third_party/fourq/FourQ_params.h
++++ b/third_party/fourq/FourQ_params.h
+@@ -15,7 +15,7 @@
+ #ifndef __FOURQ_PARAMS_H__
+ #define __FOURQ_PARAMS_H__
+ 
+-#include "FourQ_internal.h"
++#include "apsi/fourq/FourQ_internal.h"
+ 
+ 
+ // Encoding of field elements, elements over Z_r and elements over GF(p^2):
 --- a/third_party/fourq/generic/fp.h
 +++ b/third_party/fourq/generic/fp.h
 @@ -58,7 +58,7 @@
