@@ -975,6 +975,9 @@ To use the example command-line interface, run tests, or work on APSI itself, [b
 
 APSI is C++17. Only static builds are supported; the build configuration fails fast if `BUILD_SHARED_LIBS=ON` is passed.
 
+APSI also builds with GNU G++ on Windows (MinGW-w64), against the `x64-mingw-dynamic` vcpkg
+triplet. There is no preset for it and no CI covers it, so treat it as supported but not gated.
+
 > **Note:** The `win-vs2026-*` presets use the `Visual Studio 18 2026` generator, which requires CMake ≥ 4.2 (newer than the ≥ 3.25 baseline). All other presets work with CMake ≥ 3.25.
 
 ### Installing APSI with vcpkg
