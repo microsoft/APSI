@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -24,8 +24,8 @@ This only turns on showing colors for Windows.
 */
 void prepare_console()
 {
-#ifndef _MSC_VER
-    // Nothing to do on Linux.
+#ifndef _WIN32
+    // Nothing to do outside Windows.
 #else
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hConsole == INVALID_HANDLE_VALUE)
