@@ -16,6 +16,8 @@ extern "C" {
 #endif
 
 
+#include <string.h>
+
 #include "../table_lookup.h"
 #include "../FourQ_params.h"
 
@@ -32,10 +34,17 @@ void mod1271(felm_t a)
 { // Modular correction, a = a mod (2^127-1)
     
 #if defined(UINT128_SUPPORT)
-    uint128_t* r = (uint128_t*)&a[0];
+    // A field element is an array of digit_t, so reading or writing it through a uint128_t
+    // lvalue is undefined: the two types do not alias, and the array is not guaranteed to carry
+    // the alignment uint128_t requires. Copying in and out keeps the 128-bit arithmetic while
+    // leaving every access to the element at its own type. Compilers fold these copies into the
+    // same pair of 64-bit loads and stores the cast produced.
+    uint128_t r;
 
-    *r = *r - prime1271;
-    *r = *r + (((uint128_t)0 - (*r >> 127)) & prime1271);
+    memcpy(&r, a, sizeof(r));
+    r = r - prime1271;
+    r = r + (((uint128_t)0 - (r >> 127)) & prime1271);
+    memcpy(a, &r, sizeof(r));
 #elif defined(SCALAR_INTRIN_SUPPORT)
     uint64_t mask;
     uint128_t prime;
@@ -69,13 +78,14 @@ void fpadd1271(felm_t a, felm_t b, felm_t c)
 { // Field addition, c = a+b mod (2^127-1)
     
 #if defined(UINT128_SUPPORT)
-    uint128_t* r = (uint128_t*)&a[0];
-    uint128_t* s = (uint128_t*)&b[0];
-    uint128_t* t = (uint128_t*)&c[0];
+    uint128_t r, s, t;
 
-    *t = *r + *s;
-    *t += (*t >> 127);
-    *t &= prime1271;
+    memcpy(&r, a, sizeof(r));
+    memcpy(&s, b, sizeof(s));
+    t = r + s;
+    t += (t >> 127);
+    t &= prime1271;
+    memcpy(c, &t, sizeof(t));
 #elif defined(SCALAR_INTRIN_SUPPORT)
     uint64_t temp;
     unsigned char _carry;
@@ -93,13 +103,14 @@ void fpsub1271(felm_t a, felm_t b, felm_t c)
 { // Field subtraction, c = a-b mod (2^127-1)
     
 #if defined(UINT128_SUPPORT)
-    uint128_t* r = (uint128_t*)&a[0];
-    uint128_t* s = (uint128_t*)&b[0];
-    uint128_t* t = (uint128_t*)&c[0];
+    uint128_t r, s, t;
 
-    *t = *r - *s;
-    *t -= (*t >> 127);
-    *t &= prime1271;
+    memcpy(&r, a, sizeof(r));
+    memcpy(&s, b, sizeof(s));
+    t = r - s;
+    t -= (t >> 127);
+    t &= prime1271;
+    memcpy(c, &t, sizeof(t));
 #elif defined(SCALAR_INTRIN_SUPPORT)
     uint64_t temp;
     unsigned char _borrow;
@@ -117,9 +128,11 @@ void fpneg1271(felm_t a)
 { // Field negation, a = -a mod (2^127-1)
     
 #if defined(UINT128_SUPPORT)
-    uint128_t* r = (uint128_t*)&a[0];
+    uint128_t r;
 
-    *r = prime1271 - *r;
+    memcpy(&r, a, sizeof(r));
+    r = prime1271 - r;
+    memcpy(a, &r, sizeof(r));
 #elif defined(SCALAR_INTRIN_SUPPORT)
     SUB128(prime1271, a, a);
 #endif
