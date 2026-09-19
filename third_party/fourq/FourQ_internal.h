@@ -28,7 +28,10 @@ extern "C" {
  
 #if defined(GENERIC_IMPLEMENTATION)                       
     typedef uint64_t uint128_t[2];
-#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
+// APSI: which 128-bit strategy works is a property of the compiler, not of the OS: GCC and Clang
+// have a native 128-bit integer on AMD64 wherever they run, and MSVC never does. Testing the OS
+// as well left GCC on Windows (MinGW) matching no branch at all.
+#elif (TARGET == TARGET_AMD64) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
     #define UINT128_SUPPORT
     typedef unsigned uint128_t __attribute__((mode(TI)));  
 #elif (TARGET == TARGET_ARM64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
@@ -138,7 +141,10 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 #define ADC128(addend1, addend2, carry, addition)                                                 \
     (carry) = mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
 
-#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_WIN)
+// APSI: these are MSVC intrinsics, and the array-shaped uint128_t they operate on is exactly
+// what SCALAR_INTRIN_SUPPORT selects above. Keying the branch off that macro rather than
+// restating the target matrix keeps the two blocks from drifting apart.
+#elif defined(SCALAR_INTRIN_SUPPORT)
 
 // Digit multiplication
 #define MUL(multiplier, multiplicand, hi, lo)                                                     \
@@ -189,7 +195,10 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
     (shiftOut)[1]  = __shiftleft128((Input)[0], (Input)[1], (shift));                             \
     (shiftOut)[0] = (Input)[0] << (shift);  
 
-#elif ((TARGET == TARGET_AMD64 || TARGET == TARGET_ARM64) && OS_TARGET == OS_LINUX)
+// APSI: these spell the operations in terms of a native 128-bit integer, which is exactly what
+// UINT128_SUPPORT selects above. Keying the branch off that macro rather than restating the
+// target matrix keeps the two blocks from drifting apart.
+#elif defined(UINT128_SUPPORT)
 
 // Digit multiplication
 #define MUL(multiplier, multiplicand, hi, lo)                                                     \
