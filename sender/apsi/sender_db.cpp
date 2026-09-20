@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <iterator>
@@ -661,6 +662,33 @@ namespace apsi {
             auto lock = get_reader_lock();
 
             return bin_bundles_.at(safe_cast<size_t>(bundle_idx)).size();
+        }
+
+        double SenderDB::log2_fpp(size_t query_item_count) const
+        {
+            if (!query_item_count) {
+                throw invalid_argument("query_item_count cannot be zero");
+            }
+
+            // Lock the database for reading
+            auto lock = get_reader_lock();
+
+            // A receiver's item is tested against every bin bundle at its bundle index, so the
+            // probability is that of one bundle multiplied by however many the busiest index
+            // holds. A stripped database keeps its bundles, so this remains meaningful.
+            size_t max_bundles = 0;
+            for (const auto &bundles : bin_bundles_) {
+                max_bundles = max(max_bundles, bundles.size());
+            }
+
+            double result = params_.log2_fpp_per_bin_bundle() +
+                            std::log2(static_cast<double>(query_item_count));
+            if (max_bundles) {
+                result += std::log2(static_cast<double>(max_bundles));
+            }
+
+            // A probability cannot exceed one, however loose the terms above are.
+            return min<double>(0.0, result);
         }
 
         size_t SenderDB::get_bin_bundle_count_unlocked() const

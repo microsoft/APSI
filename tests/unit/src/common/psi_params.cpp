@@ -2,11 +2,15 @@
 // Licensed under the MIT license.
 
 // STD
+#include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -1013,5 +1017,155 @@ namespace APSITests {
 
         // Missing coeff_modulus_bits
         ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
+    }
+    namespace {
+        // Smallest load that a bin should not exceed: the smallest k for which the chance that
+        // any of the m bins holds k or more is below delta. A mean-plus-one-deviation estimate
+        // is not enough here, because it describes a typical maximum rather than bounding one,
+        // and under-predicts often enough to matter -- one bundle either way decides whether a
+        // parameter set meets the bound.
+        double load_bound(double mean, double bins)
+        {
+            if (mean <= 0.0) {
+                return 1.0;
+            }
+            const double delta = 1e-3;
+            double target = delta / bins;
+            double log_p = -mean; // log P(X = 0)
+            double tail = 1.0;    // P(X >= k)
+            double k = 0.0;
+            while (tail > target && k < 1e7) {
+                tail -= exp(log_p);
+                k += 1.0;
+                log_p += log(mean) - log(k);
+            }
+            return k;
+        }
+
+        // How many bin bundles a bundle index may hold. Two things open a new one: a location
+        // filling its bin, and -- in labeled mode only -- two items whose field elements collide,
+        // since interpolation needs distinct points and BinBundle::multi_insert refuses the
+        // repeat. The second dominates when max_items_per_bin approaches the square root of the
+        // field element space, which is where a capacity-only estimate silently under-predicts.
+        double bundle_bound(
+            double sender_size,
+            double hash_func_count,
+            double table_size,
+            double max_items_per_bin,
+            double item_bit_count_per_felt,
+            double label_byte_count)
+        {
+            double mean = hash_func_count * sender_size / table_size;
+            double per_bin = load_bound(mean, table_size);
+            double bundles = max(1.0, ceil(per_bin / max_items_per_bin));
+
+            if (label_byte_count > 0.0) {
+                double in_bin = min(per_bin, max_items_per_bin);
+                double space = pow(2.0, item_bit_count_per_felt);
+                double colliding_pairs = in_bin * in_bin / (2.0 * space);
+                bundles = max(bundles, 1.0 + load_bound(colliding_pairs, table_size));
+            }
+            return bundles;
+        }
+
+        // Sender and receiver set sizes, and any label byte count, are encoded in the file name as
+        // the README describes: <sender>-<receiver>[-<label byte count>][-com|-cmp].
+        bool parse_name(const string &stem, double &sender, double &receiver, double &label_bytes)
+        {
+            size_t dash = stem.find('-');
+            if (dash == string::npos) {
+                return false;
+            }
+            string s = stem.substr(0, dash);
+            size_t mult = 1;
+            if (!s.empty() && (s.back() == 'K' || s.back() == 'M')) {
+                mult = (s.back() == 'K') ? 1000 : 1000000;
+                s.pop_back();
+            }
+            string rest = stem.substr(dash + 1);
+            string r = rest;
+            string tail;
+            size_t dash2 = rest.find('-');
+            if (dash2 != string::npos) {
+                r = rest.substr(0, dash2);
+                tail = rest.substr(dash2 + 1);
+            }
+            if (s.empty() || r.empty() || s.find_first_not_of("0123456789") != string::npos ||
+                r.find_first_not_of("0123456789") != string::npos) {
+                return false;
+            }
+            sender = static_cast<double>(stoull(s)) * static_cast<double>(mult);
+            receiver = static_cast<double>(stoull(r));
+
+            label_bytes = 0.0;
+            if (!tail.empty()) {
+                string first = tail.substr(0, tail.find('-'));
+                if (first.find_first_not_of("0123456789") == string::npos) {
+                    label_bytes = static_cast<double>(stoull(first));
+                }
+            }
+            return true;
+        }
+    } // namespace
+
+    TEST(PSIParamsTests, ShippedParameterSetsHoldTheDocumentedFalsePositiveBound)
+    {
+        // The README promises that every shipped parameter set keeps the probability of a query
+        // returning at least one false positive below 2^-40, at the set sizes its file name
+        // gives. That figure is not PSIParams::log2_fpp_per_bin_bundle, which describes one
+        // bin bundle: it must also count the bundles a location spills into and the items in
+        // a query. Retuning a
+        // parameter file without carrying both terms is what this guards against.
+        //
+        // The bundle count is bounded rather than estimated, so the guard errs towards reporting
+        // a set as failing rather than passing.
+        namespace fs = std::filesystem;
+        fs::path dir(APSI_PARAMETERS_DIR);
+        ASSERT_TRUE(fs::is_directory(dir)) << "cannot find " << dir;
+
+        size_t json_files = 0;
+        size_t checked = 0;
+        for (const auto &entry : fs::directory_iterator(dir)) {
+            if (entry.path().extension() != ".json") {
+                continue;
+            }
+            json_files++;
+
+            string stem = entry.path().stem().string();
+            double sender = 0.0;
+            double receiver = 0.0;
+            double label_bytes = 0.0;
+            // A name this cannot read is a parameter set nothing here is checking, which is the
+            // failure this test exists to prevent.
+            ASSERT_TRUE(parse_name(stem, sender, receiver, label_bytes))
+                << stem << ": cannot read sender and receiver sizes from the file name, so the "
+                << "false-positive bound cannot be checked for it";
+
+            ifstream file(entry.path());
+            ASSERT_TRUE(file.is_open()) << stem;
+            stringstream json;
+            json << file.rdbuf();
+
+            PSIParams params = PSIParams::Load(json.str());
+            double bundles = bundle_bound(
+                sender,
+                static_cast<double>(params.table_params().hash_func_count),
+                static_cast<double>(params.table_params().table_size),
+                static_cast<double>(params.table_params().max_items_per_bin),
+                static_cast<double>(params.item_bit_count_per_felt()),
+                label_bytes);
+
+            double fpp = params.log2_fpp_per_bin_bundle() + log2(bundles) + log2(receiver);
+
+            ASSERT_LT(fpp, -40.0) << stem << ": per-execution log2(fpp) is " << fpp
+                                  << ", which is not below -40. "
+                                  << "One bundle gives " << params.log2_fpp_per_bin_bundle()
+                                  << ", a location may fill " << bundles
+                                  << " bin bundles, and a query carries " << receiver << " items.";
+            checked++;
+        }
+
+        ASSERT_EQ(json_files, checked) << "every parameter set must be checked";
+        ASSERT_LE(size_t(30), checked) << "expected to find the shipped parameter sets";
     }
 } // namespace APSITests

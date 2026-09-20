@@ -411,6 +411,10 @@ namespace apsi {
             if (json_seal_params.isMember("plain_modulus")) {
                 seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
             } else if (json_seal_params.isMember("plain_modulus_bits")) {
+                // Microsoft SEAL returns the largest prime of this width. A smaller one of the
+                // same width would describe the same items and leave more noise budget, which is
+                // why the parameter sets APSI ships name their plain modulus outright rather
+                // than by width.
                 seal_params.set_plain_modulus(
                     PlainModulus::Batching(
                         poly_modulus_degree,

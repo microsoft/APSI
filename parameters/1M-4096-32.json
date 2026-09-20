@@ -12,8 +12,8 @@
         "query_powers": [ 1, 5, 8, 27, 135 ]
     },
     "seal_params": {
-        "plain_modulus_bits": 21,
+        "plain_modulus": 2277377,
         "poly_modulus_degree": 8192,
-        "coeff_modulus_bits": [ 48, 56, 56, 48 ]
+        "coeff_modulus_bits": [ 60, 60, 60, 26 ]
     }
 }

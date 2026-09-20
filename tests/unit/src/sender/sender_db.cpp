@@ -4,6 +4,7 @@
 // STD
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <numeric>
@@ -1195,5 +1196,41 @@ namespace APSITests {
         ASSERT_LT(0, rounds_with_refusal)
             << "no round had a reader still looping when the strip took the lock, so the readers "
                "always finished first and this test covered nothing";
+    }
+    TEST(SenderDBTests, Log2FppAccountsForBinBundleMultiplicity)
+    {
+        // PSIParams::log2_fpp_per_bin_bundle describes one bin bundle. A location holding more
+        // items than max_items_per_bin spills into further bundles at the same index, each with its
+        // own matching polynomial, and a match from any of them is reported, so the probability the
+        // database exhibits is higher than the parameters alone suggest.
+        auto params = *get_params2();
+        SenderDB sender_db(params, 0);
+
+        // Empty: nothing has spilled, so there is nothing to add.
+        ASSERT_EQ(params.log2_fpp_per_bin_bundle(), sender_db.log2_fpp(1));
+
+        vector<Item> items;
+        items.reserve(500);
+        for (uint64_t i = 0; i < 500; i++) {
+            items.emplace_back(i + 1, i + 1);
+        }
+        sender_db.insert_or_assign(items);
+
+        size_t max_bundles = 0;
+        for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+            max_bundles = max(max_bundles, sender_db.get_bin_bundle_count(b));
+        }
+        ASSERT_LT(size_t(0), max_bundles);
+
+        ASSERT_DOUBLE_EQ(
+            params.log2_fpp_per_bin_bundle() + log2(static_cast<double>(max_bundles)),
+            sender_db.log2_fpp(1));
+
+        // The query size is the caller's to supply, and cannot be left out.
+        ASSERT_DOUBLE_EQ(sender_db.log2_fpp(1) + 10.0, sender_db.log2_fpp(1024));
+        ASSERT_THROW(static_cast<void>(sender_db.log2_fpp(0)), invalid_argument);
+
+        // Never optimistic: the database figure is at least the single-bundle one.
+        ASSERT_LE(params.log2_fpp_per_bin_bundle(), sender_db.log2_fpp(1));
     }
 } // namespace APSITests

@@ -291,6 +291,22 @@ namespace apsi::sender {
         std::size_t get_bin_bundle_count() const;
 
         /**
+        Returns an upper bound on the base-2 logarithm of the probability that a query of
+        query_item_count items returns at least one false positive against this database.
+
+        This is the figure a deployment wants. It counts what PSIParams::log2_fpp_per_bin_bundle
+        cannot: the bin bundles a location spills into, which this database knows, and the items
+        a query carries, which the caller supplies. Pass 1 for the probability per item.
+
+        The result moves as items are inserted, since inserting can add bin bundles. It is an
+        upper bound rather than an exact figure -- both terms it adds are union bounds -- and it
+        assumes the OPRF leaves items pseudorandom.
+
+        Throws std::invalid_argument if query_item_count is zero.
+        */
+        [[nodiscard]] double log2_fpp(std::size_t query_item_count) const;
+
+        /**
         Returns the total number of bin bundles. The caller must already hold a lock on this
         SenderDB; this function acquires none. Acquiring the reader lock a second time on a
         thread that already holds it is undefined behavior and deadlocks against a waiting

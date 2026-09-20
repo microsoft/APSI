@@ -12,7 +12,7 @@
         "query_powers": [ 1, 2, 5, 8, 9, 10 ]
     },
     "seal_params": {
-        "plain_modulus_bits": 18,
+        "plain_modulus": 147457,
         "poly_modulus_degree": 4096,
         "coeff_modulus_bits": [ 48, 32, 24 ]
     }

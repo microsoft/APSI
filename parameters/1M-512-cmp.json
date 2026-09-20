@@ -14,6 +14,6 @@
     "seal_params": {
         "plain_modulus": 65537,
         "poly_modulus_degree": 4096,
-        "coeff_modulus_bits": [ 40, 34, 30 ]
+        "coeff_modulus_bits": [ 40, 40, 24 ]
     }
 }
