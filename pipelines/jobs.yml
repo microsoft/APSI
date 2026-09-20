@@ -1,8 +1,8 @@
 # This file selects the correct job definition based on system and buildType.
 #
-# Configuration values are capitalized deliberately. On the Ninja jobs they reach CMake as
-# CMAKE_BUILD_TYPE, which is compared with STREQUAL against "Debug", so a lowercase value
-# silently fails to match and the build is not the one the job name claims.
+# Configuration values are capitalized because the Windows job uses one as the Visual Studio
+# output directory, bin\Release or bin\Debug, and because the Release-only steps compare against
+# 'Release'. Build preset names are lower case, so the uses that name a preset apply lower().
 
 parameters:
   debug: 'false'
