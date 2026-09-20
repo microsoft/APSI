@@ -1,0 +1,57 @@
+# Cross-build for ARM64 Windows from an x64 agent.
+#
+# Azure Pipelines has no ARM64 Windows hosted image, but the hosted x64 Windows images already
+# carry the MSVC ARM64 cross tools (Microsoft.VisualStudio.Component.VC.Tools.ARM64), so the
+# ARM64 configuration can be compiled and linked here even though its binaries cannot run.
+# That is worth a job on its own: this configuration selects the generic FourQ implementation
+# rather than the ARM64 one, and nothing else in CI compiles it, so a break in it is otherwise
+# invisible until someone builds on an ARM64 machine.
+#
+# There are no test steps because the agent cannot execute ARM64 binaries. Do not add any.
+
+parameters:
+- name: configuration
+  type: string
+  values:
+  - Debug
+  - Release
+
+steps:
+- task: PowerShell@2
+  displayName: 'Bootstrap vcpkg'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $baseline = (Get-Content vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+      git clone https://github.com/microsoft/vcpkg.git
+      cd vcpkg
+      git checkout $baseline
+      .\bootstrap-vcpkg.bat -disableMetrics
+    workingDirectory: '$(Build.SourcesDirectory)'
+
+- task: PowerShell@2
+  displayName: 'Check the ARM64 cross tools are present'
+  inputs:
+    targetType: 'inline'
+    # Fail with something readable rather than a confusing CMake compiler check, in case a
+    # future agent image drops the component.
+    script: |
+      $vs = vswhere -latest -products * -property installationPath
+      $arm64 = Get-ChildItem -Path "$vs\VC\Tools\MSVC" -Directory |
+               ForEach-Object { Join-Path $_.FullName 'bin\Hostx64\arm64\cl.exe' } |
+               Where-Object { Test-Path $_ }
+      if (-not $arm64) {
+        Write-Host "##vso[task.logissue type=error]No Hostx64/arm64 cl.exe under $vs."
+        Write-Host "##vso[task.logissue type=error]The agent image is missing Microsoft.VisualStudio.Component.VC.Tools.ARM64."
+        exit 1
+      }
+      Write-Host "ARM64 cross compiler: $($arm64 | Select-Object -First 1)"
+    workingDirectory: '$(Build.SourcesDirectory)'
+
+- script: cmake --preset win-vs2022-arm64
+  workingDirectory: '$(Build.SourcesDirectory)'
+  displayName: 'Configure APSI for ARM64'
+
+- script: cmake --build --preset win-vs2022-arm64-${{ lower(parameters.configuration) }}
+  workingDirectory: '$(Build.SourcesDirectory)'
+  displayName: 'Build APSI for ARM64'

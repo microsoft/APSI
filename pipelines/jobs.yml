@@ -28,6 +28,26 @@ jobs:
         ${{ if eq(parameters.debug, 'false') }}:
           configuration: 'Release'
 
+- ${{ if eq(parameters.name, 'WindowsArm64') }}:
+  - job: ${{ parameters.name }}
+    displayName: Windows ARM64 (cross-build)
+    pool:
+      # No ARM64 Windows hosted image exists, so this cross-builds from x64. The ARM64 cross
+      # tools ship on this image; windows-arm64.yml checks for them and fails clearly if that
+      # ever stops being true. Keep this on the VS 2022 image: the win-vs2026-arm64 preset
+      # needs the Visual Studio 18 2026 generator, which only the VS 2026 image has a new
+      # enough CMake to know.
+      vmImage: 'windows-latest'
+    variables:
+      VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
+    steps:
+    - template: windows-arm64.yml
+      parameters:
+        ${{ if eq(parameters.debug, 'true') }}:
+          configuration: 'Debug'
+        ${{ if eq(parameters.debug, 'false') }}:
+          configuration: 'Release'
+
 - ${{ if eq(parameters.name, 'Linux') }}:
   - job: ${{ parameters.name }}
     displayName: ${{ parameters.name }}
