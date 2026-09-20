@@ -34,8 +34,10 @@ Eight changes, in descending order of how much they matter.
     uint64_t and a generic uint128_t that is an array of uint64_t. Where digit_t is not uint64_t
     -- the 32-bit targets, which APSI selects by defining _X86_ -- casting those pointers reads
     and writes the objects through the wrong type, which is the same violation as above. The
-    sizes agree either way, so only the type of each access changes: NWORDS_FIELD digits span 16
-    bytes whether a digit is 64 or 32 bits. Verified by building the generic implementation and
+    sizes agree either way, so the operands keep their layout: NWORDS_FIELD digits span 16
+    bytes whether a digit is 64 or 32 bits. The staging buffers are the one thing that is new,
+    and they are not covered by the optional TEMP_ZEROING scrubbing, which is off by default.
+    Verified by building the generic implementation and
     comparing k*G against the AMD64 implementation over ten scalars, which agree exactly.
 
   * AMD64/fp2_1271_AVX2.S comments out its #include of consts.s. Upstream generates that file
@@ -44,10 +46,10 @@ Eight changes, in descending order of how much they matter.
     and only on a target that assembles it, which is neither Windows nor macOS.
 
   * Both AMD64/*.S files gain a .note.GNU-stack section. GNU ld marks the stack of the whole
-    output executable when any input object lacks one, so without this every ELF binary that
-    links APSI loses NX. The linker warns on each link, and the deprecation it mentions is of
-    the inference itself, so a future version stops silently guessing rather than starting to
-    refuse. Upstream has the same omission.
+    output executable when any input object lacks one, so without this an ELF link that draws
+    either object out of the archive loses NX for the whole binary. The linker warns on each
+    such link, and the deprecation it mentions is of the inference itself, so a future version
+    stops silently guessing rather than starting to refuse. Upstream has the same omission.
 
   * FourQ_internal.h selects the 128-bit arithmetic by compiler rather than by operating system,
     and selects the matching digit macros off the support macro that choice sets rather than by
@@ -55,7 +57,8 @@ Eight changes, in descending order of how much they matter.
     admits are GCC or Clang on Linux and MSVC on Windows, and GCC on Windows (MinGW) matches
     neither: it reaches the #error, and if that is lifted it still lands on the MSVC branch and
     fails on _umul128. The distinction the code actually needs is the compiler, since GCC and
-    Clang have a native 128-bit integer wherever they run and MSVC never does. MinGW then takes
+    Clang have a native 128-bit integer on the AMD64 and ARM64 targets these branches select,
+    and MSVC never does. MinGW then takes
     the same UINT128_SUPPORT path that AMD64 Linux already uses; AMD64/fp_x64.h and eccp2.c both
     switch on that macro rather than on the target, so neither sees a combination it does not
     already handle. ARM64 is left paired with Linux, because no ARM64 Windows toolchain has been
