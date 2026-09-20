@@ -32,9 +32,8 @@ extern "C" {
  
 #if defined(GENERIC_IMPLEMENTATION)                       
     typedef uint64_t uint128_t[2];
-// APSI: which 128-bit strategy works is a property of the compiler, not of the OS: GCC and Clang
-// have a native 128-bit integer on AMD64 wherever they run, and MSVC never does. Testing the OS
-// as well left GCC on Windows (MinGW) matching no branch at all.
+// APSI: which 128-bit strategy applies is a property of the compiler. GCC and Clang have a
+// native 128-bit integer on AMD64; MSVC has none and uses the intrinsic branch below.
 #elif (TARGET == TARGET_AMD64) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
     #define UINT128_SUPPORT
     typedef unsigned uint128_t __attribute__((mode(TI)));  
@@ -133,12 +132,11 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 #define SHIFTL(highIn, lowIn, shift, shiftOut, DigitSize)                                         \
     (shiftOut) = ((highIn) << (shift)) ^ ((lowIn) >> (DigitSize - (shift)));
 
-// APSI: mp_mul and mp_add operate on digit_t, but a generic uint128_t is an array of uint64_t
-// and the operands here are uint64_t. Where digit_t is not uint64_t -- the 32-bit targets --
-// casting the pointers reads and writes those objects through the wrong type, which is the same
-// aliasing violation the architecture headers had. Staging through a digit_t buffer keeps every
-// access at the type of the object. The sizes agree either way: NWORDS_FIELD digits span 16
-// bytes for both a 64-bit and a 32-bit digit, and NWORDS_FIELD/2 digits span 8.
+// APSI: mp_mul and mp_add take digit_t, while a generic uint128_t is an array of uint64_t and
+// these operands are uint64_t. Stage through digit_t buffers so every object is accessed at its
+// own type. NWORDS_FIELD digits span 16 bytes whether a digit is 64 or 32 bits, and
+// NWORDS_FIELD/2 digits span 8, so the operands keep their layout. These buffers are not
+// covered by TEMP_ZEROING, which is off by default.
 
 // 64x64-bit multiplication
 #define MUL128(multiplier, multiplicand, product)                                                 \

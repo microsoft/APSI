@@ -29,7 +29,7 @@
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
-- Fixed the vendored FourQ sources reading and writing field elements through a `uint128_t` pointer, which GCC 16 miscompiled into wrong curve points.
+- Fixed the vendored FourQ sources reading and writing field elements through a `uint128_t` pointer, which produced wrong curve points under GCC 16.
 - The exported CMake package links `JsonCpp::JsonCpp` rather than `jsoncpp_static`, so APSI can be built against a shared jsoncpp. jsoncpp 1.9.5 or newer is now required.
 - APSI builds with GCC on Windows (MinGW).
 

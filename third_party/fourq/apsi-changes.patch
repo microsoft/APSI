@@ -8,74 +8,57 @@ upstream sources exactly, which is the check to run afterwards:
 
 Eight changes, in descending order of how much they matter.
 
-  * AMD64/fp_x64.h and ARM64/fp_arm64.h stop reading and writing field elements through a
-    uint128_t pointer. A field element is an array of digit_t, so mod1271, fpadd1271, fpsub1271
-    and fpneg1271 casting &a[0] to uint128_t* and assigning through it is undefined: the two
-    types do not alias, and the array carries only the alignment digit_t requires. GCC 16 acts
-    on the aliasing assumption and drops stores, which silently yields wrong curve points --
-    OPRFTests.Hash2Curve is the known-answer test that catches it. Every GCC or Clang build
+  * AMD64/fp_x64.h and ARM64/fp_arm64.h move field elements between felm_t and uint128_t with
+    memcpy rather than through a cast. A field element is an array of digit_t, which neither
+    aliases a uint128_t nor carries its alignment, so mod1271, fpadd1271, fpsub1271 and
+    fpneg1271 must not read or write one through a uint128_t lvalue. Every GCC or Clang build
     that selects one of these two architecture headers compiles this, which is Linux and macOS
-    as well as MinGW; assembly support does not replace these routines. MSVC escapes because it
-    takes the intrinsic path instead, and a generic build escapes because it includes
-    generic/fp.h, which is already free of the pattern. The replacement copies in and out with
-    memcpy, which cost nothing in the configurations tested here: diffing the generated
-    assembly for all four functions showed GCC 16 emitting an identical instruction sequence.
-    The <string.h> this needs is included outside the extern "C" block, since these headers are
-    included from C++ and a standard header must not be given C language linkage.
+    as well as MinGW; assembly support does not replace these four routines. MSVC takes the
+    intrinsic path instead, and a generic build uses generic/fp.h, which is free of the
+    pattern. The <string.h> this needs is included outside the extern "C" block, since these
+    headers are included from C++ and a standard header must not be given C language linkage.
 
-  * eccp2_core.c, generic/fp.h and AMD64/fp_x64.h drop the __inline qualifier from 31 definitions.
-    Do not skip this one. Twenty of them are non-static and called from other translation units,
-    and MSVC emits no external symbol for such a definition, so those callers fail to link. The
-    Unix toolchains emit it either way, which is what makes the omission easy to miss: it breaks
-    only the Windows build.
+  * eccp2_core.c, generic/fp.h and AMD64/fp_x64.h drop the __inline qualifier from 31
+    definitions. Twenty are non-static and called from other translation units, and MSVC emits
+    no external symbol for such a definition, so those callers need the qualifier gone to link.
+    The Unix toolchains emit the symbol either way.
 
-  * FourQ_internal.h's generic MUL128, ADD128 and ADC128 stage through a digit_t buffer rather
-    than casting to one. They hand mp_mul and mp_add, which take digit_t, operands that are
-    uint64_t and a generic uint128_t that is an array of uint64_t. Where digit_t is not uint64_t
-    -- the 32-bit targets, which APSI selects by defining _X86_ -- casting those pointers reads
-    and writes the objects through the wrong type, which is the same violation as above. The
-    sizes agree either way, so the operands keep their layout: NWORDS_FIELD digits span 16
-    bytes whether a digit is 64 or 32 bits. The staging buffers are the one thing that is new,
-    and they are not covered by the optional TEMP_ZEROING scrubbing, which is off by default.
-    Verified by building the generic implementation and
-    comparing k*G against the AMD64 implementation over ten scalars, which agree exactly.
+  * FourQ_internal.h's generic MUL128, ADD128 and ADC128 stage through digit_t buffers rather
+    than casting to them. They hand mp_mul and mp_add, which take digit_t, operands that are
+    uint64_t and a generic uint128_t that is an array of uint64_t, and on the 32-bit targets
+    digit_t is not uint64_t. The sizes agree either way, so the operands keep their layout:
+    NWORDS_FIELD digits span 16 bytes whether a digit is 64 or 32 bits. The staging buffers are
+    not covered by the optional TEMP_ZEROING scrubbing, which is off by default.
 
-  * AMD64/fp2_1271_AVX2.S comments out its #include of consts.s. Upstream generates that file
-    from consts.c as a build step; APSI compiles consts.c as an ordinary source instead, so the
-    constants are linked in rather than textually included. Without this the AVX2 build fails,
-    and only on a target that assembles it, which is neither Windows nor macOS.
+  * AMD64/fp2_1271_AVX2.S drops its #include of consts.s. Upstream generates that file from
+    consts.c as a build step; APSI compiles consts.c as an ordinary source, so the constants
+    are linked in rather than textually included.
 
-  * Both AMD64/*.S files gain a .note.GNU-stack section. GNU ld marks the stack of the whole
-    output executable when any input object lacks one, so without this an ELF link that draws
-    either object out of the archive loses NX for the whole binary. The linker warns on each
-    such link, and the deprecation it mentions is of the inference itself, so a future version
-    stops silently guessing rather than starting to refuse. Upstream has the same omission.
+  * Both AMD64/*.S files carry a .note.GNU-stack section. GNU ld marks the stack of the whole
+    output executable when any input object lacks one, so an ELF link that draws either object
+    out of the archive needs it to keep NX. The linker warns on each such link, and the
+    deprecation it mentions is of the inference itself, so a future version stops guessing
+    rather than starts refusing. Upstream omits the section.
 
-  * FourQ_internal.h selects the 128-bit arithmetic by compiler rather than by operating system,
-    and selects the matching digit macros off the support macro that choice sets rather than by
-    restating the target matrix. Upstream pairs target with OS, so the only configurations it
-    admits are GCC or Clang on Linux and MSVC on Windows, and GCC on Windows (MinGW) matches
-    neither: it reaches the #error, and if that is lifted it still lands on the MSVC branch and
-    fails on _umul128. The distinction the code actually needs is the compiler, since GCC and
-    Clang have a native 128-bit integer on the AMD64 and ARM64 targets these branches select,
-    and MSVC never does. MinGW then takes
-    the same UINT128_SUPPORT path that AMD64 Linux already uses; AMD64/fp_x64.h and eccp2.c both
-    switch on that macro rather than on the target, so neither sees a combination it does not
-    already handle. ARM64 is left paired with Linux, because no ARM64 Windows toolchain has been
-    tested here; APSI's CMake compiles ARM64 Windows as a generic build, which does not reach
-    these branches at all.
+  * FourQ_internal.h selects the 128-bit arithmetic by compiler rather than by operating
+    system, and selects the matching digit macros off the support macro that choice sets rather
+    than by restating the target matrix. The distinction the code needs is the compiler: GCC
+    and Clang have a native 128-bit integer on the AMD64 and ARM64 targets these branches
+    select, and MSVC has none. MinGW therefore takes the same UINT128_SUPPORT path as AMD64
+    Linux, and AMD64/fp_x64.h and eccp2.c both switch on that macro rather than on the target.
+    ARM64 stays paired with Linux; APSI's CMake compiles ARM64 Windows as a generic build,
+    which does not reach these branches.
 
-  * Every #include of a header in this same directory gains an "apsi/fourq/" prefix, so that it
-    resolves through the mirrored build-tree layout described in README.md. The "../" includes in
-    the architecture headers already resolve through that layout and are left alone.
+  * Every #include of a header in this same directory carries an "apsi/fourq/" prefix, so that
+    it resolves through the mirrored build-tree layout described in README.md. The "../"
+    includes in the architecture headers already resolve through that layout and are left
+    alone.
 
-  * crypto_util.c reduces both x-coordinate components in decode before the sign bit is read.
-    FourQlib's 32-bit implementation, which APSI does not vendor, already reduces both here. The
-    only value this changes is the redundant encoding of zero, so it is a consistency change
-    rather than a defect fix, and it can be dropped if upstream reworks this area.
+  * crypto_util.c reduces both x-coordinate components in decode before the sign bit is read,
+    as FourQlib's 32-bit implementation does. The only value this affects is the redundant
+    encoding of zero, where a component holds p rather than 0.
 
 To regenerate, diff the pinned upstream sources against this tree and keep this header.
-
 --- a/third_party/fourq/AMD64/fp2_1271_AVX2.S
 +++ b/third_party/fourq/AMD64/fp2_1271_AVX2.S
 @@ -6,7 +6,8 @@
@@ -125,7 +108,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // For C++
  #ifdef __cplusplus
-@@ -32,10 +36,17 @@
+@@ -32,10 +36,14 @@
  { // Modular correction, a = a mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
@@ -133,11 +116,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
 -
 -    *r = *r - prime1271;
 -    *r = *r + (((uint128_t)0 - (*r >> 127)) & prime1271);
-+    // A field element is an array of digit_t, so reading or writing it through a uint128_t
-+    // lvalue is undefined: the two types do not alias, and the array is not guaranteed to carry
-+    // the alignment uint128_t requires. Copying in and out keeps the 128-bit arithmetic while
-+    // leaving every access to the element at its own type. Compilers fold these copies into the
-+    // same pair of 64-bit loads and stores the cast produced.
++    // APSI: a field element is an array of digit_t, which neither aliases nor is aligned as a
++    // uint128_t, so move between the two with memcpy rather than a cast.
 +    uint128_t r;
 +
 +    memcpy(&r, a, sizeof(r));
@@ -147,7 +127,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t mask;
      uint128_t prime;
-@@ -51,31 +62,32 @@
+@@ -51,31 +59,32 @@
  }
  
  
@@ -190,7 +170,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t temp;
      unsigned char _carry;
-@@ -89,17 +101,18 @@
+@@ -89,17 +98,18 @@
  }
  
  
@@ -217,7 +197,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t temp;
      unsigned char _borrow;
-@@ -117,16 +130,18 @@
+@@ -117,16 +127,18 @@
  { // Field negation, a = -a mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
@@ -239,7 +219,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field multiplication, c = a*b mod (2^127-1)
      uint128_t tt1, tt2, tt3 = {0};
      
-@@ -191,7 +206,7 @@
+@@ -191,7 +203,7 @@
  }
  
  
@@ -248,7 +228,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Exponentiation over GF(p), af = a^(125-1)
      int i;
      felm_t t1, t2, t3, t4, t5;
-@@ -240,7 +255,7 @@
+@@ -240,7 +252,7 @@
  }
  
  
@@ -257,7 +237,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Schoolbook multiprecision multiply, c = a*b   
      unsigned int i, j;
      digit_t u, v, UV[2];
-@@ -263,7 +278,7 @@
+@@ -263,7 +275,7 @@
  }
  
  
@@ -279,7 +259,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // For C++
  #ifdef __cplusplus
-@@ -26,10 +30,17 @@
+@@ -26,10 +30,14 @@
  
  void mod1271(felm_t a)
  { // Modular correction, a = a mod (2^127-1)    
@@ -287,11 +267,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
 -
 -    *r = *r - prime1271;
 -    *r = *r + (((uint128_t)0 - (*r >> 127)) & prime1271);
-+    // A field element is an array of digit_t, so reading or writing it through a uint128_t
-+    // lvalue is undefined: the two types do not alias, and the array is not guaranteed to carry
-+    // the alignment uint128_t requires. Copying in and out keeps the 128-bit arithmetic while
-+    // leaving every access to the element at its own type. Compilers fold these copies into the
-+    // same pair of 64-bit loads and stores the cast produced.
++    // APSI: a field element is an array of digit_t, which neither aliases nor is aligned as a
++    // uint128_t, so move between the two with memcpy rather than a cast.
 +    uint128_t r;
 +
 +    memcpy(&r, a, sizeof(r));
@@ -301,7 +278,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  }
  
  
-@@ -49,33 +60,37 @@
+@@ -49,33 +57,37 @@
  
  __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
  { // Field addition, c = a+b mod (2^127-1)
@@ -574,7 +551,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // For C++
  #ifdef __cplusplus
-@@ -21,14 +25,17 @@
+@@ -21,14 +25,16 @@
  #endif
  
      
@@ -587,23 +564,21 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #if defined(GENERIC_IMPLEMENTATION)                       
      typedef uint64_t uint128_t[2];
 -#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
-+// APSI: which 128-bit strategy works is a property of the compiler, not of the OS: GCC and Clang
-+// have a native 128-bit integer on AMD64 wherever they run, and MSVC never does. Testing the OS
-+// as well left GCC on Windows (MinGW) matching no branch at all.
++// APSI: which 128-bit strategy applies is a property of the compiler. GCC and Clang have a
++// native 128-bit integer on AMD64; MSVC has none and uses the intrinsic branch below.
 +#elif (TARGET == TARGET_AMD64) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
      #define UINT128_SUPPORT
      typedef unsigned uint128_t __attribute__((mode(TI)));  
  #elif (TARGET == TARGET_ARM64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
-@@ -126,19 +133,41 @@
+@@ -126,19 +132,40 @@
  #define SHIFTL(highIn, lowIn, shift, shiftOut, DigitSize)                                         \
      (shiftOut) = ((highIn) << (shift)) ^ ((lowIn) >> (DigitSize - (shift)));
  
-+// APSI: mp_mul and mp_add operate on digit_t, but a generic uint128_t is an array of uint64_t
-+// and the operands here are uint64_t. Where digit_t is not uint64_t -- the 32-bit targets --
-+// casting the pointers reads and writes those objects through the wrong type, which is the same
-+// aliasing violation the architecture headers had. Staging through a digit_t buffer keeps every
-+// access at the type of the object. The sizes agree either way: NWORDS_FIELD digits span 16
-+// bytes for both a 64-bit and a 32-bit digit, and NWORDS_FIELD/2 digits span 8.
++// APSI: mp_mul and mp_add take digit_t, while a generic uint128_t is an array of uint64_t and
++// these operands are uint64_t. Stage through digit_t buffers so every object is accessed at its
++// own type. NWORDS_FIELD digits span 16 bytes whether a digit is 64 or 32 bits, and
++// NWORDS_FIELD/2 digits span 8, so the operands keep their layout. These buffers are not
++// covered by TEMP_ZEROING, which is off by default.
 +
  // 64x64-bit multiplication
  #define MUL128(multiplier, multiplicand, product)                                                 \
@@ -641,7 +616,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // Digit multiplication
  #define MUL(multiplier, multiplicand, hi, lo)                                                     \
-@@ -189,7 +218,10 @@
+@@ -189,7 +216,10 @@
      (shiftOut)[1]  = __shiftleft128((Input)[0], (Input)[1], (shift));                             \
      (shiftOut)[0] = (Input)[0] << (shift);  
  
