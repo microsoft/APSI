@@ -32,14 +32,16 @@ jobs:
   - job: ${{ parameters.name }}
     displayName: Windows ARM64 (cross-build)
     pool:
-      # No ARM64 Windows hosted image exists, so this cross-builds from x64. The ARM64 cross
-      # tools ship on this image; windows-arm64.yml checks for them and fails clearly if that
-      # ever stops being true. Keep this on the VS 2022 image: the win-vs2026-arm64 preset
-      # needs the Visual Studio 18 2026 generator, which only the VS 2026 image has a new
-      # enough CMake to know.
-      vmImage: 'windows-latest'
+      # Azure Pipelines has no ARM64 Windows image, so this cross-builds from x64. The image
+      # carries the MSVC ARM64 cross tools; windows-arm64.yml checks for them. The preset it
+      # builds is win-vs2022-arm64, because the VS 2026 generator the win-vs2026-* presets ask
+      # for needs a newer CMake than this image ships.
+      vmImage: 'windows-2022'
     variables:
       VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
+      # This job has no CodeQL tasks of its own, and auto-injection would instrument vcpkg's
+      # dependency build as well. The x64 job is where CodeQL runs.
+      Codeql.SkipTaskAutoInjection: true
     steps:
     - template: windows-arm64.yml
       parameters:
