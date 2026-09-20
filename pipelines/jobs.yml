@@ -39,9 +39,6 @@ jobs:
       vmImage: 'windows-2022'
     variables:
       VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
-      # This job has no CodeQL tasks of its own, and auto-injection would instrument vcpkg's
-      # dependency build as well. The x64 job is where CodeQL runs.
-      Codeql.SkipTaskAutoInjection: true
     steps:
     - template: windows-arm64.yml
       parameters:

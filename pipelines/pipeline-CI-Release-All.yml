@@ -2,6 +2,14 @@
 
 trigger: none
 
+# CodeQL is an explicit Release-only gate: windows.yml initializes it after the dependency
+# configuration so it wraps the APSI build alone. Where no CodeQL task is present, policy
+# injects one at the start of the job instead, which also instruments vcpkg's from-source
+# dependency build and pushes the job past the agent timeout, so every job opts out of the
+# automatic injection and only the explicit tasks run.
+variables:
+  Codeql.SkipTaskAutoInjection: true
+
 stages:
   - stage: build
     displayName: Build
