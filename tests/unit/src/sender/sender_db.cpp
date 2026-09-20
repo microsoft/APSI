@@ -959,24 +959,19 @@ namespace APSITests {
 
     TEST(SenderDBTests, PackingRateAndSaveDoNotDeadlockAgainstAWriter)
     {
-        // get_packing_rate and save hold the reader lock and read the bin bundle count while
-        // holding it. Reading it through the locking accessor takes the lock a second time on
-        // that thread, which blocks once a writer queues between the two acquisitions; the writer
-        // then waits on the reader that is blocked on itself. Both must use the unlocked
-        // accessor, as must Sender::RunQuery, which reads the count under its own lock. A writer
-        // runs alongside throughout so that such a window is available.
+        // get_packing_rate, save and Sender::RunQuery read the bin bundle count while already
+        // holding the SenderDB lock, so each uses the unlocked accessor: the locking one takes
+        // the lock a second time on that thread, which blocks once a writer queues between the
+        // two acquisitions, and the writer then waits on a reader blocked on itself. A writer
+        // runs alongside throughout so that window is available.
         //
-        // This reproduces only where a queued writer bars new readers, which is the case for
-        // libc++, for MSVC's SRWLOCK, and for the winpthreads rwlock libstdc++ uses on MinGW.
-        // On Linux libstdc++ wraps a reader-preferring pthread_rwlock_t on which the second
-        // acquisition succeeds, so a pass there says nothing either way.
+        // Only a lock where a queued writer bars new readers can show this, which is libc++,
+        // MSVC's SRWLOCK, and the winpthreads rwlock libstdc++ uses on MinGW. On Linux
+        // libstdc++ wraps a reader-preferring pthread_rwlock_t on which the second acquisition
+        // succeeds, so a pass there says nothing either way.
         //
-        // Every piece of state the threads touch is owned by a shared_ptr they each hold, so a
-        // thread left running by a wedged run cannot outlive what it uses. Each reports when it
-        // has left its loop: the test joins the ones that have, and detaches only a thread that
-        // is still wedged, so a genuine deadlock fails on the deadline rather than hanging the
-        // binary. Joining matters because a thread still inside the SenderDB when the process
-        // tears its globals down faults there.
+        // Each thread holds a shared_ptr to everything it touches, so one left running cannot
+        // outlive what it uses, and each reports when it leaves its loop.
         struct State {
             shared_ptr<SenderDB> db;
             atomic<bool> stop{ false };
@@ -1022,17 +1017,11 @@ namespace APSITests {
             this_thread::sleep_for(chrono::milliseconds(10));
         }
 
-        // Stop the writer and let both threads drain before judging the run. Where a queued
-        // writer bars new readers the writer can also starve one outright by re-queueing
-        // immediately, which is what winpthreads' rwlock does, and libstdc++ builds
-        // std::shared_mutex on that for MinGW. The deadline on its own cannot tell that apart
-        // from the deadlock this guards: a starved reader finishes within a round or two once
-        // the writer stops, while a reader blocked on itself never does, because the writer it
-        // queues behind is itself blocked and so never observes the stop either.
-        //
-        // Waiting for the writer as well is what keeps a passing run from faulting: these
-        // threads are detached, so one still inside the SenderDB when the process starts
-        // destroying its globals dies there rather than returning.
+        // Stop the writer before judging the reader. A writer that re-queues immediately can
+        // starve a reader outright where a queued writer bars new readers, and a deadline
+        // alone cannot tell that from the deadlock this guards: a starved reader finishes
+        // within a round or two once the writer stops, while a reader blocked on itself never
+        // does, because the writer it queues behind is blocked too and never observes the stop.
         state->stop = true;
         auto drain_deadline = chrono::steady_clock::now() + chrono::seconds(10);
         while ((!state->done || !state->writer_done) &&
@@ -1040,12 +1029,11 @@ namespace APSITests {
             this_thread::sleep_for(chrono::milliseconds(10));
         }
 
-        // Join whichever threads reported leaving their loops, which is what actually guarantees
-        // nothing of theirs runs past this point; a flag only says the loop was left, not that
-        // the thread has finished unwinding. A thread that is still wedged is detached instead,
-        // so the deadlock this guards fails the test rather than hanging the binary. Both must
-        // be resolved before the assertion, because a failing ASSERT returns and would destroy
-        // a still-joinable thread.
+        // Join the threads that left their loops, which is what guarantees neither is inside
+        // the SenderDB once the process starts destroying its globals; a flag alone only says
+        // the loop was left. A thread still wedged is detached so a deadlock fails the test
+        // rather than hanging the binary. Both are resolved before the assertion, because a
+        // failing ASSERT returns and would destroy a joinable thread.
         const bool reader_finished = state->done.load();
         const bool writer_finished = state->writer_done.load();
         if (writer_finished) {
@@ -1059,9 +1047,11 @@ namespace APSITests {
             reader.detach();
         }
 
+        // Both must have stopped: a run that leaves the writer going has a thread loose in the
+        // SenderDB, whatever the reader did.
         ASSERT_TRUE(reader_finished)
-            << "get_packing_rate or save deadlocked against a concurrent writer"
-            << (writer_finished ? "" : "; the writer had not stopped either");
+            << "get_packing_rate or save deadlocked against a concurrent writer";
+        ASSERT_TRUE(writer_finished) << "the writer never stopped";
     }
 
     TEST(SenderDBTests, KeyConsumersAreSafeAgainstAConcurrentStrip)
