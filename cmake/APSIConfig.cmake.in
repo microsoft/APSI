@@ -38,6 +38,10 @@ apsi_find_dependency(Microsoft.GSL REQUIRED)
 apsi_find_dependency(Kuku REQUIRED)
 apsi_find_dependency(Flatbuffers REQUIRED)
 apsi_find_dependency(jsoncpp REQUIRED)
+if(NOT TARGET JsonCpp::JsonCpp)
+    # APSI's exported target links JsonCpp::JsonCpp, which jsoncpp exports from 1.9.5 on.
+    message(FATAL_ERROR "APSI: jsoncpp does not define JsonCpp::JsonCpp; 1.9.5 or newer is required")
+endif()
 
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
