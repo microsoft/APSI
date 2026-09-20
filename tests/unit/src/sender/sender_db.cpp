@@ -967,13 +967,16 @@ namespace APSITests {
         // runs alongside throughout so that such a window is available.
         //
         // This reproduces only where a queued writer bars new readers, which is the case for
-        // libc++ and for MSVC's SRWLOCK. libstdc++ wraps a reader-preferring pthread_rwlock_t on
-        // which the second acquisition succeeds, so a pass there says nothing either way.
+        // libc++, for MSVC's SRWLOCK, and for the winpthreads rwlock libstdc++ uses on MinGW.
+        // On Linux libstdc++ wraps a reader-preferring pthread_rwlock_t on which the second
+        // acquisition succeeds, so a pass there says nothing either way.
         //
-        // The threads are detached and every piece of state they touch is owned by a shared_ptr
-        // they each hold, so a wedged run fails on the deadline rather than hanging the binary.
-        // Each reports when it has left its loop, because a detached thread still running inside
-        // the SenderDB while the process tears its globals down faults there.
+        // Every piece of state the threads touch is owned by a shared_ptr they each hold, so a
+        // thread left running by a wedged run cannot outlive what it uses. Each reports when it
+        // has left its loop: the test joins the ones that have, and detaches only a thread that
+        // is still wedged, so a genuine deadlock fails on the deadline rather than hanging the
+        // binary. Joining matters because a thread still inside the SenderDB when the process
+        // tears its globals down faults there.
         struct State {
             shared_ptr<SenderDB> db;
             atomic<bool> stop{ false };
@@ -1003,7 +1006,6 @@ namespace APSITests {
             }
             state->writer_done = true;
         });
-        writer.detach();
 
         thread reader([state] {
             constexpr int reader_rounds = 300;
@@ -1014,7 +1016,6 @@ namespace APSITests {
             }
             state->done = true;
         });
-        reader.detach();
 
         auto deadline = chrono::steady_clock::now() + chrono::seconds(60);
         while (!state->done && chrono::steady_clock::now() < deadline) {
@@ -1039,8 +1040,28 @@ namespace APSITests {
             this_thread::sleep_for(chrono::milliseconds(10));
         }
 
-        ASSERT_TRUE(state->done.load())
-            << "get_packing_rate or save deadlocked against a concurrent writer";
+        // Join whichever threads reported leaving their loops, which is what actually guarantees
+        // nothing of theirs runs past this point; a flag only says the loop was left, not that
+        // the thread has finished unwinding. A thread that is still wedged is detached instead,
+        // so the deadlock this guards fails the test rather than hanging the binary. Both must
+        // be resolved before the assertion, because a failing ASSERT returns and would destroy
+        // a still-joinable thread.
+        const bool reader_finished = state->done.load();
+        const bool writer_finished = state->writer_done.load();
+        if (writer_finished) {
+            writer.join();
+        } else {
+            writer.detach();
+        }
+        if (reader_finished) {
+            reader.join();
+        } else {
+            reader.detach();
+        }
+
+        ASSERT_TRUE(reader_finished)
+            << "get_packing_rate or save deadlocked against a concurrent writer"
+            << (writer_finished ? "" : "; the writer had not stopped either");
     }
 
     TEST(SenderDBTests, KeyConsumersAreSafeAgainstAConcurrentStrip)
