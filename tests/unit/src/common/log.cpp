@@ -98,7 +98,7 @@ namespace APSITests {
             log_handlers[static_cast<size_t>(LogLevel::warning)] = push("warning");
             log_handlers[static_cast<size_t>(LogLevel::error)] = push("error");
 
-            auto flush_fn = [&cap]() {
+            auto flush_fn = [&cap] {
                 cap.flushed = true;
             };
             flush_handlers[static_cast<size_t>(LogLevel::trace)] = flush_fn;
@@ -107,7 +107,7 @@ namespace APSITests {
             flush_handlers[static_cast<size_t>(LogLevel::warning)] = flush_fn;
             flush_handlers[static_cast<size_t>(LogLevel::error)] = flush_fn;
 
-            close_handlers[static_cast<size_t>(LogLevel::error)] = [&cap]() {
+            close_handlers[static_cast<size_t>(LogLevel::error)] = [&cap] {
                 cap.closed = true;
             };
 

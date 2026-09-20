@@ -202,9 +202,7 @@ namespace APSITests {
             Sender::RunOPRF(oprf_request, oprf_key, chl);
             OPRFResponse oprf_response = to_oprf_response(chl.receive_response());
 
-            vector<HashedItem> hashed_recv_items;
-            LabelKeyVector label_keys;
-            tie(hashed_recv_items, label_keys) =
+            auto [hashed_recv_items, label_keys] =
                 Receiver::ExtractHashes(oprf_response, oprf_receiver);
 
             auto recv_query_pair = receiver.create_query(hashed_recv_items);
@@ -230,13 +228,15 @@ namespace APSITests {
                 packages.push_back(*rp);
             }
 
-            HonestQuery result{ std::move(recv_items),
-                                std::move(recv_int_items),
-                                std::move(hashed_recv_items),
-                                std::move(label_keys),
-                                std::move(itt),
-                                std::move(packages),
-                                std::move(sender_item_labels) };
+            HonestQuery result{
+                std::move(recv_items),
+                std::move(recv_int_items),
+                std::move(hashed_recv_items),
+                std::move(label_keys),
+                std::move(itt),
+                std::move(packages),
+                std::move(sender_item_labels),
+            };
 
             // Confirm the captured material really is a correct answer, so that a later
             // failure points at the hostile behaviour and not at a broken capture.

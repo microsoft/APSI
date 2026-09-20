@@ -560,7 +560,7 @@ namespace apsi {
             vector<future<void>> result_workers;
             result_workers.reserve(task_count);
             for (size_t t = 0; t < task_count; t++) {
-                result_workers.push_back(async(launch::async, [&]() {
+                result_workers.push_back(async(launch::async, [&] {
                     process_result_worker(
                         package_count, merge_state, deadline, label_keys, itt, chl);
                 }));

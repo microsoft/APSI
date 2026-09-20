@@ -338,7 +338,7 @@ namespace apsi {
             sinks.log_handlers[static_cast<size_t>(LogLevel::error)] =
                 build_handler(LogLevel::error, &std::cerr);
 
-            auto flush_fn = [file_stream]() {
+            auto flush_fn = [file_stream] {
                 std::cout.flush();
                 std::cerr.flush();
                 if (file_stream && file_stream->is_open()) {
@@ -352,7 +352,7 @@ namespace apsi {
             sinks.flush_handlers[static_cast<size_t>(LogLevel::error)] = flush_fn;
 
             // A single close action on the file stream; std::cout / std::cerr are not closed.
-            sinks.close_handlers[static_cast<size_t>(LogLevel::error)] = [file_stream]() {
+            sinks.close_handlers[static_cast<size_t>(LogLevel::error)] = [file_stream] {
                 if (file_stream && file_stream->is_open()) {
                     file_stream->close();
                 }

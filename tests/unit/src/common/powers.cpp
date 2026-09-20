@@ -251,13 +251,22 @@ namespace APSITests {
             auto signal = make_shared<promise<void>>();
             future<void> done = signal->get_future();
 
+            // NOLINTNEXTLINE(bugprone-exception-escape): both throwing calls below are guarded
             thread([pd, func, outcome, signal]() mutable {
                 try {
                     pd.parallel_apply(func);
-                } catch (const exception &) {
+                } catch (...) {
+                    // A thread function that lets anything escape terminates the process, so
+                    // this catches every type, not only those derived from std::exception.
                     outcome->threw = true;
                 }
-                signal->set_value();
+
+                // The promise is fresh and satisfied once, so this cannot throw; it is guarded
+                // for the same reason as above.
+                try {
+                    signal->set_value();
+                } catch (...) { // NOLINT(bugprone-empty-catch)
+                }
             }).detach();
 
             if (done.wait_for(chrono::seconds(30)) != future_status::ready) {

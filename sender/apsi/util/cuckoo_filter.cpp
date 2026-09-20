@@ -77,17 +77,16 @@ CuckooFilter::CuckooFilter(size_t key_count_max, size_t bits_per_tag) : num_item
 
 bool CuckooFilter::contains(gsl::span<const uint64_t> item) const
 {
-    size_t idx1;
-    size_t idx2;
+    size_t idx1 = 0;
+    size_t idx2 = 0;
     uint64_t tag = 0;
 
     get_tag_and_index(item, tag, idx1);
     idx2 = get_alt_index(idx1, tag);
 
-    if (overflow_.used && overflow_.tag == tag) {
-        if (overflow_.index == idx1 || overflow_.index == idx2) {
-            return true;
-        }
+    if ((overflow_.used && overflow_.tag == tag) &&
+        (overflow_.index == idx1 || overflow_.index == idx2)) {
+        return true;
     }
 
     return table_->find_tag_in_buckets(idx1, idx2, tag);
@@ -145,8 +144,8 @@ bool CuckooFilter::add_index_tag(size_t idx, uint64_t tag)
 
 bool CuckooFilter::remove(gsl::span<const uint64_t> item)
 {
-    size_t idx1;
-    size_t idx2;
+    size_t idx1 = 0;
+    size_t idx2 = 0;
     uint64_t tag = 0;
 
     get_tag_and_index(item, tag, idx1);

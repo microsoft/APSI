@@ -54,7 +54,7 @@ namespace APSITests {
 
     TEST(BitstringTests, Basics)
     {
-        auto get_data = []() {
+        auto get_data = [] {
             vector<unsigned char> data(8, 0);
             for (size_t i = 0; i < data.size(); i++) {
                 data[i] = static_cast<unsigned char>(i);
@@ -62,7 +62,7 @@ namespace APSITests {
             return data;
         };
 
-        auto get_single_byte = []() {
+        auto get_single_byte = [] {
             vector<unsigned char> single_byte;
             single_byte.push_back(0xA5);
             return single_byte;

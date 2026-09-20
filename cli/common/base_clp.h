@@ -31,8 +31,9 @@ public:
     BaseCLP(const std::string &description, const std::string &version)
         : TCLAP::CmdLine(description, /* delim */ ' ', version)
     {
-        std::vector<std::string> log_levels = { "trace",   "debug", "info",
-                                                "warning", "error", "suppress" };
+        std::vector<std::string> log_levels = {
+            "trace", "debug", "info", "warning", "error", "suppress",
+        };
         log_level_constraint_ = std::make_unique<TCLAP::ValuesConstraint<std::string>>(log_levels);
         log_level_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>(
             "l",

@@ -167,7 +167,7 @@ namespace APSITests {
             vector<uint64_t> points(modulus.value());
             iota(points.begin(), points.end(), 0);
             vector<uint64_t> values;
-            generate_n(back_inserter(values), points.size(), [&]() { return u(rd); });
+            generate_n(back_inserter(values), points.size(), [&] { return u(rd); });
 
             // Interpolate and check the result
             auto p = newton_interpolate_polyn(points, values, modulus);

@@ -265,7 +265,7 @@ namespace apsi {
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
                 auto bundle_caches = sender_db->get_cache_at(static_cast<uint32_t>(bundle_idx));
                 for (auto &cache : bundle_caches) {
-                    tasks.add([&, bundle_idx, cache]() {
+                    tasks.add([&, bundle_idx, cache] {
                         ProcessBinBundleCache(
                             sender_db,
                             crypto_context,
@@ -352,7 +352,7 @@ namespace apsi {
 
             TaskGroup tasks(tpm.thread_pool());
             for (uint32_t power : pd.target_powers()) {
-                tasks.add([&, power]() {
+                tasks.add([&, power] {
                     if (!ps_low_degree) {
                         // Only one ciphertext-plaintext multiplication is needed after this
                         evaluator->mod_switch_to_inplace(

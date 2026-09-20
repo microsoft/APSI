@@ -954,7 +954,7 @@ namespace apsi {
             ThreadPoolMgr tpm;
 
             TaskGroup tasks(tpm.thread_pool());
-            tasks.add([&]() {
+            tasks.add([&] {
                 // Compute and cache the batched "matching polynomials". They're computed in both
                 // labeled and unlabeled PSI.
                 BatchedPlaintextPolyn bmp(
@@ -966,7 +966,7 @@ namespace apsi {
             });
 
             for (size_t label_idx = 0; label_idx < cache_.felt_interp_polyns.size(); label_idx++) {
-                tasks.add([&, label_idx]() {
+                tasks.add([&, label_idx] {
                     // Compute and cache the batched Newton interpolation polynomials
                     const auto &interp_polyn = cache_.felt_interp_polyns[label_idx];
                     BatchedPlaintextPolyn bip(
@@ -1006,7 +1006,7 @@ namespace apsi {
             // polynomial"
             tasks.reserve(num_bins);
             for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
-                tasks.add([&, bin_idx]() {
+                tasks.add([&, bin_idx] {
                     // Compute and cache the matching polynomial
                     FEltPolyn fmp = polyn_with_roots(item_bins_[bin_idx], mod);
                     cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
@@ -1016,7 +1016,7 @@ namespace apsi {
             // For each bin in the bundle, compute and cache the corresponding "label polynomials"
             for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
-                    tasks.add([&, label_idx, bin_idx]() {
+                    tasks.add([&, label_idx, bin_idx] {
                         // Compute and cache the matching polynomial
                         FEltPolyn fip = newton_interpolate_polyn(
                             item_bins_[bin_idx], label_bins_[label_idx][bin_idx], mod);
@@ -1071,7 +1071,7 @@ namespace apsi {
             flatbuffers::Offset<fbs::FEltMatrix> fbs_create_felt_matrix(
                 flatbuffers::FlatBufferBuilder &fbs_builder, const vector<vector<felt_t>> &felts)
             {
-                auto felt_matrix_data = fbs_builder.CreateVector([&]() {
+                auto felt_matrix_data = fbs_builder.CreateVector([&] {
                     vector<flatbuffers::Offset<fbs::FEltArray>> ret;
                     ret.reserve(felts.size());
                     for (const auto &felts_row : felts) {
@@ -1094,7 +1094,7 @@ namespace apsi {
                 flatbuffers::FlatBufferBuilder &fbs_builder,
                 const vector<vector<unsigned char>> &polyn)
             {
-                auto polyn_data = fbs_builder.CreateVector([&]() {
+                auto polyn_data = fbs_builder.CreateVector([&] {
                     vector<flatbuffers::Offset<fbs::Plaintext>> ret;
                     ret.reserve(polyn.size());
                     for (const auto &coeff : polyn) {
@@ -1112,7 +1112,7 @@ namespace apsi {
 
             // Write the items and labels
             auto item_bins = fbs_create_felt_matrix(fbs_builder, item_bins_);
-            auto label_bins = fbs_builder.CreateVector([&]() {
+            auto label_bins = fbs_builder.CreateVector([&] {
                 vector<flatbuffers::Offset<fbs::FEltMatrix>> ret;
                 ret.reserve(label_bins_.size());
                 for (const auto &bin : label_bins_) {
@@ -1128,7 +1128,7 @@ namespace apsi {
                 auto batched_matching_polyn = fbs_create_batched_plaintext_polyn(
                     fbs_builder, cache_.batched_matching_polyn.batched_coeffs);
 
-                auto felt_interp_polyns = fbs_builder.CreateVector([&]() {
+                auto felt_interp_polyns = fbs_builder.CreateVector([&] {
                     vector<flatbuffers::Offset<fbs::FEltMatrix>> ret;
                     ret.reserve(cache_.felt_interp_polyns.size());
                     for (const auto &fips : cache_.felt_interp_polyns) {
@@ -1137,7 +1137,7 @@ namespace apsi {
                     return ret;
                 }());
 
-                auto batched_interp_polyns = fbs_builder.CreateVector([&]() {
+                auto batched_interp_polyns = fbs_builder.CreateVector([&] {
                     vector<flatbuffers::Offset<fbs::BatchedPlaintextPolyn>> ret;
                     ret.reserve(cache_.batched_interp_polyns.size());
                     for (const auto &bips : cache_.batched_interp_polyns) {

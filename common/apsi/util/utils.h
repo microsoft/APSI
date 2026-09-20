@@ -142,8 +142,8 @@ namespace apsi::util {
     {
         // The projection is applied to container elements (lvalues), never temporaries.
         return to_string(values, [](T &t) -> T & {
-            return t;
-        }); // NOLINT(bugprone-return-const-ref-from-parameter)
+            return t; // NOLINT(bugprone-return-const-ref-from-parameter)
+        });
     }
 
     /**
@@ -195,8 +195,8 @@ namespace apsi::util {
     {
         // The projection is applied to container elements (lvalues), never temporaries.
         return to_string(values, [](const T &t) -> const T & {
-            return t;
-        }); // NOLINT(bugprone-return-const-ref-from-parameter)
+            return t; // NOLINT(bugprone-return-const-ref-from-parameter)
+        });
     }
 
     /**

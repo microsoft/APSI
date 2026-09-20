@@ -124,11 +124,10 @@ namespace apsi {
                 // use the result to parallelize the work of inserting the items into BinBundles.
                 vector<pair<AlgItemLabel, size_t>> data_with_indices;
                 for (auto it = begin; it != end; it++) {
-                    const pair<HashedItem, EncryptedLabel> &item_label_pair = *it;
+                    const auto &[item, label] = *it;
 
                     // Serialize the data into field elements
-                    const HashedItem &item = item_label_pair.first;
-                    const EncryptedLabel &label = item_label_pair.second;
+
                     AlgItemLabel alg_item_label = algebraize_item_label(
                         item, label, item_bit_count, params.seal_params().plain_modulus());
 
@@ -244,9 +243,8 @@ namespace apsi {
 
                     // Get the bundle index
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx;
-                    size_t bundle_idx;
-                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
                     // If the bundle_idx isn't in the prescribed range, don't try to insert this
                     // data
@@ -357,9 +355,8 @@ namespace apsi {
                 set<size_t> bundle_indices_set;
                 for (auto &data_with_idx : data_with_indices) {
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx;
-                    size_t bundle_idx;
-                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
                     bundle_indices_set.insert(bundle_idx);
                 }
 
@@ -379,7 +376,7 @@ namespace apsi {
                 APSI_LOG_INFO(
                     "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
                 for (auto &bundle_idx : bundle_indices) {
-                    tasks.add([&, bundle_idx]() {
+                    tasks.add([&, bundle_idx] {
                         insert_or_assign_worker(
                             data_with_indices,
                             bin_bundles,
@@ -417,9 +414,8 @@ namespace apsi {
                 for (const auto &data_with_idx : data_with_indices) {
                     // Get the bundle index
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx;
-                    size_t bundle_idx;
-                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
                     // If the bundle_idx isn't in the prescribed range, don't try to remove this
                     // data
@@ -481,9 +477,8 @@ namespace apsi {
                 set<size_t> bundle_indices_set;
                 for (const auto &data_with_idx : data_with_indices) {
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx;
-                    size_t bundle_idx;
-                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
                     bundle_indices_set.insert(bundle_idx);
                 }
 
@@ -502,7 +497,7 @@ namespace apsi {
                 tasks.reserve(bundle_indices.size());
                 APSI_LOG_INFO("Launching " << bundle_indices.size() << " remove worker tasks");
                 for (auto &bundle_idx : bundle_indices) {
-                    tasks.add([&, bundle_idx]() {
+                    tasks.add([&, bundle_idx] {
                         remove_worker(
                             data_with_indices,
                             bin_bundles,
@@ -805,7 +800,7 @@ namespace apsi {
                     // whose lifetime ends when the iteration does, while the task it was handed
                     // to may still be running; the element itself lives in bin_bundles_ and
                     // outlives the join() below.
-                    tasks.add([bb_ptr = &bb]() { bb_ptr->strip(); });
+                    tasks.add([bb_ptr = &bb] { bb_ptr->strip(); });
                 }
             }
 
@@ -1136,9 +1131,8 @@ namespace apsi {
             }
 
             // Compute the hash for the input item
-            HashedItem hashed_item;
-            LabelKey key;
-            tie(hashed_item, key) = OPRFSender::GetItemHash(item, oprf_key_);
+
+            auto [hashed_item, key] = OPRFSender::GetItemHash(item, oprf_key_);
 
             // key decrypts this item's label, and the lookups below can throw before reaching
             // the decryption, so wipe it however this returns.
@@ -1155,14 +1149,12 @@ namespace apsi {
             // Preprocess a single element. This algebraizes the item and gives back its field
             // element representation as well as its cuckoo hash. We only read one of the locations
             // because the labels are the same in each location.
-            AlgItem alg_item;
-            size_t cuckoo_idx = 0;
-            tie(alg_item, cuckoo_idx) = preprocess_unlabeled_data(hashed_item, params_)[0];
+
+            auto [alg_item, cuckoo_idx] = preprocess_unlabeled_data(hashed_item, params_)[0];
 
             // Now figure out where to look to get the label
-            size_t bin_idx;
-            size_t bundle_idx;
-            tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+            auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
             // Retrieve the algebraic labels from one of the BinBundles at this index
             const vector<BinBundle> &bundle_set = bin_bundles_[bundle_idx];
@@ -1222,7 +1214,7 @@ namespace apsi {
                 stripped_);
             auto oprf_key_span = oprf_key_.key_span();
             auto oprf_key = fbs_builder.CreateVector(oprf_key_span.data(), oprf_key_span.size());
-            auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
+            auto hashed_items = fbs_builder.CreateVectorOfStructs([&] {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
                 ret.reserve(get_hashed_items().size());
@@ -1426,7 +1418,7 @@ namespace apsi {
             // Indexing lets the task capture bb_data_idx by value instead.
             // NOLINTNEXTLINE(modernize-loop-convert)
             for (size_t bb_data_idx = 0; bb_data_idx < bin_bundle_data.size(); bb_data_idx++) {
-                tasks.add([&, bb_data_idx]() {
+                tasks.add([&, bb_data_idx] {
                     BinBundle bb(
                         sender_db->crypto_context_,
                         label_size,

@@ -48,7 +48,7 @@ namespace apsi::network {
         auto psi_ct = fbs::CreateCiphertext(fbs_builder, psi_ct_data);
 
         // There may or may not be label data
-        auto label_cts = fbs_builder.CreateVector([&]() {
+        auto label_cts = fbs_builder.CreateVector([&] {
             // The Ciphertext vector is populated with an immediately-invoked lambda
             vector<flatbuffers::Offset<fbs::Ciphertext>> ret;
             for (const auto &label_ct : label_result) {

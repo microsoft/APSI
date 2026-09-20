@@ -223,9 +223,7 @@ namespace apsi::oprf {
                 const Item &item = oprf_item_labels[idx].first;
                 const Label &label = oprf_item_labels[idx].second;
 
-                HashedItem hashed_item;
-                LabelKey key;
-                tie(hashed_item, key) = get_item_hash(item, oprf_key);
+                auto [hashed_item, key] = get_item_hash(item, oprf_key);
 
                 // Wipe the per-item label encryption key however this iteration ends: the
                 // encryption below draws a nonce, and that can fail.
