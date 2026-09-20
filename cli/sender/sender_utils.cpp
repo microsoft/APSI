@@ -53,8 +53,10 @@ unique_ptr<PSIParams> build_psi_params(const CLP &cmd)
     }
 
     APSI_LOG_INFO(
-        "PSIParams have false-positive probability 2^(" << params->log2_fpp()
-                                                        << ") per receiver item");
+        "PSIParams have false-positive probability 2^("
+        << params->log2_fpp_per_bin_bundle()
+        << ") per receiver item against a single bin bundle; SenderDB::log2_fpp gives the figure "
+           "for a whole database and query");
 
     return params;
 }

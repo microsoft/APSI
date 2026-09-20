@@ -176,6 +176,11 @@ int start_sender(const CLP &cmd)
                                      << " bundle indices");
     APSI_LOG_INFO(
         "The largest bundle index holds " << max_bin_bundles_per_bundle_idx << " bin bundles");
+    APSI_LOG_INFO(
+        "This SenderDB has false-positive probability at most 2^("
+        << sender_db->log2_fpp(1)
+        << ") per receiver item; SenderDB::log2_fpp takes a query size for the probability that a "
+           "whole query returns at least one false positive");
 
     // Try to save the SenderDB if a save file was given
     if (!cmd.sdb_out_file().empty() && !try_save_sender_db(cmd, sender_db, oprf_key)) {

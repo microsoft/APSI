@@ -438,6 +438,11 @@ if(APSI_BUILD_TESTS)
     add_subdirectory(tests/unit/src)
     target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/tests)
     target_link_libraries(unit_tests apsi GTest::gtest)
+
+    # The shipped parameter sets are tested as data rather than copied into a test, so that a
+    # change to one is caught by the test rather than by a reader.
+    target_compile_definitions(unit_tests
+        PRIVATE APSI_PARAMETERS_DIR="${CMAKE_CURRENT_LIST_DIR}/parameters")
 endif()
 
 ##########################

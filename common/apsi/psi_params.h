@@ -238,11 +238,22 @@ namespace apsi {
         std::string to_string() const;
 
         /**
-        Returns an approximate base-2 logarithm of the false-positive probability per receiver's
-        item.
+        Returns an upper bound on the base-2 logarithm of the false-positive probability per
+        receiver's item, against a SINGLE bin bundle.
+
+        This is not the probability a deployment sees, and is not meant to be read as one. A
+        receiver's item is matched against every bin bundle at its bundle index, and a location
+        holding more items than max_items_per_bin spills into further bundles, each carrying its
+        own matching polynomial; a match from any of them is reported. A query of many items is
+        likelier to contain a false positive than a query of one. Both terms are missing here,
+        and together they are worth several bits and more than ten for some parameter sets.
+
+        PSIParams cannot supply either: it does not know how large a sender's set is, nor how
+        many items a query will carry. sender::SenderDB::log2_fpp knows the first and takes the
+        second, and is what a deployment should consult.
         */
         [[nodiscard]]
-        double log2_fpp() const
+        double log2_fpp_per_bin_bundle() const
         {
             return std::min<double>(
                 0.0,

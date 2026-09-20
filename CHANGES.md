@@ -2,35 +2,54 @@
 
 ## Version 1.0.0
 
+### Breaking changes
+
 - Require Microsoft SEAL 4.4.5 or a newer 4.x release, and update the vcpkg baseline.
-- Added an optional `timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, and a `--timeout` option to the receiver CLI.
-- Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them.
-- Added `network::ZMQChannel::end_point` and an optional `on_bound` callback to `ZMQSenderDispatcher::run`, so a sender can bind to port 0.
-- A `network::Channel` send throws when it cannot hand the data over, as its documentation always said it would. `ZMQChannel` no longer discards a message for a receiver ZeroMQ has no route to, or one whose queue is full, and stops waiting once a bounded send timeout expires; `StreamChannel` flushes and reports a stream that would not take what was written. Neither can make a send that returns mean the peer received the data. A sender that cannot send one result package sends no more of that query.
-- Added `util::TaskGroup`, which throws if used from inside a task of the same pool, and replaced `ThreadPoolMgr::SetPhysThreadCount` with `ThreadPoolMgr::SetPoolWorkerCount`.
-- Added `ThreadPoolMgr::GetPoolWorkerCount`; the thread counts report what the pool obtained rather than what was requested.
+- The exported CMake package links `JsonCpp::JsonCpp` rather than `jsoncpp_static`, so APSI can be built against a shared jsoncpp. jsoncpp 1.9.5 or newer is now required.
+- Retuned 31 of the 36 shipped parameter sets: twenty-seven were above the documented 2^-40 false-positive probability per query, and three more left only two or three bits of noise budget once their bins filled. Only `plain_modulus` and `coeff_modulus_bits` changed, and some sets now send a little more than before. A sender and a receiver must agree on their parameters, so both sides of a deployment want the new values.
+- `PSIParams::log2_fpp` is now `PSIParams::log2_fpp_per_bin_bundle`, which is what it measures: it counts neither the bin bundles a location spills into nor the items a query carries. Added `sender::SenderDB::log2_fpp`, which counts both and is the figure a deployment should read.
+- A `network::Channel` send throws when it cannot hand the data over. `ZMQChannel` no longer discards a message it has no route for or whose queue is full, and gives up after a bounded send timeout; `StreamChannel` flushes and reports a stream that refused the write. A send that returns still does not mean the peer received the data.
+- Code that loops on a `nullptr` receive must consult the new `network::Channel::receive_failed` and `network::Channel::receive_failure_count`.
+- `ThreadPoolMgr::SetPhysThreadCount` is now `ThreadPoolMgr::SetPoolWorkerCount`.
 - `ThreadPoolMgr` is no longer copyable or movable.
-- A receiving process creates no thread pool.
+- `SenderDB::get_reader_lock` returns a `std::shared_lock`. The `SenderDB` lock is now a `std::shared_mutex` rather than Microsoft SEAL's, whose implementation depended on how SEAL itself was built.
+- `sender::util::CuckooFilter::add` and `remove` are `[[nodiscard]]`. An item the filter cannot store is not stored anywhere, so `has_dropped_items` reports that its negative answers are no longer conclusive, and a `BinBundle` whose filter says so searches the bin instead.
+- `oprf::ECPoint::scalar_multiply` is `[[nodiscard]]` and leaves the point unchanged when it fails.
+
+### Added
+
+- Added an optional `timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, and a `--timeout` option to the receiver CLI.
+- Added `network::ZMQChannel::end_point` and an optional `on_bound` callback to `ZMQSenderDispatcher::run`, so a sender can bind to port 0.
+- Added `util::TaskGroup`, which throws if used from inside a task of the same pool.
+- Added `ThreadPoolMgr::GetPoolWorkerCount`; the thread counts report what the pool obtained rather than what was requested.
 - Added `util::secure_random_bytes`, which throws when the platform random number generator fails. All of APSI's randomness comes from it.
 - Added `util::secure_zero_stack`, `util::StackScrubGuard`, `util::SecureZeroGuard` and `util::stack_scrub_byte_count` for clearing secret material left on the stack.
-- Added `oprf::ECPoint::is_prime_order` and `oprf::ECPoint::clear`. `oprf::ECPoint::scalar_multiply` is now `[[nodiscard]]` and leaves the point unchanged when it fails.
+- Added `oprf::ECPoint::is_prime_order` and `oprf::ECPoint::clear`.
+- Added `SenderDB::get_bin_bundle_count_unlocked` for callers that already hold a lock on the `SenderDB`.
+
+### Hardened
+
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
 - `oprf::OPRFReceiver::process_responses` rejects a response outside the prime-order subgroup, and `oprf::ECPoint::load` rejects a non-canonical point encoding.
 - An OPRF request is limited to `oprf::oprf_query_count_max` items.
 - `SenderDB::insert_or_assign` validates a labeled batch before modifying anything, and refuses it if a label is longer than the `SenderDB` holds or if an item appears twice. Repeats in an unlabeled batch are collapsed rather than refused.
-- `SenderDB` holds its lock across the whole of each operation, so hashing no longer runs outside it. Concurrent updates block queries for longer than before. Moving a `SenderDB` must not overlap any other use of it.
-- Added `SenderDB::get_bin_bundle_count_unlocked` for callers that already hold a lock on the `SenderDB`.
-- `SenderDB::get_reader_lock` returns a `std::shared_lock`. The `SenderDB` lock is now a `std::shared_mutex` rather than Microsoft SEAL's, whose implementation depended on how SEAL itself was built.
 - `Sender::RunQuery` rejects a query that the `SenderDB` parameters no longer describe.
 - `SenderDB::Load` rejects a serialized `SenderDB` that omits a required field.
-- `sender::util::CuckooFilter::add` and `remove` are `[[nodiscard]]`. An item the filter cannot store is not stored anywhere, so `has_dropped_items` reports that its negative answers are no longer conclusive, and a `BinBundle` whose filter says so searches the bin instead.
 - `sender::util::CuckooFilter::Load` rejects a serialized filter whose table size, bucket count, tag width or overflow slot are inconsistent, including a `bits_per_tag` of 64, which earlier versions accepted. A filter written by an earlier version is loaded as one that may have dropped items.
+
+### Changed and fixed
+
+- Every shipped parameter set names its `plain_modulus` outright rather than a bit count, which pins the noise budget as well as the item size. `plain_modulus_bits` is still accepted.
+- A receiving process creates no thread pool.
+- `SenderDB` holds its lock across the whole of each operation, so hashing no longer runs outside it. Concurrent updates block queries for longer than before. Moving a `SenderDB` must not overlap any other use of it.
 - An exception thrown from a `PowersDag::parallel_apply` callback now propagates to the caller instead of hanging the thread pool.
+- Fixed the vendored FourQ sources reading and writing field elements through a `uint128_t` pointer, which produced wrong curve points under GCC 16.
+
+### Build
+
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
-- Fixed the vendored FourQ sources reading and writing field elements through a `uint128_t` pointer, which produced wrong curve points under GCC 16.
-- The exported CMake package links `JsonCpp::JsonCpp` rather than `jsoncpp_static`, so APSI can be built against a shared jsoncpp. jsoncpp 1.9.5 or newer is now required.
 - APSI builds with GCC on Windows (MinGW).
 
 ## Version 0.13.1
