@@ -30,11 +30,8 @@ const uint128_t prime1271 = ((uint128_t)1 << 127) - 1;
 
 void mod1271(felm_t a)
 { // Modular correction, a = a mod (2^127-1)    
-    // A field element is an array of digit_t, so reading or writing it through a uint128_t
-    // lvalue is undefined: the two types do not alias, and the array is not guaranteed to carry
-    // the alignment uint128_t requires. Copying in and out keeps the 128-bit arithmetic while
-    // leaving every access to the element at its own type. Compilers fold these copies into the
-    // same pair of 64-bit loads and stores the cast produced.
+    // APSI: a field element is an array of digit_t, which neither aliases nor is aligned as a
+    // uint128_t, so move between the two with memcpy rather than a cast.
     uint128_t r;
 
     memcpy(&r, a, sizeof(r));

@@ -33,10 +33,9 @@ set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/hash_to_curve.c
 )
 
-# Select the directory that matches the implementation the top-level CMakeLists.txt chose, not
-# the detected CPU. ARM64 Windows detects as ARM64 but is built as a generic implementation,
-# and mirroring the ARM64 header there left eccp2_core.c including an apsi/fourq/generic/fp.h
-# that nothing had copied into the build tree.
+# Add the directory for the implementation the top-level CMakeLists.txt selected, not the one the
+# detected CPU suggests: ARM64 Windows defines _ARM64_ but builds the generic implementation, so
+# it needs generic/fp.h mirrored.
 if(APSI_FOURQ_AMD64)
     add_subdirectory(AMD64)
 elseif(APSI_FOURQ_ARM64 AND UNIX)
