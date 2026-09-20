@@ -51,7 +51,7 @@ namespace APSITests {
 
         TaskGroup tasks(tpm.thread_pool());
         for (size_t t = 0; t < task_count; t++) {
-            tasks.add([&finished, t]() {
+            tasks.add([&finished, t] {
                 if (t == 0) {
                     throw FirstError{};
                 }
@@ -76,11 +76,11 @@ namespace APSITests {
         shared_future<void> gate_future = gate.get_future().share();
 
         TaskGroup tasks(tpm.thread_pool());
-        tasks.add([gate_future]() {
+        tasks.add([gate_future] {
             gate_future.wait();
             throw FirstError{};
         });
-        tasks.add([]() { throw SecondError{}; });
+        tasks.add([] { throw SecondError{}; });
 
         // Let the second task fail before the first is even allowed to start failing.
         this_thread::sleep_for(20ms);
@@ -101,7 +101,7 @@ namespace APSITests {
         {
             TaskGroup tasks(tpm.thread_pool());
             for (size_t t = 0; t < task_count; t++) {
-                tasks.add([&finished]() {
+                tasks.add([&finished] {
                     this_thread::sleep_for(20ms);
                     finished++;
                 });
@@ -125,7 +125,7 @@ namespace APSITests {
             TaskGroup tasks(tpm.thread_pool());
 
             for (size_t t = 0; t < added_before_failure; t++) {
-                tasks.add([&finished]() {
+                tasks.add([&finished] {
                     this_thread::sleep_for(20ms);
                     finished++;
                 });
@@ -161,7 +161,7 @@ namespace APSITests {
 
         TaskGroup tasks(tpm.thread_pool());
         for (size_t t = 0; t < 4; t++) {
-            tasks.add([&finished]() { finished++; });
+            tasks.add([&finished] { finished++; });
         }
 
         ASSERT_EQ(static_cast<size_t>(4), tasks.size());
@@ -193,7 +193,7 @@ namespace APSITests {
 
         TaskGroup tasks(tpm.thread_pool());
         for (size_t t = 0; t < task_count; t++) {
-            tasks.add([&finished]() { finished++; });
+            tasks.add([&finished] { finished++; });
         }
 
         ASSERT_EQ(task_count, tasks.size());
@@ -231,7 +231,7 @@ namespace APSITests {
         ASSERT_FALSE(pool_a.is_worker_thread());
         ASSERT_FALSE(pool_b.is_worker_thread());
 
-        auto from_a = pool_a.enqueue([&pool_a, &pool_b]() {
+        auto from_a = pool_a.enqueue([&pool_a, &pool_b] {
             return make_pair(pool_a.is_worker_thread(), pool_b.is_worker_thread());
         });
 
@@ -251,9 +251,9 @@ namespace APSITests {
         // than as a hang whose cause is somewhere else entirely.
         ThreadPool pool(2);
 
-        auto fut = pool.enqueue([&pool]() {
+        auto fut = pool.enqueue([&pool] {
             TaskGroup nested(pool);
-            nested.add([]() {});
+            nested.add([] {});
         });
 
         ASSERT_THROW(fut.get(), logic_error);
@@ -266,10 +266,10 @@ namespace APSITests {
         ThreadPool pool_a(1);
         ThreadPool pool_b(2);
 
-        auto fut = pool_a.enqueue([&pool_b]() {
+        auto fut = pool_a.enqueue([&pool_b] {
             TaskGroup tasks(pool_b);
             atomic<int> ran{ 0 };
-            tasks.add([&ran]() { ran++; });
+            tasks.add([&ran] { ran++; });
             tasks.join();
             return ran.load();
         });

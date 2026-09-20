@@ -100,7 +100,7 @@ namespace apsi {
 
         // Success
         configured_ = true;
-        target_powers_ = target_powers;
+        target_powers_ = std::move(target_powers);
         depth_ = curr_depth;
         source_count_ = static_cast<uint32_t>(source_powers.size());
         return true;

@@ -106,6 +106,7 @@ namespace apsi::util {
         // size prefix of UINT32_MAX (~4 GiB) and force a comparable allocation. The
         // FlatBuffers verifier rejects any buffer larger than INT32_MAX bytes, so anything
         // beyond that is guaranteed to fail verification later anyway.
+        // NOLINTNEXTLINE(readability-redundant-parentheses): windows.h defines max
         constexpr uint32_t max_byte_count = static_cast<uint32_t>((numeric_limits<int32_t>::max)());
         if (size > max_byte_count) {
             throw runtime_error("read_from_stream: size prefix exceeds maximum allowed");
@@ -186,7 +187,7 @@ namespace apsi::util {
         // callers include destructors.
         try {
             seal::util::seal_memzero(ptr, count);
-        } catch (const std::exception &) {
+        } catch (const std::exception &) { // NOLINT(bugprone-empty-catch): see above
         }
     }
 
@@ -224,8 +225,8 @@ namespace apsi::util {
         const auto *first_end = first_begin + count;
         const auto *second_begin = reinterpret_cast<const unsigned char *>(second);
 
-        return equal(
-            first_begin, first_end, second_begin); // NOLINT(readability-suspicious-call-argument)
+        // NOLINTNEXTLINE(readability-suspicious-call-argument)
+        return equal(first_begin, first_end, second_begin);
     }
 
     set<uint32_t> create_powers_set(uint32_t ps_low_degree, uint32_t target_degree)

@@ -104,7 +104,7 @@ namespace APSITests {
 
         void start_sender(bool labels = false)
         {
-            th_ = thread([this, labels]() {
+            th_ = thread([this, labels] {
                 // Run until stopped
                 while (!stop_token_) {
                     unique_ptr<ZMQSenderOperation> sop =

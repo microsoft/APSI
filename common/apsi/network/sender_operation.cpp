@@ -206,12 +206,12 @@ namespace apsi::network {
         // pass them to the CreateVector function. In the outer lambda, we populate a vector of
         // QueryRequestParts, creating a new builder class for each of them. In the inner lambda
         // we build the QueryRequestPart data by creating multiple Ciphertexts.
-        auto query_request_parts = fbs_builder.CreateVector([&]() {
+        auto query_request_parts = fbs_builder.CreateVector([&] {
             // The QueryRequestPart vector is populated with an immediately-invoked lambda
             vector<flatbuffers::Offset<fbs::QueryRequestPart>> ret;
             for (const auto &q : data) {
                 // Then the vector of Ciphertexts
-                auto cts = fbs_builder.CreateVector([&]() {
+                auto cts = fbs_builder.CreateVector([&] {
                     // The Ciphertext vector is populated with an immediately-invoked lambda
                     vector<flatbuffers::Offset<fbs::Ciphertext>> ret_inner;
                     for (const auto &ct : q.second) {

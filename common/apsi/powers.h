@@ -185,7 +185,7 @@ namespace apsi {
             std::mutex failure_mutex;
             std::exception_ptr first_exception;
 
-            auto capture_failure = [&]() {
+            auto capture_failure = [&] {
                 {
                     std::lock_guard<std::mutex> lock(failure_mutex);
                     if (!first_exception) {
@@ -195,7 +195,7 @@ namespace apsi {
                 failed.store(true);
             };
 
-            auto node_worker = [&]() {
+            auto node_worker = [&] {
                 // Start looking for work by going over node_states vector
                 std::size_t power_idx = 0;
                 while (true) {
@@ -307,7 +307,7 @@ namespace apsi {
             tasks.reserve(task_count);
             try {
                 for (std::size_t t = 0; t < task_count; t++) {
-                    tasks.add([&]() {
+                    tasks.add([&] {
                         try {
                             node_worker();
                         } catch (...) {

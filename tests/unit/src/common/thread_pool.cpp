@@ -605,17 +605,17 @@ namespace APSITests {
         promise<void> running;
         future<void> running_f = running.get_future();
 
-        thread opener([&release]() {
+        thread opener([&release] {
             this_thread::sleep_for(2s);
             release.set_value();
         });
 
-        thread owner([&running, gate]() {
+        thread owner([&running, gate] {
             ThreadPoolMgr tpm;
 
             // Fire and forget: nothing waits on this, so it is still running when tpm goes out
             // of scope and the pool's destructor has to drain it.
-            (void)tpm.thread_pool().enqueue([&running, gate]() {
+            (void)tpm.thread_pool().enqueue([&running, gate] {
                 running.set_value();
                 gate.wait();
             });

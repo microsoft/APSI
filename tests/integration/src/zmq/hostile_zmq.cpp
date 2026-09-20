@@ -70,7 +70,7 @@ namespace APSITests {
                 if (running_.valid()) {
                     try {
                         running_.get();
-                    } catch (const exception &) {
+                    } catch (const exception &) { // NOLINT(bugprone-empty-catch): see below
                         // The dispatcher's own failure must not replace the assertion that is
                         // already on its way out, and must not leave the process by way of a
                         // destructor.
@@ -252,7 +252,7 @@ namespace APSITests {
         promise<int> listening_on;
         future<int> listening_on_f = listening_on.get_future();
 
-        future<void> sender_f = async(launch::async, [&]() {
+        future<void> sender_f = async(launch::async, [&] {
             try {
                 ZMQSenderDispatcher dispatcher(sender_db);
                 dispatcher.run(
@@ -260,7 +260,7 @@ namespace APSITests {
             } catch (...) {
                 try {
                     listening_on.set_exception(current_exception());
-                } catch (const future_error &) {
+                } catch (const future_error &) { // NOLINT(bugprone-empty-catch): see below
                     // The port was already announced, so the bind succeeded and the failure came
                     // later. Nothing is waiting on the promise any more.
                 }
@@ -293,9 +293,7 @@ namespace APSITests {
         constexpr uint64_t absent_item_word = numeric_limits<uint64_t>::max();
         recv_items.emplace_back(absent_item_word, absent_item_word);
 
-        vector<HashedItem> hashed_recv_items;
-        LabelKeyVector label_keys;
-        tie(hashed_recv_items, label_keys) = Receiver::RequestOPRF(recv_items, recv_chl, 30s);
+        auto [hashed_recv_items, label_keys] = Receiver::RequestOPRF(recv_items, recv_chl, 30s);
 
         auto query_result = receiver.request_query(hashed_recv_items, label_keys, recv_chl, 30s);
 
@@ -333,7 +331,7 @@ namespace APSITests {
         string address = connect_address(silent_chl);
 
         future<void> sender_f =
-            async(launch::async, [&]() { RunSilentSender(sender_db, 2, stop_sender, silent_chl); });
+            async(launch::async, [&] { RunSilentSender(sender_db, 2, stop_sender, silent_chl); });
         DispatcherStopper stopper(stop_sender, sender_f);
 
         ZMQReceiverChannel recv_chl;
@@ -343,9 +341,7 @@ namespace APSITests {
 
         vector<Item> recv_items = { sender_items[0], sender_items[1] };
 
-        vector<HashedItem> hashed_recv_items;
-        LabelKeyVector label_keys;
-        tie(hashed_recv_items, label_keys) = Receiver::RequestOPRF(recv_items, recv_chl, 30s);
+        auto [hashed_recv_items, label_keys] = Receiver::RequestOPRF(recv_items, recv_chl, 30s);
 
         // Comfortably longer than the channel's receive poll interval, so the workers have to
         // come back from a blocking receive several times before the deadline is reached.

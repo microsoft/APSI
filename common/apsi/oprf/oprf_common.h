@@ -34,6 +34,6 @@ namespace apsi::oprf {
     whatever the sender does with it. The largest parameter set in parameters/ recommends 11041
     receiver items, leaving roughly two orders of magnitude of headroom.
     */
-    constexpr std::size_t oprf_query_count_max = std::size_t(1) << 20;
+    constexpr std::size_t oprf_query_count_max = static_cast<std::size_t>(1) << 20;
 
 } // namespace apsi::oprf

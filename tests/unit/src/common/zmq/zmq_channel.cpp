@@ -563,7 +563,7 @@ namespace APSITests {
         rp->psi_result = query_ct123;
         rp->label_result.emplace_back(query_ct123);
         nrp = make_unique<ZMQResultPackage>();
-        nrp->client_id = client_id;
+        nrp->client_id = std::move(client_id);
         nrp->rp = std::move(rp);
         svr.send(std::move(nrp));
 
@@ -609,7 +609,7 @@ namespace APSITests {
 
         vector<thread> clients(5);
         for (auto &client : clients) {
-            client = thread([&server_address]() {
+            client = thread([&server_address] {
                 ZMQReceiverChannel recv;
 
                 recv.connect(server_address);

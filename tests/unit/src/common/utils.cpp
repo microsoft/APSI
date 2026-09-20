@@ -114,7 +114,7 @@ namespace APSITests {
 
         res = partition_evenly(5, 5);
         compare = {
-            make_pair(0, 1), make_pair(1, 2), make_pair(2, 3), make_pair(3, 4), make_pair(4, 5)
+            make_pair(0, 1), make_pair(1, 2), make_pair(2, 3), make_pair(3, 4), make_pair(4, 5),
         };
         ASSERT_TRUE(compare_results(res, compare));
 

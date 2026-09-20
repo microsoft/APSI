@@ -30,7 +30,7 @@ namespace apsi::network {
 
         sop_oprf = 2,
 
-        sop_query = 3
+        sop_query = 3,
     };
 
     const char *sender_operation_type_str(SenderOperationType sop_type);

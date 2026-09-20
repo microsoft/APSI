@@ -30,11 +30,13 @@ namespace apsi::util {
 
         if (timespan_evt == timespan_events_.end()) {
             // Insert new
-            TimespanSummary summ = { /* name */ name,
-                                     /* count */ 1,
-                                     /* average */ static_cast<double>(duration),
-                                     /* min */ duration,
-                                     /* max */ duration };
+            TimespanSummary summ = {
+                /* name */ name,
+                /* count */ 1,
+                /* average */ static_cast<double>(duration),
+                /* min */ duration,
+                /* max */ duration,
+            };
 
             timespan_events_[name] = summ;
 

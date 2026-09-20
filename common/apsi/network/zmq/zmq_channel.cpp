@@ -702,8 +702,9 @@ namespace apsi {
             // can bound that: ZeroMQ assembles a message in full before offering it to a
             // reader. That exposure grows with the number of concurrent peers rather than with
             // traffic, so it belongs at the network layer.
-            socket->set(
-                sockopt::maxmsgsize, static_cast<int64_t>((numeric_limits<int32_t>::max)()));
+            // NOLINTNEXTLINE(readability-redundant-parentheses): windows.h defines max
+            constexpr int64_t max_message_size = (numeric_limits<int32_t>::max)();
+            socket->set(sockopt::maxmsgsize, max_message_size);
 
             // What lets a receiver that has given up on a silent sender actually exit.
             socket->set(sockopt::linger, receiver_linger_ms);
@@ -754,8 +755,9 @@ namespace apsi {
 
             // See ZMQReceiverChannel::set_socket_options, including why this does not bound
             // the number of frames in a message.
-            socket->set(
-                sockopt::maxmsgsize, static_cast<int64_t>((numeric_limits<int32_t>::max)()));
+            // NOLINTNEXTLINE(readability-redundant-parentheses): windows.h defines max
+            constexpr int64_t max_message_size = (numeric_limits<int32_t>::max)();
+            socket->set(sockopt::maxmsgsize, max_message_size);
 
             // Generous, unlike the receiver's: cutting this short would truncate an answer that
             // had in fact been computed, leaving the receiver to time out on it.

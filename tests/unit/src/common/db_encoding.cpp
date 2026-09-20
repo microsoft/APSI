@@ -136,7 +136,7 @@ namespace APSITests {
             random_device rd;
             vector<unsigned char> bytes(256);
             std::generate(
-                begin(bytes), end(bytes), [&]() { return static_cast<unsigned char>(rd()); });
+                begin(bytes), end(bytes), [&] { return static_cast<unsigned char>(rd()); });
 
             // Pick a random bit length within range, i.e., within 7 bits of the total length
             std::uniform_int_distribution<size_t> bitlen_dist(0, 7);
