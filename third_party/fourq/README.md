@@ -29,3 +29,25 @@ directories hold arch-specific field arithmetic and are selected at configure
 time. `CMakeLists.txt` copies the headers to
 `${CMAKE_BINARY_DIR}/common/apsi/fourq/` at configure time, which is how the
 `apsi/fourq/` include prefix resolves.
+
+## Two things that look like bugs and are not
+
+GCC reports `'fp2neg1271' accessing 32 bytes in a region of size 16` in `decode`
+(`crypto_util.c`) on every build. It is a false positive, and it is upstream's
+shape rather than anything APSI changed. Passing `P->x[0]`, which is one 16-byte
+`felm_t`, to `mod1271` narrows what GCC believes is reachable through `P->x`, so
+the 32-byte `f2elm_t` access that follows looks like an overrun. `P->x` is a whole
+`f2elm_t` in every caller, so those 32 bytes are always there. Reducing only the
+first half, which is what upstream does, is enough on its own to provoke it, and
+it reproduces in nine lines that contain no FourQ code: declare the `felm_t`,
+`f2elm_t` and `point_affine` types, call a `felm_t` function on `P->x[0]`, then
+call an `f2elm_t` function on `P->x`.
+
+Microsoft SEAL also declares `uint128_t`, as `unsigned __int128`, wherever it has
+`__int128`. The generic implementation here declares that same name as
+`uint64_t[2]`, so a translation unit including both will not compile where both
+apply, and `common/apsi/oprf/ecpoint.cpp` includes both. No configuration APSI
+builds reaches it: the generic implementation is selected for ARM64 Windows,
+which builds with MSVC, where SEAL declares no `uint128_t` at all, and for 32-bit
+x86, which has no `__int128` either. It would collide only if the generic
+implementation were built by GCC or Clang for a 64-bit target.
