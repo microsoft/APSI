@@ -142,27 +142,27 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 
 // 64x64-bit multiplication
 #define MUL128(multiplier, multiplicand, product)                                                 \
-    { digit_t mulIn1[NWORDS_FIELD/2], mulIn2[NWORDS_FIELD/2], mulOut[NWORDS_FIELD];               \
-    memcpy(mulIn1, &(multiplier), sizeof(mulIn1));                                                \
-    memcpy(mulIn2, &(multiplicand), sizeof(mulIn2));                                              \
-    mp_mul(mulIn1, mulIn2, mulOut, NWORDS_FIELD/2);                                               \
-    memcpy((product), mulOut, sizeof(mulOut)); }
+    { digit_t mul128_a_[NWORDS_FIELD/2], mul128_b_[NWORDS_FIELD/2], mul128_r_[NWORDS_FIELD];      \
+    memcpy(mul128_a_, &(multiplier), sizeof(mul128_a_));                                          \
+    memcpy(mul128_b_, &(multiplicand), sizeof(mul128_b_));                                        \
+    mp_mul(mul128_a_, mul128_b_, mul128_r_, NWORDS_FIELD/2);                                      \
+    memcpy((product), mul128_r_, sizeof(mul128_r_)); }
 
 // 128-bit addition, inputs < 2^127
 #define ADD128(addend1, addend2, addition)                                                        \
-    { digit_t addIn1[NWORDS_FIELD], addIn2[NWORDS_FIELD], addOut[NWORDS_FIELD];                   \
-    memcpy(addIn1, (addend1), sizeof(addIn1));                                                    \
-    memcpy(addIn2, (addend2), sizeof(addIn2));                                                    \
-    mp_add(addIn1, addIn2, addOut, NWORDS_FIELD);                                                 \
-    memcpy((addition), addOut, sizeof(addOut)); }
+    { digit_t add128_a_[NWORDS_FIELD], add128_b_[NWORDS_FIELD], add128_r_[NWORDS_FIELD];          \
+    memcpy(add128_a_, (addend1), sizeof(add128_a_));                                              \
+    memcpy(add128_b_, (addend2), sizeof(add128_b_));                                              \
+    mp_add(add128_a_, add128_b_, add128_r_, NWORDS_FIELD);                                        \
+    memcpy((addition), add128_r_, sizeof(add128_r_)); }
 
 // 128-bit addition with output carry
 #define ADC128(addend1, addend2, carry, addition)                                                 \
-    { digit_t adcIn1[NWORDS_FIELD], adcIn2[NWORDS_FIELD], adcOut[NWORDS_FIELD];                   \
-    memcpy(adcIn1, (addend1), sizeof(adcIn1));                                                    \
-    memcpy(adcIn2, (addend2), sizeof(adcIn2));                                                    \
-    (carry) = mp_add(adcIn1, adcIn2, adcOut, NWORDS_FIELD);                                       \
-    memcpy((addition), adcOut, sizeof(adcOut)); }
+    { digit_t adc128_a_[NWORDS_FIELD], adc128_b_[NWORDS_FIELD], adc128_r_[NWORDS_FIELD];          \
+    memcpy(adc128_a_, (addend1), sizeof(adc128_a_));                                              \
+    memcpy(adc128_b_, (addend2), sizeof(adc128_b_));                                              \
+    (carry) = mp_add(adc128_a_, adc128_b_, adc128_r_, NWORDS_FIELD);                              \
+    memcpy((addition), adc128_r_, sizeof(adc128_r_)); }
 
 // APSI: these are MSVC intrinsics, and the array-shaped uint128_t they operate on is exactly
 // what SCALAR_INTRIN_SUPPORT selects above. Keying the branch off that macro rather than
