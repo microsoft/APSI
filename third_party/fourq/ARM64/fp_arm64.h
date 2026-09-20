@@ -9,14 +9,16 @@
 #ifndef __FP_ARM64_H__
 #define __FP_ARM64_H__
 
+// APSI: outside the extern "C" block below, because a standard header must not be dragged into
+// a language linkage specification.
+#include <string.h>
+
 
 // For C++
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-#include <string.h>
 
 #include "../table_lookup.h"
 #include "../FourQ_params.h"
