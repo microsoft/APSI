@@ -972,10 +972,13 @@ namespace APSITests {
         //
         // The threads are detached and every piece of state they touch is owned by a shared_ptr
         // they each hold, so a wedged run fails on the deadline rather than hanging the binary.
+        // Each reports when it has left its loop, because a detached thread still running inside
+        // the SenderDB while the process tears its globals down faults there.
         struct State {
             shared_ptr<SenderDB> db;
             atomic<bool> stop{ false };
             atomic<bool> done{ false };
+            atomic<bool> writer_done{ false };
         };
 
         auto state = make_shared<State>();
@@ -998,6 +1001,7 @@ namespace APSITests {
                 state->db->clear();
                 this_thread::yield();
             }
+            state->writer_done = true;
         });
         writer.detach();
 
@@ -1016,7 +1020,24 @@ namespace APSITests {
         while (!state->done && chrono::steady_clock::now() < deadline) {
             this_thread::sleep_for(chrono::milliseconds(10));
         }
+
+        // Stop the writer and let both threads drain before judging the run. Where a queued
+        // writer bars new readers the writer can also starve one outright by re-queueing
+        // immediately, which is what winpthreads' rwlock does, and libstdc++ builds
+        // std::shared_mutex on that for MinGW. The deadline on its own cannot tell that apart
+        // from the deadlock this guards: a starved reader finishes within a round or two once
+        // the writer stops, while a reader blocked on itself never does, because the writer it
+        // queues behind is itself blocked and so never observes the stop either.
+        //
+        // Waiting for the writer as well is what keeps a passing run from faulting: these
+        // threads are detached, so one still inside the SenderDB when the process starts
+        // destroying its globals dies there rather than returning.
         state->stop = true;
+        auto drain_deadline = chrono::steady_clock::now() + chrono::seconds(10);
+        while ((!state->done || !state->writer_done) &&
+               chrono::steady_clock::now() < drain_deadline) {
+            this_thread::sleep_for(chrono::milliseconds(10));
+        }
 
         ASSERT_TRUE(state->done.load())
             << "get_packing_rate or save deadlocked against a concurrent writer";
