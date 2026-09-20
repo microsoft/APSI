@@ -17,7 +17,10 @@
     "ms-gsl",
     "kuku",
     "flatbuffers",
-    "jsoncpp"
+    {
+      "name": "jsoncpp",
+      "version>=": "1.9.5"
+    }
   ],
   "default-features": [
     "zmq"

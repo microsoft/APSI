@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+  "Registrations": [
+    {
+      "component": {
+        "type": "other",
+        "other": {
+          "name": "ThreadPool",
+          "version": "2012-2015",
+          "downloadUrl": "https://github.com/progschj/ThreadPool"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "other",
+        "other": {
+          "name": "ThreadPool (log4cplus fork)",
+          "version": "2014-2015",
+          "downloadUrl": "https://github.com/log4cplus/ThreadPool"
+        }
+      },
+      "developmentDependency": false
+    }
+  ]
+}
