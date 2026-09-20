@@ -14,6 +14,10 @@
 #ifndef __FOURQ_INTERNAL_H__
 #define __FOURQ_INTERNAL_H__
 
+// APSI: outside the extern "C" block below, because this header is included from C++ and a
+// standard header must not be dragged into a language linkage specification.
+#include <string.h>
+
 
 // For C++
 #ifdef __cplusplus
@@ -129,17 +133,36 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 #define SHIFTL(highIn, lowIn, shift, shiftOut, DigitSize)                                         \
     (shiftOut) = ((highIn) << (shift)) ^ ((lowIn) >> (DigitSize - (shift)));
 
+// APSI: mp_mul and mp_add operate on digit_t, but a generic uint128_t is an array of uint64_t
+// and the operands here are uint64_t. Where digit_t is not uint64_t -- the 32-bit targets --
+// casting the pointers reads and writes those objects through the wrong type, which is the same
+// aliasing violation the architecture headers had. Staging through a digit_t buffer keeps every
+// access at the type of the object. The sizes agree either way: NWORDS_FIELD digits span 16
+// bytes for both a 64-bit and a 32-bit digit, and NWORDS_FIELD/2 digits span 8.
+
 // 64x64-bit multiplication
 #define MUL128(multiplier, multiplicand, product)                                                 \
-    mp_mul((digit_t*)&(multiplier), (digit_t*)&(multiplicand), (digit_t*)&(product), NWORDS_FIELD/2);
+    { digit_t mulIn1[NWORDS_FIELD/2], mulIn2[NWORDS_FIELD/2], mulOut[NWORDS_FIELD];               \
+    memcpy(mulIn1, &(multiplier), sizeof(mulIn1));                                                \
+    memcpy(mulIn2, &(multiplicand), sizeof(mulIn2));                                              \
+    mp_mul(mulIn1, mulIn2, mulOut, NWORDS_FIELD/2);                                               \
+    memcpy((product), mulOut, sizeof(mulOut)); }
 
 // 128-bit addition, inputs < 2^127
 #define ADD128(addend1, addend2, addition)                                                        \
-    mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
+    { digit_t addIn1[NWORDS_FIELD], addIn2[NWORDS_FIELD], addOut[NWORDS_FIELD];                   \
+    memcpy(addIn1, (addend1), sizeof(addIn1));                                                    \
+    memcpy(addIn2, (addend2), sizeof(addIn2));                                                    \
+    mp_add(addIn1, addIn2, addOut, NWORDS_FIELD);                                                 \
+    memcpy((addition), addOut, sizeof(addOut)); }
 
 // 128-bit addition with output carry
 #define ADC128(addend1, addend2, carry, addition)                                                 \
-    (carry) = mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
+    { digit_t adcIn1[NWORDS_FIELD], adcIn2[NWORDS_FIELD], adcOut[NWORDS_FIELD];                   \
+    memcpy(adcIn1, (addend1), sizeof(adcIn1));                                                    \
+    memcpy(adcIn2, (addend2), sizeof(adcIn2));                                                    \
+    (carry) = mp_add(adcIn1, adcIn2, adcOut, NWORDS_FIELD);                                       \
+    memcpy((addition), adcOut, sizeof(adcOut)); }
 
 // APSI: these are MSVC intrinsics, and the array-shaped uint128_t they operate on is exactly
 // what SCALAR_INTRIN_SUPPORT selects above. Keying the branch off that macro rather than

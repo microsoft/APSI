@@ -6,7 +6,7 @@ upstream sources exactly, which is the check to run afterwards:
 
     git apply --check --reverse third_party/fourq/apsi-changes.patch
 
-Seven changes, in descending order of how much they matter.
+Eight changes, in descending order of how much they matter.
 
   * AMD64/fp_x64.h and ARM64/fp_arm64.h stop reading and writing field elements through a
     uint128_t pointer. A field element is an array of digit_t, so mod1271, fpadd1271, fpsub1271
@@ -20,12 +20,23 @@ Seven changes, in descending order of how much they matter.
     generic/fp.h, which is already free of the pattern. The replacement copies in and out with
     memcpy, which cost nothing in the configurations tested here: diffing the generated
     assembly for all four functions showed GCC 16 emitting an identical instruction sequence.
+    The <string.h> this needs is included outside the extern "C" block, since these headers are
+    included from C++ and a standard header must not be given C language linkage.
 
   * eccp2_core.c, generic/fp.h and AMD64/fp_x64.h drop the __inline qualifier from 31 definitions.
     Do not skip this one. Twenty of them are non-static and called from other translation units,
     and MSVC emits no external symbol for such a definition, so those callers fail to link. The
     Unix toolchains emit it either way, which is what makes the omission easy to miss: it breaks
     only the Windows build.
+
+  * FourQ_internal.h's generic MUL128, ADD128 and ADC128 stage through a digit_t buffer rather
+    than casting to one. They hand mp_mul and mp_add, which take digit_t, operands that are
+    uint64_t and a generic uint128_t that is an array of uint64_t. Where digit_t is not uint64_t
+    -- the 32-bit targets, which APSI selects by defining _X86_ -- casting those pointers reads
+    and writes the objects through the wrong type, which is the same violation as above. The
+    sizes agree either way, so only the type of each access changes: NWORDS_FIELD digits span 16
+    bytes whether a digit is 64 or 32 bits. Verified by building the generic implementation and
+    comparing k*G against the AMD64 implementation over ten scalars, which agree exactly.
 
   * AMD64/fp2_1271_AVX2.S comments out its #include of consts.s. Upstream generates that file
     from consts.c as a build step; APSI compiles consts.c as an ordinary source instead, so the
@@ -100,16 +111,18 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
 +#endif
 --- a/third_party/fourq/AMD64/fp_x64.h
 +++ b/third_party/fourq/AMD64/fp_x64.h
-@@ -16,6 +16,8 @@
- #endif
+@@ -9,6 +9,10 @@
+ #ifndef __FP_X64_H__
+ #define __FP_X64_H__
  
- 
++// APSI: outside the extern "C" block below, because a standard header must not be dragged into
++// a language linkage specification.
 +#include <string.h>
 +
- #include "../table_lookup.h"
- #include "../FourQ_params.h"
  
-@@ -32,10 +34,17 @@
+ // For C++
+ #ifdef __cplusplus
+@@ -32,10 +36,17 @@
  { // Modular correction, a = a mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
@@ -131,7 +144,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t mask;
      uint128_t prime;
-@@ -51,31 +60,32 @@
+@@ -51,31 +62,32 @@
  }
  
  
@@ -174,7 +187,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t temp;
      unsigned char _carry;
-@@ -89,17 +99,18 @@
+@@ -89,17 +101,18 @@
  }
  
  
@@ -201,7 +214,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t temp;
      unsigned char _borrow;
-@@ -117,16 +128,18 @@
+@@ -117,16 +130,18 @@
  { // Field negation, a = -a mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
@@ -223,7 +236,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field multiplication, c = a*b mod (2^127-1)
      uint128_t tt1, tt2, tt3 = {0};
      
-@@ -191,7 +204,7 @@
+@@ -191,7 +206,7 @@
  }
  
  
@@ -232,7 +245,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Exponentiation over GF(p), af = a^(125-1)
      int i;
      felm_t t1, t2, t3, t4, t5;
-@@ -240,7 +253,7 @@
+@@ -240,7 +255,7 @@
  }
  
  
@@ -241,7 +254,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Schoolbook multiprecision multiply, c = a*b   
      unsigned int i, j;
      digit_t u, v, UV[2];
-@@ -263,7 +276,7 @@
+@@ -263,7 +278,7 @@
  }
  
  
@@ -252,16 +265,18 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
      unsigned char carry = 0;
 --- a/third_party/fourq/ARM64/fp_arm64.h
 +++ b/third_party/fourq/ARM64/fp_arm64.h
-@@ -16,6 +16,8 @@
- #endif
+@@ -9,6 +9,10 @@
+ #ifndef __FP_ARM64_H__
+ #define __FP_ARM64_H__
  
- 
++// APSI: outside the extern "C" block below, because a standard header must not be dragged into
++// a language linkage specification.
 +#include <string.h>
 +
- #include "../table_lookup.h"
- #include "../FourQ_params.h"
  
-@@ -26,10 +28,17 @@
+ // For C++
+ #ifdef __cplusplus
+@@ -26,10 +30,17 @@
  
  void mod1271(felm_t a)
  { // Modular correction, a = a mod (2^127-1)    
@@ -283,7 +298,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  }
  
  
-@@ -49,33 +58,37 @@
+@@ -49,33 +60,37 @@
  
  __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
  { // Field addition, c = a+b mod (2^127-1)
@@ -545,7 +560,18 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  /**************** Public ECC API ****************/
 --- a/third_party/fourq/FourQ_internal.h
 +++ b/third_party/fourq/FourQ_internal.h
-@@ -21,14 +21,17 @@
+@@ -14,6 +14,10 @@
+ #ifndef __FOURQ_INTERNAL_H__
+ #define __FOURQ_INTERNAL_H__
+ 
++// APSI: outside the extern "C" block below, because this header is included from C++ and a
++// standard header must not be dragged into a language linkage specification.
++#include <string.h>
++
+ 
+ // For C++
+ #ifdef __cplusplus
+@@ -21,14 +25,17 @@
  #endif
  
      
@@ -565,11 +591,46 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
      #define UINT128_SUPPORT
      typedef unsigned uint128_t __attribute__((mode(TI)));  
  #elif (TARGET == TARGET_ARM64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
-@@ -138,7 +141,10 @@
- #define ADC128(addend1, addend2, carry, addition)                                                 \
-     (carry) = mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
+@@ -126,19 +133,41 @@
+ #define SHIFTL(highIn, lowIn, shift, shiftOut, DigitSize)                                         \
+     (shiftOut) = ((highIn) << (shift)) ^ ((lowIn) >> (DigitSize - (shift)));
  
++// APSI: mp_mul and mp_add operate on digit_t, but a generic uint128_t is an array of uint64_t
++// and the operands here are uint64_t. Where digit_t is not uint64_t -- the 32-bit targets --
++// casting the pointers reads and writes those objects through the wrong type, which is the same
++// aliasing violation the architecture headers had. Staging through a digit_t buffer keeps every
++// access at the type of the object. The sizes agree either way: NWORDS_FIELD digits span 16
++// bytes for both a 64-bit and a 32-bit digit, and NWORDS_FIELD/2 digits span 8.
++
+ // 64x64-bit multiplication
+ #define MUL128(multiplier, multiplicand, product)                                                 \
+-    mp_mul((digit_t*)&(multiplier), (digit_t*)&(multiplicand), (digit_t*)&(product), NWORDS_FIELD/2);
++    { digit_t mulIn1[NWORDS_FIELD/2], mulIn2[NWORDS_FIELD/2], mulOut[NWORDS_FIELD];               \
++    memcpy(mulIn1, &(multiplier), sizeof(mulIn1));                                                \
++    memcpy(mulIn2, &(multiplicand), sizeof(mulIn2));                                              \
++    mp_mul(mulIn1, mulIn2, mulOut, NWORDS_FIELD/2);                                               \
++    memcpy((product), mulOut, sizeof(mulOut)); }
+ 
+ // 128-bit addition, inputs < 2^127
+ #define ADD128(addend1, addend2, addition)                                                        \
+-    mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
++    { digit_t addIn1[NWORDS_FIELD], addIn2[NWORDS_FIELD], addOut[NWORDS_FIELD];                   \
++    memcpy(addIn1, (addend1), sizeof(addIn1));                                                    \
++    memcpy(addIn2, (addend2), sizeof(addIn2));                                                    \
++    mp_add(addIn1, addIn2, addOut, NWORDS_FIELD);                                                 \
++    memcpy((addition), addOut, sizeof(addOut)); }
+ 
+ // 128-bit addition with output carry
+ #define ADC128(addend1, addend2, carry, addition)                                                 \
+-    (carry) = mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
+-
 -#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_WIN)
++    { digit_t adcIn1[NWORDS_FIELD], adcIn2[NWORDS_FIELD], adcOut[NWORDS_FIELD];                   \
++    memcpy(adcIn1, (addend1), sizeof(adcIn1));                                                    \
++    memcpy(adcIn2, (addend2), sizeof(adcIn2));                                                    \
++    (carry) = mp_add(adcIn1, adcIn2, adcOut, NWORDS_FIELD);                                       \
++    memcpy((addition), adcOut, sizeof(adcOut)); }
++
 +// APSI: these are MSVC intrinsics, and the array-shaped uint128_t they operate on is exactly
 +// what SCALAR_INTRIN_SUPPORT selects above. Keying the branch off that macro rather than
 +// restating the target matrix keeps the two blocks from drifting apart.
@@ -577,7 +638,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // Digit multiplication
  #define MUL(multiplier, multiplicand, hi, lo)                                                     \
-@@ -189,7 +195,10 @@
+@@ -189,7 +218,10 @@
      (shiftOut)[1]  = __shiftleft128((Input)[0], (Input)[1], (shift));                             \
      (shiftOut)[0] = (Input)[0] << (shift);  
  
