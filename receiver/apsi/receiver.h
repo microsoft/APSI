@@ -95,10 +95,17 @@ namespace apsi::receiver {
     public:
         /**
         Indicates the number of random-walk steps used by the Kuku library to insert items into
-        the cuckoo hash table. Increasing this number can yield better packing rates in cuckoo
-        hashing.
+        the cuckoo hash table.
+
+        A walk that runs out of steps gives up on an item the table could still have held, so
+        this bounds how hard the receiver tries before reporting that its items do not fit. At
+        the occupancy the shipped parameter sets use, a walk ends long before reaching this and
+        the value costs nothing; it decides the outcome only for a receiver whose table is
+        fuller than that, where it is the difference between a query and an exception. The walk
+        records a journal of four bytes per step so that it can be undone, and grows it only as
+        far as a walk actually goes.
         */
-        static constexpr std::uint64_t cuckoo_table_insert_attempts = 500;
+        static constexpr std::uint64_t cuckoo_table_insert_attempts = 8000;
 
         /**
         How long the receiver waits for the sender to make progress before it gives up on an
