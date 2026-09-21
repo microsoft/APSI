@@ -353,6 +353,22 @@ namespace apsi {
         stringstream ss(in);
         ss >> root;
 
+        // A parameter file may name the serialization version it was written for. The key is
+        // optional, so that a file written before it existed still loads, but a file that names
+        // a version this build does not implement is refused here rather than at the first
+        // exchange with a peer, where the mismatch would otherwise first appear.
+        const auto &json_version = root["version"];
+        if (!json_version.isNull()) {
+            uint32_t version = json_value_ui32(json_version);
+            if (!same_serialization_version(version)) {
+                stringstream err;
+                err << "parameters are written for serialization version " << version
+                    << ", which is incompatible with the serialization version this build "
+                    << "implements (" << apsi_serialization_version << ")";
+                throw runtime_error(err.str());
+            }
+        }
+
         // Load TableParams
         PSIParams::TableParams table_params;
         try {

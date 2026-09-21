@@ -26,6 +26,7 @@
 - Added `util::secure_zero_stack`, `util::StackScrubGuard`, `util::SecureZeroGuard` and `util::stack_scrub_byte_count` for clearing secret material left on the stack.
 - Added `oprf::ECPoint::is_prime_order` and `oprf::ECPoint::clear`.
 - Added `SenderDB::get_bin_bundle_count_unlocked` for callers that already hold a lock on the `SenderDB`.
+- A JSON parameter file may name the serialization version it was written for in an optional top-level `version` key. One naming a version this build does not implement is refused while loading, rather than at the first exchange with a peer.
 
 ### Hardened
 
