@@ -1191,6 +1191,62 @@ namespace APSITests {
         }
     }
 
+    TEST(PSIParamsTests, ShippedParameterSetsLeaveRoomInTheCuckooTable)
+    {
+        // A receiver places its items in a cuckoo table of table_size, and a set that will not
+        // fit gets an exception from Receiver::create_query rather than a query. The hash
+        // functions are seeded identically on every call, so an item's candidate locations never
+        // change, but the walk that evicts and re-places items is not, so calling again on the
+        // same items usually succeeds. The margin still matters: a caller has an exception to
+        // handle, and a receiver that visibly retries has told an observer something.
+        //
+        // Three-way cuckoo hashing carries a threshold near 91.8% occupancy, and insertion
+        // starts failing measurably well before it. The shipped sets hold to at least 1.6 times
+        // the receiver's item count, which is about 62% occupancy; this checks that a retune has
+        // not quietly taken one below that.
+        constexpr double min_ratio = 1.5996; // 1638/1024, the ratio the shipped sets realize
+
+        namespace fs = std::filesystem;
+        fs::path dir(APSI_PARAMETERS_DIR);
+        ASSERT_TRUE(fs::is_directory(dir)) << "cannot find " << dir;
+
+        size_t checked = 0;
+        for (const auto &entry : fs::directory_iterator(dir)) {
+            if (entry.path().extension() != ".json") {
+                continue;
+            }
+
+            string stem = entry.path().stem().string();
+            double sender = 0.0;
+            double receiver = 0.0;
+            double label_bytes = 0.0;
+            ASSERT_TRUE(parse_name(stem, sender, receiver, label_bytes)) << stem;
+
+            ifstream file(entry.path());
+            ASSERT_TRUE(file.is_open()) << stem;
+            stringstream json;
+            json << file.rdbuf();
+            PSIParams params = PSIParams::Load(json.str());
+
+            // A single hash function gives each item one location and no eviction, so occupancy
+            // says nothing about it; those sets carry one query item and are sized by the
+            // table_size granularity rule instead.
+            if (params.table_params().hash_func_count < 2) {
+                continue;
+            }
+
+            double ratio = static_cast<double>(params.table_params().table_size) / receiver;
+            ASSERT_GE(ratio, min_ratio)
+                << stem << ": table_size " << params.table_params().table_size << " is only "
+                << ratio << " times the " << receiver << " items the name says a receiver "
+                << "queries, which is " << (100.0 * receiver / params.table_params().table_size)
+                << "% occupancy; cuckoo insertion fails too often above about 83%";
+            checked++;
+        }
+
+        ASSERT_LE(size_t(20), checked) << "far fewer parameter sets checked than expected";
+    }
+
     TEST(PSIParamsTests, ShippedParameterSetsHoldTheDocumentedFalsePositiveBound)
     {
         // The README promises that every shipped parameter set keeps the probability of a query

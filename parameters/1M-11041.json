@@ -1,7 +1,7 @@
 {
     "table_params": {
         "hash_func_count": 3,
-        "table_size": 16384,
+        "table_size": 18432,
         "max_items_per_bin": 98
     },
     "item_params": {
