@@ -757,11 +757,19 @@ The couplings worth keeping in front of you:
 | each `coeff_modulus` prime | at most 60 bits |
 | number of `coeff_modulus` primes | at most `PSIParams::coeff_modulus_size_max`, which is 12 |
 
-A parameter set that passes the constructor can still be wrong in two ways that only show up when you run it.
+A parameter set that passes the constructor can still be wrong in three ways that only show up when you run it.
+
 It can return false positives more often than you expect, which `sender::SenderDB::log2_fpp` tells you in advance; and it can run out of noise budget, which shows up as wrong results rather than as an error.
 Build a `SenderDB` whose bins are full &ndash; roughly `table_size * max_items_per_bin / hash_func_count` items, since the sender places each item once per hash function &ndash; run a query, and read the "Matching result noise budget" and "Label result noise budget" lines that APSI logs at debug level.
 Measuring with fewer items than that reports a budget that is too high, because a bin bundle that is not full evaluates a lower-degree polynomial and keeps more of it.
 A few bits left is what the shipped sets aim for; zero means the parameters are already producing wrong answers, and one or two means a different sender's set may.
+
+Third, `table_size` can be too small for the number of items the receiver means to query.
+The receiver places its items in a cuckoo hash table of that size, and `Receiver::create_query` throws when a set will not fit.
+The shipped sets hold `table_size` to at least 1.6 times the receiver's item count, which is about 62% occupancy; the granularity of the first constraint above is why several sit well above that rather than at it.
+Occupancy is the figure to watch rather than the absolute size: with three hash functions insertion succeeds essentially always up to around 83%, and then fails sharply as it approaches the 91.8% threshold that three-way cuckoo hashing carries.
+A failure is not permanent for a given set of items. The hash functions are seeded identically on every call, so an item's candidate locations never change, but the walk that evicts and re-places items in search of a consistent assignment is not: calling `Receiver::create_query` again on the same items succeeds about 99 times in 100, measured at 85% occupancy.
+Leave margin all the same, since what a caller gets is an exception it has to handle, and a receiver that visibly retries has told an observer something about the set it holds.
 
 #### SEALParams
 
