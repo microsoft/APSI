@@ -42,6 +42,7 @@
 ### Changed and fixed
 
 - `PowersDag::configure` rejects a set of target powers it cannot decompose, rather than returning a configured DAG whose node names a parent that does not exist and letting `PowersDag::parallel_apply` discover it from a worker thread.
+- Loading a JSON parameter file reports a value of the wrong type instead of reading it as a string, which threw or aborted depending on how jsoncpp was built.
 - Every shipped parameter set names its `plain_modulus` outright rather than a bit count, which pins the noise budget as well as the item size. `plain_modulus_bits` is still accepted.
 - A receiving process creates no thread pool.
 - `SenderDB` holds its lock across the whole of each operation, so hashing no longer runs outside it. Concurrent updates block queries for longer than before. Moving a `SenderDB` must not overlap any other use of it.

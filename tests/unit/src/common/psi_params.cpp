@@ -1146,6 +1146,51 @@ namespace APSITests {
         ASSERT_THROW(static_cast<void>(PSIParams::Load(with_version("\"one\""))), runtime_error);
     }
 
+    TEST(PSIParamsTests, MalformedJSONValuesAreRefusedWhateverTheirType)
+    {
+        // A value of the wrong type is reported rather than asserted on. The message names the
+        // offending value by streaming it, which every Json::Value supports; reading it as a
+        // string instead would hold only for a string, and jsoncpp answers the rest by throwing
+        // a logic error or, when built without exceptions, by aborting.
+        stringstream ss;
+        ifstream file(string(APSI_PARAMETERS_DIR) + "/100K-1.json");
+        ASSERT_TRUE(file.is_open());
+        ss << file.rdbuf();
+        string base = ss.str();
+
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(base)));
+
+        auto with_replacement = [&base](const string &from, const string &to) {
+            string result = base;
+            size_t at = result.find(from);
+            EXPECT_NE(string::npos, at);
+            return result.replace(at, from.size(), to);
+        };
+
+        // A query power at every JSON type that is not an unsigned integer.
+        for (const string &value : vector<string>{ "1.5", "true", "-3", "{}", "[]", "null" }) {
+            ASSERT_THROW(
+                static_cast<void>(
+                    PSIParams::Load(with_replacement("[ 1, 2,", "[ " + value + ", 2,"))),
+                runtime_error);
+        }
+
+        // A coefficient modulus bit count at every JSON type that is not an int.
+        for (const string &value : vector<string>{ "1.5", "true", "{}", "[]", "null" }) {
+            ASSERT_THROW(
+                static_cast<void>(PSIParams::Load(with_replacement("[ 48 ]", "[ " + value + " ]"))),
+                runtime_error);
+        }
+
+        // And the optional version key, which is read the same way.
+        for (const string &value : vector<string>{ "1.5", "true", "{}", "[]" }) {
+            ASSERT_THROW(
+                static_cast<void>(
+                    PSIParams::Load(with_replacement("{", "{ \"version\": " + value + ","))),
+                runtime_error);
+        }
+    }
+
     TEST(PSIParamsTests, ShippedParameterSetsHoldTheDocumentedFalsePositiveBound)
     {
         // The README promises that every shipped parameter set keeps the probability of a query
