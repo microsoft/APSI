@@ -48,6 +48,13 @@ namespace apsi::sender {
     and can be disabled when constructing the SenderDB. The downside of in-memory compression is
     a performance reduction from decompressing parts of the data when they are used, and
     recompressing them if they are updated.
+
+    An update and a query cannot overlap. SenderDB::insert_or_assign and SenderDB::remove hold a
+    writer lock for the whole of their work, including the OPRF hashing they begin with, while
+    answering a query holds a reader lock for as long as the answer takes. An embedder that
+    updates a SenderDB while it serves queries therefore stalls every query for the duration of
+    the update, which for a large batch is not brief. Where that matters, build the new state
+    separately and direct later queries at it, or update while the sender is not serving.
     */
     class SenderDB {
     public:
