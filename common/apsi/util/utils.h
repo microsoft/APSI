@@ -217,7 +217,9 @@ namespace apsi::util {
 
     /**
     Returns whether two byte buffers of given length hold the same data, throwing an exception
-    if either pointer is nullptr.
+    if either pointer is nullptr. The comparison reads both buffers in full rather than stopping
+    at the first difference, so its running time reveals nothing about where they differ. Use it
+    wherever either buffer is secret.
     */
     bool compare_bytes(const void *first, const void *second, std::size_t count);
 

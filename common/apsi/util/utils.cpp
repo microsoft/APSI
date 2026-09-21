@@ -222,11 +222,17 @@ namespace apsi::util {
         }
 
         const auto *first_begin = reinterpret_cast<const unsigned char *>(first);
-        const auto *first_end = first_begin + count;
         const auto *second_begin = reinterpret_cast<const unsigned char *>(second);
 
-        // NOLINTNEXTLINE(readability-suspicious-call-argument)
-        return equal(first_begin, first_end, second_begin);
+        // Every byte is read whatever the buffers hold, so the time taken says nothing about
+        // where they first differ. OPRFKey compares its secret key through this.
+        unsigned char difference = 0;
+        for (size_t i = 0; i < count; i++) {
+            difference =
+                static_cast<unsigned char>(difference | (first_begin[i] ^ second_begin[i]));
+        }
+
+        return difference == 0;
     }
 
     set<uint32_t> create_powers_set(uint32_t ps_low_degree, uint32_t target_degree)

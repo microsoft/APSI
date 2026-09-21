@@ -30,6 +30,7 @@
 
 ### Hardened
 
+- `oprf::OPRFKey` comparison reads both keys in full rather than stopping at the first difference, so its running time says nothing about where they differ.
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
 - `oprf::OPRFReceiver::process_responses` rejects a response outside the prime-order subgroup, and `oprf::ECPoint::load` rejects a non-canonical point encoding.
 - An OPRF request is limited to `oprf::oprf_query_count_max` items.

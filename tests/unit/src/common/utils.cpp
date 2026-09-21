@@ -231,6 +231,44 @@ namespace APSITests {
         ASSERT_TRUE(equal(arr1_5.begin(), arr1_5.end(), res.begin()));
     }
 
+    TEST(UtilsTests, CompareBytes)
+    {
+        // The comparison has to hold whatever the position of the first difference, since it no
+        // longer stops at one. A difference in the last byte is the case a short-circuiting
+        // comparison would still get right but would take longest to reach.
+        array<unsigned char, 8> a{ 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8 };
+
+        ASSERT_TRUE(compare_bytes(a.data(), a.data(), a.size()));
+
+        for (size_t i = 0; i < a.size(); i++) {
+            array<unsigned char, 8> b = a;
+            b[i] = static_cast<unsigned char>(b[i] ^ 0x80);
+            ASSERT_FALSE(compare_bytes(a.data(), b.data(), a.size()));
+            ASSERT_FALSE(compare_bytes(b.data(), a.data(), a.size()));
+
+            // A difference past the compared length is not a difference.
+            ASSERT_TRUE(compare_bytes(a.data(), b.data(), i));
+        }
+
+        // Every byte differing, and a single bit differing, are both differences.
+        array<unsigned char, 8> all_different{};
+        for (size_t i = 0; i < a.size(); i++) {
+            all_different[i] = static_cast<unsigned char>(~a[i]);
+        }
+        ASSERT_FALSE(compare_bytes(a.data(), all_different.data(), a.size()));
+
+        array<unsigned char, 8> one_bit = a;
+        one_bit[4] = static_cast<unsigned char>(one_bit[4] ^ 0x01);
+        ASSERT_FALSE(compare_bytes(a.data(), one_bit.data(), a.size()));
+
+        // An empty comparison holds, and a null pointer is refused.
+        ASSERT_TRUE(compare_bytes(a.data(), all_different.data(), 0));
+        ASSERT_THROW(
+            static_cast<void>(compare_bytes(nullptr, a.data(), a.size())), invalid_argument);
+        ASSERT_THROW(
+            static_cast<void>(compare_bytes(a.data(), nullptr, a.size())), invalid_argument);
+    }
+
     TEST(UtilsTests, SecureRandomBytes)
     {
         // Every secret APSI generates comes from here, so check that it fills what it is asked
