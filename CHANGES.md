@@ -4,7 +4,7 @@
 
 ### Breaking changes
 
-- `Receiver::request_query` draws a new key pair for each query, so a sender can no longer recognize two queries as coming from one receiver. A caller using `Receiver::create_query` and `Receiver::process_result` instead must call `Receiver::reset_keys` between queries itself, at a point where none is in flight.
+- `Receiver::request_query` draws a new key pair for each query, so two queries no longer carry the same public keys for a sender to link them by. A caller using `Receiver::create_query` and `Receiver::process_result` instead must call `Receiver::reset_keys` between queries itself, at a point where none is in flight.
 - Require Microsoft SEAL 4.4.5 or a newer 4.x release, and update the vcpkg baseline.
 - The exported CMake package links `JsonCpp::JsonCpp` rather than `jsoncpp_static`, so APSI can be built against a shared jsoncpp. jsoncpp 1.9.5 or newer is now required.
 - Retuned 31 of the 36 shipped parameter sets: twenty-seven were above the documented 2^-40 false-positive probability per query, and three more left only two or three bits of noise budget once their bins filled. Only `plain_modulus` and `coeff_modulus_bits` changed, and some sets now send a little more than before. A sender and a receiver must agree on their parameters, so both sides of a deployment want the new values.
@@ -33,7 +33,7 @@
 
 - The ZeroMQ high water mark is 256 messages rather than 70000. It bounds what ZeroMQ retains for a peer that has stopped reading, which at the largest shipped parameter set is the difference between roughly a hundred megabytes and tens of gigabytes per peer.
 - `oprf::OPRFKey` comparison reads both keys in full rather than stopping at the first difference, so its running time says nothing about where they differ.
-- The receiver CLI escapes control characters in items and labels before printing them, quotes its CSV output, and emits color only to a terminal. A label is whatever the sender chose to store, and an escape sequence in one could otherwise rewrite what appeared on the screen or add a column to the output file.
+- The receiver CLI escapes control characters in items and labels before printing them, quotes its CSV output, and emits color only to a terminal. A label is whatever the sender chose to store: an escape sequence in one could otherwise rewrite what had already appeared on the screen, and a comma could add a column to the output file.
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
 - `oprf::OPRFReceiver::process_responses` rejects a response outside the prime-order subgroup, and `oprf::ECPoint::load` rejects a non-canonical point encoding.
 - An OPRF request is limited to `oprf::oprf_query_count_max` items.
@@ -44,7 +44,7 @@
 
 ### Changed and fixed
 
-- `PowersDag::configure` rejects a set of target powers it cannot decompose, rather than returning a configured DAG whose node names a parent that does not exist and letting `PowersDag::parallel_apply` discover it from a worker thread.
+- `PowersDag::configure` rejects a set of target powers it cannot decompose, rather than returning a DAG whose node names a parent that does not exist. The target powers APSI derives from a parameter set are always decomposable, so this is for a caller that builds a set of its own.
 - Loading a JSON parameter file reports a value of the wrong type instead of reading it as a string, which threw or aborted depending on how jsoncpp was built.
 - Every shipped parameter set names its `plain_modulus` outright rather than a bit count, which pins the noise budget as well as the item size. `plain_modulus_bits` is still accepted.
 - A receiving process creates no thread pool.
@@ -54,7 +54,7 @@
 
 ### Build
 
-- `APSI_SECURE_COMPILE_OPTIONS` now hardens the build rather than doing nothing, and defaults to ON. Every toolchain gets stack protection and bounds-checked standard library containers; GCC and Clang additionally get fortified libc calls, stack-clash protection, position-independent code, and full RELRO with a non-executable stack on ELF targets; MSVC gets Control Flow Guard, the Spectre variant 1 mitigation, EH continuation metadata and, on x64, shadow-stack marking. The options are not exported, so a consumer chooses its own.
+- `APSI_SECURE_COMPILE_OPTIONS` now hardens the build rather than doing nothing, and defaults to ON. GCC and Clang get stack protection, position-independent code and bounds-checked standard library containers, together with fortified libc calls and stack-clash protection away from Apple platforms and full RELRO with a non-executable stack on ELF targets; MSVC gets Control Flow Guard, the Spectre variant 1 mitigation, EH continuation metadata on a 64-bit target, and shadow-stack marking on x64. See [Build Hardening](README.md#build-hardening) for what each toolchain receives. The options are not exported, so a consumer chooses its own.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
