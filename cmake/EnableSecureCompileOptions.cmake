@@ -43,29 +43,17 @@ if(MSVC)
         add_compile_options(/Qspectre)
     endif()
 
-    # The two options below depend on the target, and neither the generator platform variables nor
-    # check_linker_flag can gate them reliably on MSVC, so each probe asks the compiler's own target
-    # macros and rejects everything it does not name.
-    check_cxx_source_compiles("
-#if defined(_M_X64) || defined(_M_ARM64) || defined(_M_ARM64EC)
-int main() { return 0; }
-#else
-#error Not a 64-bit target.
-#endif
-" APSI_MSVC_TARGET_IS_64BIT)
-
-    # EH continuation metadata, which matters here because APSI unwinds across the C boundary of
-    # the vendored FourQ sources.
-    if(APSI_MSVC_TARGET_IS_64BIT)
-        apsi_check_compile_option(/guard:ehcont APSI_HAS_GUARD_EHCONT)
-        if(APSI_HAS_GUARD_EHCONT)
-            add_compile_options(/guard:ehcont)
-            add_link_options(/guard:ehcont)
-        endif()
-    endif()
+    # EH continuation metadata is deliberately not enabled. It is all-or-nothing at link time:
+    # /guard:ehcont makes the linker reject any module that carries EH metadata without it, and
+    # the dependencies arrive prebuilt from vcpkg without it, so SEAL, ZeroMQ and GoogleTest all
+    # fail the link. Nor can it be limited to APSI's own objects, because MSBuild turns the
+    # linker flag on whenever any compiled file sets the compile one. Enabling it would mean
+    # building every dependency for it.
 
     # Shadow-stack marking is x64 only. ARM64EC has to be excluded by name because it defines
-    # _M_X64 as well, being x64-compatible by design.
+    # _M_X64 as well, being x64-compatible by design. Neither the generator platform variables
+    # nor check_linker_flag gate this reliably on MSVC, so the probe asks the compiler's own
+    # target macros and rejects everything it does not name.
     check_cxx_source_compiles("
 #if defined(_M_X64) && !defined(_M_ARM64EC)
 int main() { return 0; }
