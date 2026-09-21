@@ -528,6 +528,13 @@ Two further limitations follow from the same root.
 Labels carry no integrity protection: the label ciphertext is a keystream XOR with no authentication tag, so a party on the connection can apply a chosen difference to a delivered label without detection.
 And an authenticated channel makes the sender *identified*, not *honest*: a sender remains authoritative for its own data and can always answer as though its database contained any item it likes.
 
+One case makes transport *encryption* matter as much as authentication, and is the reason APSI builds Microsoft SEAL with its `no-throw-tran` feature rather than letting SEAL reject the ciphertext outright.
+A label result is produced by evaluating an interpolation polynomial, and when every occupied bin in a bundle holds a single item that polynomial has degree zero.
+The result is then a constant that the sender cannot blind, because rerandomizing it would require the receiver's public encryption key, which the protocol never transmits.
+Such a ciphertext is *transparent*: its plaintext can be read off the wire without the receiver's secret key.
+What that exposes is the `EncryptedLabel` described in [Label Encryption](#label-encryption) rather than the label itself, so an eavesdropper who does not already know the item still cannot recover the label, and the matching result is unaffected because its leading coefficient is monic and so never degenerates.
+A deployment serving labels should nonetheless choose a transport that encrypts as well as authenticates.
+
 #### What a Peer Can Learn
 
 These two exposures are properties of the protocol rather than of the transport, so an authenticated channel bounds them only by bounding *who* may query.
@@ -693,6 +700,11 @@ It is possible to optionally specify the size of the nonce used in encrypting th
 The `SenderDB` requires substantially more memory than the raw data would.
 Part of that memory can automatically be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing the `SenderDB`.
 The downside of in-memory compression is a performance reduction from decompressing parts of the data when they are used, and recompressing them if they are updated.
+
+An update and a query cannot overlap.
+`SenderDB::insert_or_assign` and `SenderDB::remove` hold a writer lock for the whole of their work, including the OPRF hashing they begin with, while answering a query holds a reader lock for as long as the answer takes.
+An embedder that updates a `SenderDB` while it serves queries therefore stalls every query for the duration of the update, which for a large batch is not brief.
+Where that matters, build the new state separately and direct later queries at it, or update while the sender is not serving.
 
 In many cases the `SenderDB` does not need to be modified after having been constructed, or loaded from disk.
 The function `SenderDB::strip` can be called to remove all data that is not strictly needed to serve query requests.
