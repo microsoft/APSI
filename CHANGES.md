@@ -7,7 +7,7 @@
 - `Receiver::request_query` draws a new key pair for each query, so two queries no longer carry the same public keys for a sender to link them by. A caller using `Receiver::create_query` and `Receiver::process_result` instead must call `Receiver::reset_keys` between queries itself, at a point where none is in flight.
 - Require Microsoft SEAL 4.4.5 or a newer 4.x release, and update the vcpkg baseline.
 - The exported CMake package links `JsonCpp::JsonCpp` rather than `jsoncpp_static`, so APSI can be built against a shared jsoncpp. jsoncpp 1.9.5 or newer is now required.
-- Retuned 31 of the 36 shipped parameter sets. Twenty-seven were above the documented 2^-40 false-positive probability per query, and three more left only two or three bits of noise budget once their bins filled; those moved `plain_modulus` and `coeff_modulus_bits`. Five sized their cuckoo table below 1.6 times the receiver's item count, which is the ratio the rest hold to, and now hold a larger one: `1M-5535`, `1M-11041`, `16M-5535`, `16M-11041` and `256M-4096` each carry one more bundle of query ciphertexts than before. A receiver whose items will not fit its cuckoo table gets an exception from `Receiver::create_query` rather than a query. A sender and a receiver must agree on their parameters, so both sides of a deployment want the new values.
+- Retuned 31 of the 36 shipped parameter sets: twenty-seven were above the documented 2^-40 false-positive probability per query, and three more left only two or three bits of noise budget once their bins filled. Some sets now send more than before. A sender and a receiver must agree on their parameters, so both sides of a deployment want the new values.
 - `PSIParams::log2_fpp` is now `PSIParams::log2_fpp_per_bin_bundle`, which is what it measures: it counts neither the bin bundles a location spills into nor the items a query carries. Added `sender::SenderDB::log2_fpp`, which counts both and is the figure a deployment should read.
 - A `network::Channel` send throws when it cannot hand the data over. `ZMQChannel` no longer discards a message it has no route for or whose queue is full, and gives up after a bounded send timeout; `StreamChannel` flushes and reports a stream that refused the write. A send that returns still does not mean the peer received the data.
 - Code that loops on a `nullptr` receive must consult the new `network::Channel::receive_failed` and `network::Channel::receive_failure_count`.
@@ -44,6 +44,7 @@
 
 ### Changed and fixed
 
+- `Receiver::cuckoo_table_insert_attempts` is 8000 rather than 500.
 - `PowersDag::configure` rejects a set of target powers it cannot decompose, rather than returning a DAG whose node names a parent that does not exist. The target powers APSI derives from a parameter set are always decomposable, so this is for a caller that builds a set of its own.
 - Loading a JSON parameter file reports a value of the wrong type instead of reading it as a string, which threw or aborted depending on how jsoncpp was built.
 - Every shipped parameter set names its `plain_modulus` outright rather than a bit count, which pins the noise budget as well as the item size. `plain_modulus_bits` is still accepted.

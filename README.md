@@ -765,11 +765,17 @@ Measuring with fewer items than that reports a budget that is too high, because 
 A few bits left is what the shipped sets aim for; zero means the parameters are already producing wrong answers, and one or two means a different sender's set may.
 
 Third, `table_size` can be too small for the number of items the receiver means to query.
-The receiver places its items in a cuckoo hash table of that size, and `Receiver::create_query` throws when a set will not fit.
-The shipped sets hold `table_size` to at least 1.6 times the receiver's item count, which is about 62% occupancy; the granularity of the first constraint above is why several sit well above that rather than at it.
-Occupancy is the figure to watch rather than the absolute size: with three hash functions insertion succeeds essentially always up to around 83%, and then fails sharply as it approaches the 91.8% threshold that three-way cuckoo hashing carries.
-A failure is not permanent for a given set of items. The hash functions are seeded identically on every call, so an item's candidate locations never change, but the walk that evicts and re-places items in search of a consistent assignment is not: calling `Receiver::create_query` again on the same items succeeds about 99 times in 100, measured at 85% occupancy.
-Leave margin all the same, since what a caller gets is an exception it has to handle, and a receiver that visibly retries has told an observer something about the set it holds.
+The receiver places its items in a cuckoo hash table of that size, and `Receiver::create_query` throws when they do not fit.
+
+Whether a given set fits is a property of the items themselves, so a failure carries information about the receiver's set, and the receiver cannot help acting on it: it either abandons the query or retries and sends one later than it otherwise would.
+The margin is therefore a privacy parameter and not a performance one, and the shipped sets are sized for it: `table_size` is at least 1.6 times the receiver's item count, about 62% occupancy, at which the probability of a failure is around 2^-40.
+The granularity of the first constraint above is why several sets sit well above that ratio rather than at it.
+
+The failure probability is governed by occupancy rather than by the absolute size, and climbs steeply with it: by 90% it is close to even odds.
+A parameter set of your own should be sized against the largest query it will ever carry rather than a typical one, since the occupancy that decides the matter is the worst case rather than the average.
+
+A failure is not permanent for a given set of items, which bounds the damage without removing the reason for the margin.
+The hash functions are seeded identically on every call, so an item's candidate locations never change, but the walk that evicts and re-places items in search of a consistent assignment is not, and calling `Receiver::create_query` again on the same items may succeed.
 
 #### SEALParams
 
