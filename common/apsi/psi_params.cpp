@@ -48,7 +48,7 @@ namespace {
     {
         if (!value.isUInt()) {
             stringstream ss;
-            ss << value.asCString() << " should be an unsigned int32";
+            ss << value << " should be an unsigned int32";
             throw runtime_error(ss.str());
         }
 
@@ -78,7 +78,7 @@ namespace {
     {
         if (!value.isInt()) {
             stringstream ss;
-            ss << value.asCString() << " should be an int";
+            ss << value << " should be an int";
             throw runtime_error(ss.str());
         }
 
