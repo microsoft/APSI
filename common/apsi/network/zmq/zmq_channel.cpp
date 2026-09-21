@@ -59,6 +59,30 @@ namespace apsi {
             // rather than fallen behind.
             constexpr int send_timeout_ms = 30000;
 
+            // How many messages ZeroMQ may hold for one peer before a send to it blocks, and
+            // then fails once send_timeout_ms is up. The sender's outbound queue and the
+            // receiver's inbound queue are separate and each bounded by this, so the path
+            // between the two admits more than one queue's worth.
+            //
+            // This is backpressure, not capacity for an answer. A query sends one result package
+            // per bin bundle and may run to far more packages than this: the receiver drains the
+            // queue while the sender is still evaluating the rest, and a full queue makes a send
+            // wait rather than discard, so a long answer does not need a deep queue.
+            //
+            // What the number bounds is the serialized payload ZeroMQ holds for a peer that has
+            // stopped reading, since it keeps a queued message until that peer reads it rather
+            // than until the query ends, and keeps a queue per peer. A result package measures
+            // 443 KB at the largest shipped parameter set and 97 KB at a typical one, which puts
+            // one stalled peer on the order of a hundred megabytes where a high water mark of
+            // 70000 allowed tens of gigabytes. It does not bound what the sender itself holds:
+            // a result computed but not yet handed over is the sender's own memory.
+            //
+            // The value is a conservative operating choice rather than one the protocol dictates.
+            // A peer that stalls long enough to fill the queue and keep it full for
+            // send_timeout_ms loses the query, and learns of it only by running out its own
+            // deadline, because nothing tells it that the answer it was promised was abandoned.
+            constexpr int result_package_hwm = 256;
+
             template <typename T>
             size_t load_from_string(string data, T &obj)
             {
@@ -681,8 +705,9 @@ namespace apsi {
         {
             // How far ahead a sender may get while this receiver is still working through what
             // has arrived. A DEALER whose queue is full stops reading rather than discarding,
-            // so this throttles the sender instead of losing anything.
-            socket->set(sockopt::rcvhwm, 70000);
+            // so this throttles the sender instead of losing anything. See
+            // result_package_hwm for why the depth is what it is.
+            socket->set(sockopt::rcvhwm, result_package_hwm);
 
             // The receiver runs several result workers over this one socket, serialized by the
             // receive mutex. Without a bound, a worker could hold that mutex parked forever on
@@ -735,14 +760,10 @@ namespace apsi {
 
             // How far a peer may fall behind before the send above starts to fail. A receiver
             // reads packages while the sender is still computing the rest, so this has to be
-            // deep enough that an ordinary difference in pace never registers.
-            //
-            // ZeroMQ holds this many messages per peer until they are read, not until the
-            // query that produced them ends, so a peer that stops reading retains the lot. The
-            // value is inherited rather than measured, and how many packages a query produces
-            // depends on how the database was populated as well as on its parameters. Treat it
-            // as a figure to measure, not one that bounds anything.
-            socket->set(sockopt::sndhwm, 70000);
+            // deep enough that an ordinary difference in pace never registers, and shallow
+            // enough that a peer which stops reading cannot make ZeroMQ hold an unbounded
+            // amount on its behalf. See result_package_hwm.
+            socket->set(sockopt::sndhwm, result_package_hwm);
 
             // router_mandatory makes a full queue block instead of discarding, so without this
             // a send waits on a peer that has stopped reading for as long as it stays stopped.

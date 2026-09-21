@@ -30,6 +30,7 @@
 
 ### Hardened
 
+- The ZeroMQ high water mark is 256 messages rather than 70000. It bounds what ZeroMQ retains for a peer that has stopped reading, which at the largest shipped parameter set is the difference between roughly a hundred megabytes and tens of gigabytes per peer.
 - `oprf::OPRFKey` comparison reads both keys in full rather than stopping at the first difference, so its running time says nothing about where they differ.
 - The receiver CLI escapes control characters in items and labels before printing them, quotes its CSV output, and emits color only to a terminal. A label is whatever the sender chose to store, and an escape sequence in one could otherwise rewrite what appeared on the screen or add a column to the output file.
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
