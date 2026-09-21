@@ -65,7 +65,11 @@ namespace APSITests {
             vector<ResultPackage> packages;
             packages.reserve(package_count);
             while (package_count--) {
-                packages.push_back(*chl.receive_result(seal_context));
+                ResultPart rp = chl.receive_result(seal_context);
+                if (!rp) {
+                    throw runtime_error("sender did not produce the packages it announced");
+                }
+                packages.push_back(*rp);
             }
             return packages;
         }
