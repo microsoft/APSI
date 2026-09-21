@@ -1110,6 +1110,42 @@ namespace APSITests {
         }
     } // namespace
 
+    TEST(PSIParamsTests, JSONVersionKeyIsOptionalAndGatesIncompatibleFiles)
+    {
+        // A file may name the serialization version it was written for, so that one written for
+        // a version this build does not implement is refused while loading rather than at the
+        // first exchange with a peer. The key is optional: files written before it existed, and
+        // the sets in parameters/, carry no version and must still load.
+        stringstream ss;
+        ifstream file(string(APSI_PARAMETERS_DIR) + "/100K-1.json");
+        ASSERT_TRUE(file.is_open());
+        ss << file.rdbuf();
+        string base = ss.str();
+
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(base)));
+
+        auto with_version = [&base](const string &value) {
+            size_t brace = base.find('{');
+            return base.substr(0, brace + 1) + "\n    \"version\": " + value + "," +
+                   base.substr(brace + 1);
+        };
+
+        // The version this build implements is accepted.
+        ASSERT_NO_THROW(
+            static_cast<void>(
+                PSIParams::Load(with_version(to_string(apsi_serialization_version)))));
+
+        // Any other is refused, in both directions.
+        ASSERT_THROW(
+            static_cast<void>(
+                PSIParams::Load(with_version(to_string(apsi_serialization_version + 1)))),
+            runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(with_version("0"))), runtime_error);
+
+        // A version that is not an unsigned integer is refused rather than ignored.
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(with_version("\"one\""))), runtime_error);
+    }
+
     TEST(PSIParamsTests, ShippedParameterSetsHoldTheDocumentedFalsePositiveBound)
     {
         // The README promises that every shipped parameter set keeps the probability of a query
