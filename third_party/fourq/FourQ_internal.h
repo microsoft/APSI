@@ -30,8 +30,18 @@ extern "C" {
 
 // Extended datatype support
  
-#if defined(GENERIC_IMPLEMENTATION)                       
-    typedef uint64_t uint128_t[2];
+#if defined(GENERIC_IMPLEMENTATION)
+// APSI: the generic field arithmetic and the 128-bit strategy are independent of each
+// other. Where the compiler has a native 128-bit integer, use it: it is the type Microsoft
+// SEAL also names uint128_t, so both headers can appear in one translation unit, and it
+// lets the scalar decomposition in eccp2.c take its native branch. A compiler without one
+// keeps the pair of 64-bit digits, which is what MSVC builds on ARM64.
+    #if defined(__SIZEOF_INT128__)
+        #define UINT128_SUPPORT
+        typedef unsigned uint128_t __attribute__((mode(TI)));
+    #else
+        typedef uint64_t uint128_t[2];
+    #endif
 // APSI: which 128-bit strategy applies is a property of the compiler. GCC and Clang have a
 // native 128-bit integer on AMD64; MSVC has none and uses the intrinsic branch below.
 #elif (TARGET == TARGET_AMD64) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)

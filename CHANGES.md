@@ -51,6 +51,7 @@
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
+- Fixed the vendored FourQ sources and Microsoft SEAL each declaring a different `uint128_t` in the global namespace, which broke the build with GCC or Clang on any architecture outside x64 and ARM64, where FourQ falls back to its generic implementation.
 - APSI builds with GCC on Windows (MinGW).
 
 ## Version 0.13.1
