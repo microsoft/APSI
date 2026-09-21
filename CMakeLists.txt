@@ -63,9 +63,10 @@ else()
 endif()
 message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 
-# Enable security-related compile options (MSVC only)
-set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
-option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} OFF)
+# Enable security hardening. On by default: the mitigations cost little, and APSI parses input from
+# a peer it does not trust. See cmake/EnableSecureCompileOptions.cmake for what each toolchain gets.
+set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable security hardening compile and link options")
+option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} ON)
 mark_as_advanced(APSI_SECURE_COMPILE_OPTIONS)
 
 # Enable AVX implementation
@@ -252,6 +253,12 @@ configure_file(${APSI_CONFIG_H_IN_FILENAME} ${APSI_CONFIG_H_FILENAME})
 install(
     FILES ${APSI_CONFIG_H_FILENAME}
     DESTINATION ${APSI_INCLUDES_INSTALL_DIR}/apsi)
+
+# Security hardening. Directory-scoped, so it must precede every target created here, and applies
+# to APSI's own sources, the vendored FourQ sources, and the CLI and test executables.
+if(APSI_SECURE_COMPILE_OPTIONS)
+    include(EnableSecureCompileOptions)
+endif()
 
 # Create a single library "apsi" for common, sender, and receiver
 add_library(apsi STATIC)

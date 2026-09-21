@@ -1131,7 +1131,11 @@ On Windows, add `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md`.
 | `APSI_USE_AVX`      | ON      | Use the FourQ AVX implementation where the target supports it. Advanced option.                         |
 | `APSI_USE_AVX2`     | ON      | Use the FourQ AVX2 implementation where the target supports it. Advanced option.                        |
 | `APSI_USE_ASM`      | ON      | Use the FourQ assembly implementation on supported static UNIX builds. Advanced option.                  |
-| `APSI_SECURE_COMPILE_OPTIONS` | OFF | Enable Control Flow Guard and Spectre mitigations. MSVC only; advanced option.                    |
+| `APSI_SECURE_COMPILE_OPTIONS` | ON | Harden the build: stack protection, fortified libc calls, bounds-checked containers, RELRO and a non-executable stack on ELF, and Control Flow Guard, Spectre and CET mitigations on MSVC. Advanced option. |
+
+The hardening options apply to the code built in this tree and are not part of the installed target's interface, so a consumer chooses its own.
+One consequence is worth knowing: APSI installs a static library, and Control Flow Guard is enforced by the link that produces the final image.
+Compiling APSI with `/guard:cf` instruments its objects, but a consumer on MSVC has to pass `/guard:cf` to its own link for that instrumentation to be enforced.
 
 #### Dependencies pulled from `vcpkg.json`
 

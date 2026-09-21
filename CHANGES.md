@@ -48,6 +48,7 @@
 
 ### Build
 
+- `APSI_SECURE_COMPILE_OPTIONS` now hardens the build rather than doing nothing, and defaults to ON. Every toolchain gets stack protection and bounds-checked standard library containers; GCC and Clang additionally get fortified libc calls, stack-clash protection, position-independent code, and full RELRO with a non-executable stack on ELF targets; MSVC gets Control Flow Guard, the Spectre variant 1 mitigation, EH continuation metadata and, on x64, shadow-stack marking. The options are not exported, so a consumer chooses its own.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
