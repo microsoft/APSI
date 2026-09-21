@@ -89,6 +89,18 @@ namespace apsi {
                 }
             }
 
+            // The values above are a fallback rather than a decomposition: curr_power - 1 need not
+            // be a target power, and when the loop finds nothing better the fallback is all that
+            // is left. Sometimes it is a genuine pair, as for curr_power 2, whose only
+            // decomposition is 1 + 1 and whose depth the loop does not improve on. When it is not,
+            // the DAG cannot be built, and saying so here keeps parallel_apply from discovering it
+            // in a worker thread.
+            if (nodes_.find(optimal_s1) == nodes_.cend() ||
+                nodes_.find(optimal_s2) == nodes_.cend()) {
+                reset();
+                return false;
+            }
+
             // We have found an optimal way to obtain the current power from two lower powers. Now
             // add data for the new node.
             nodes_[curr_power] =

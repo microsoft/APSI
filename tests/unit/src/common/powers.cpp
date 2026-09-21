@@ -281,6 +281,38 @@ namespace APSITests {
         }
     } // namespace
 
+    TEST(PowersTests, PowersDagRejectsUnreachableTargets)
+    {
+        // A target power that no two lower target powers sum to cannot be computed at all. The
+        // search falls back on curr_power - 1 and 1, which is a real pair only when curr_power - 1
+        // is itself a target power. configure has to reject the rest here: the alternative is a
+        // node naming a parent that does not exist, which parallel_apply only discovers from
+        // inside a worker thread.
+        PowersDag pd;
+
+        // 5 would need 1 + 4 or 2 + 3, and the set holds neither.
+        ASSERT_FALSE(pd.configure({ 1 }, { 1, 5 }));
+        ASSERT_FALSE(pd.is_configured());
+
+        // Likewise 7, which is not the sum of two of 1, 2 and 3.
+        ASSERT_FALSE(pd.configure({ 1, 2 }, { 1, 2, 3, 7 }));
+        ASSERT_FALSE(pd.is_configured());
+
+        // A rejected configuration leaves nothing of itself behind.
+        ASSERT_THROW(static_cast<void>(pd.depth()), logic_error);
+        ASSERT_THROW(static_cast<void>(pd.target_powers()), logic_error);
+
+        // Filling in the missing powers makes both reachable.
+        ASSERT_TRUE(pd.configure({ 1 }, { 1, 2, 3, 4, 5 }));
+        ASSERT_TRUE(pd.is_configured());
+        ASSERT_TRUE(pd.configure({ 1, 2 }, { 1, 2, 3, 4, 7 }));
+        ASSERT_TRUE(pd.is_configured());
+
+        // The fallback is a genuine decomposition for 2, whose only parents are 1 and 1.
+        ASSERT_TRUE(pd.configure({ 1 }, { 1, 2 }));
+        ASSERT_TRUE(pd.is_configured());
+    }
+
     TEST(PowersTests, ParallelApply)
     {
         ScopedThreadCount threads(8);
