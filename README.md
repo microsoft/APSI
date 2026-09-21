@@ -1143,9 +1143,25 @@ On Windows, add `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md`.
 | `APSI_USE_AVX`      | ON      | Use the FourQ AVX implementation where the target supports it. Advanced option.                         |
 | `APSI_USE_AVX2`     | ON      | Use the FourQ AVX2 implementation where the target supports it. Advanced option.                        |
 | `APSI_USE_ASM`      | ON      | Use the FourQ assembly implementation on supported static UNIX builds. Advanced option.                  |
-| `APSI_SECURE_COMPILE_OPTIONS` | ON | Harden the build: stack protection, fortified libc calls, bounds-checked containers, RELRO and a non-executable stack on ELF, and Control Flow Guard, Spectre and CET mitigations on MSVC. Advanced option. |
+| `APSI_SECURE_COMPILE_OPTIONS` | ON | Apply the mitigations listed under [Build Hardening](#build-hardening). Advanced option. |
 
-The hardening options apply to the code built in this tree and are not part of the installed target's interface, so a consumer chooses its own.
+#### Build Hardening
+
+`APSI_SECURE_COMPILE_OPTIONS` is on by default and covers APSI's own sources, the vendored FourQ sources, and the CLI and test executables.
+The flags that not every compiler or target honors are probed before use, and one the compiler merely warns about counts as unsupported and is dropped: a compiler that parses a flag and then ignores it reports it only as an unused argument, which would warn on every source file while hardening nothing.
+The remaining flags are selected by platform and target rather than probed.
+
+| Toolchain | Applied |
+|-----------|---------|
+| GCC, Clang | Stack protection; position-independent code; bounds-checked standard library containers outside `Debug` (`_GLIBCXX_ASSERTIONS`, `_LIBCPP_HARDENING_MODE`) |
+| GCC, Clang, except Apple | Stack-clash protection; fortified libc calls outside `Debug` (`_FORTIFY_SOURCE=2`) |
+| GCC, Clang on Linux and Android | Full RELRO, immediate binding, and a non-executable stack |
+| MSVC | Control Flow Guard; the Spectre variant 1 mitigation; EH continuation metadata on a 64-bit target; shadow-stack marking (`/CETCOMPAT`) on x64 |
+
+Apple platforms are excluded from two of these deliberately: Clang there accepts `-fstack-clash-protection` and ignores it, and Apple's libc does not implement the fortified entry points.
+The standard library hardening is applied to APSI's own translation units, not to a consumer's, so a consumer that wants it enables it for its own build.
+
+These options apply to the code built in this tree and are not part of the installed target's interface, so a consumer chooses its own.
 One consequence is worth knowing: APSI installs a static library, and Control Flow Guard is enforced by the link that produces the final image.
 Compiling APSI with `/guard:cf` instruments its objects, but a consumer on MSVC has to pass `/guard:cf` to its own link for that instrumentation to be enforced.
 
