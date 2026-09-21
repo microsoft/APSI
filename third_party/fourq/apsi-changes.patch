@@ -6,7 +6,7 @@ upstream sources exactly, which is the check to run afterwards:
 
     git apply --check --reverse third_party/fourq/apsi-changes.patch
 
-Eight changes, in descending order of how much they matter.
+Nine changes, in descending order of how much they matter.
 
   * AMD64/fp_x64.h and ARM64/fp_arm64.h move field elements between felm_t and uint128_t with
     memcpy rather than through a cast. A field element is an array of digit_t, which neither
@@ -58,7 +58,38 @@ Eight changes, in descending order of how much they matter.
     as FourQlib's 32-bit implementation does. The only value this affects is the redundant
     encoding of zero, where a component holds p rather than 0.
 
-To regenerate, diff the pinned upstream sources against this tree and keep this header.
+  * FourQ_internal.h gives a generic build the native 128-bit integer when the compiler has
+    one, and eccp2.c's mul_truncate excludes that case from the branch that indexes
+    uint128_t as a pair of digits. Microsoft SEAL names the same native type uint128_t in
+    the global namespace, so without this a generic build cannot compile any translation
+    unit that includes both, which is why ecpoint.cpp failed under GCC and Clang. MSVC
+    defines no __SIZEOF_INT128__ and SEAL's MSVC header declares no uint128_t, so the
+    ARM64 Windows build keeps the pair of digits and the branch it already took.
+
+To regenerate: check out the pinned commit, copy this tree and the upstream tree into two
+directories that share the third_party/fourq/ prefix, and diff them with git diff
+--no-index, covering exactly the files listed above. Keep this header and keep each
+hunk's line endings as the file itself has them; upstream stores hash_to_curve.c with LF
+and the rest with CRLF, so a patch normalised to one ending will not apply. README.md and
+the CMakeLists.txt files are APSI's own and are deliberately absent from the patch, so
+restore them after copying upstream over this directory.
+diff --git a/third_party/fourq/AMD64/fp2_1271.S b/third_party/fourq/AMD64/fp2_1271.S
+index 454fbea..d7608f1 100644
+--- a/third_party/fourq/AMD64/fp2_1271.S
++++ b/third_party/fourq/AMD64/fp2_1271.S
+@@ -352,3 +352,10 @@ fp2addsub1271_a:
+   sbb    r9, 0
+   mov    [reg_p3+24], r9
+   ret
++
++// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
++// executable when any input object lacks this section, which silently disables NX for
++// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
++#if defined(__ELF__)
++.section .note.GNU-stack,"",%progbits
++#endif
+diff --git a/third_party/fourq/AMD64/fp2_1271_AVX2.S b/third_party/fourq/AMD64/fp2_1271_AVX2.S
+index 8d582a1..8ba3b5d 100644
 --- a/third_party/fourq/AMD64/fp2_1271_AVX2.S
 +++ b/third_party/fourq/AMD64/fp2_1271_AVX2.S
 @@ -6,7 +6,8 @@
@@ -71,7 +102,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  .intel_syntax noprefix 
  
-@@ -444,3 +445,10 @@
+@@ -444,3 +445,10 @@ table_lookup_1x8_a:
    vmovdqu      YMMWORD PTR [reg_p2+64], ymm2
    vmovdqu      YMMWORD PTR [reg_p2+96], ymm3
    ret
@@ -82,19 +113,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
 +#if defined(__ELF__)
 +.section .note.GNU-stack,"",%progbits
 +#endif
---- a/third_party/fourq/AMD64/fp2_1271.S
-+++ b/third_party/fourq/AMD64/fp2_1271.S
-@@ -352,3 +352,10 @@
-   sbb    r9, 0
-   mov    [reg_p3+24], r9
-   ret
-+
-+// APSI: mark the stack non-executable. GNU ld marks the stack of the whole output
-+// executable when any input object lacks this section, which silently disables NX for
-+// every binary that links APSI. The guard keeps this out of non-ELF assemblers.
-+#if defined(__ELF__)
-+.section .note.GNU-stack,"",%progbits
-+#endif
+diff --git a/third_party/fourq/AMD64/fp_x64.h b/third_party/fourq/AMD64/fp_x64.h
+index 9a243c0..3e1d1f0 100644
 --- a/third_party/fourq/AMD64/fp_x64.h
 +++ b/third_party/fourq/AMD64/fp_x64.h
 @@ -9,6 +9,10 @@
@@ -108,7 +128,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // For C++
  #ifdef __cplusplus
-@@ -32,10 +36,14 @@
+@@ -32,10 +36,14 @@ void mod1271(felm_t a)
  { // Modular correction, a = a mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
@@ -127,7 +147,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t mask;
      uint128_t prime;
-@@ -51,31 +59,32 @@
+@@ -51,31 +59,32 @@ void mod1271(felm_t a)
  }
  
  
@@ -170,7 +190,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t temp;
      unsigned char _carry;
-@@ -89,17 +98,18 @@
+@@ -89,17 +98,18 @@ __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
  }
  
  
@@ -197,7 +217,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  #elif defined(SCALAR_INTRIN_SUPPORT)
      uint64_t temp;
      unsigned char _borrow;
-@@ -117,16 +127,18 @@
+@@ -117,16 +127,18 @@ void fpneg1271(felm_t a)
  { // Field negation, a = -a mod (2^127-1)
      
  #if defined(UINT128_SUPPORT)
@@ -219,7 +239,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field multiplication, c = a*b mod (2^127-1)
      uint128_t tt1, tt2, tt3 = {0};
      
-@@ -191,7 +203,7 @@
+@@ -191,7 +203,7 @@ void fpsqr1271(felm_t a, felm_t c)
  }
  
  
@@ -228,7 +248,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Exponentiation over GF(p), af = a^(125-1)
      int i;
      felm_t t1, t2, t3, t4, t5;
-@@ -240,7 +252,7 @@
+@@ -240,7 +252,7 @@ void fpinv1271(felm_t a)
  }
  
  
@@ -237,7 +257,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Schoolbook multiprecision multiply, c = a*b   
      unsigned int i, j;
      digit_t u, v, UV[2];
-@@ -263,7 +275,7 @@
+@@ -263,7 +275,7 @@ static __inline void multiply(const digit_t* a, const digit_t* b, digit_t* c)
  }
  
  
@@ -246,6 +266,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Multiprecision addition, c = a+b. Returns the carry bit 
      unsigned int i;
      unsigned char carry = 0;
+diff --git a/third_party/fourq/ARM64/fp_arm64.h b/third_party/fourq/ARM64/fp_arm64.h
+index a14c16e..76ece26 100644
 --- a/third_party/fourq/ARM64/fp_arm64.h
 +++ b/third_party/fourq/ARM64/fp_arm64.h
 @@ -9,6 +9,10 @@
@@ -259,7 +281,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // For C++
  #ifdef __cplusplus
-@@ -26,10 +30,14 @@
+@@ -26,10 +30,14 @@ const uint128_t prime1271 = ((uint128_t)1 << 127) - 1;
  
  void mod1271(felm_t a)
  { // Modular correction, a = a mod (2^127-1)    
@@ -278,7 +300,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  }
  
  
-@@ -49,33 +57,37 @@
+@@ -49,33 +57,37 @@ static __inline void fpzero1271(felm_t a)
  
  __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
  { // Field addition, c = a+b mod (2^127-1)
@@ -332,204 +354,11 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  }
  
  
---- a/third_party/fourq/crypto_util.c
-+++ b/third_party/fourq/crypto_util.c
-@@ -6,8 +6,8 @@
- * Abstract: crypto utility functions
- ************************************************************************************/ 
- 
--#include "FourQ_internal.h"
--#include "FourQ_params.h"
-+#include "apsi/fourq/FourQ_internal.h"
-+#include "apsi/fourq/FourQ_params.h"
- #include <string.h>
- 
- static digit_t mask4000 = (digit_t)1 << (sizeof(digit_t)*8 - 2);
-@@ -103,7 +103,11 @@
-         fpcopy1271(t0, P->x[1]);
-     }
-     
-+    // APSI: reduce both components before the sign bit is read out of either, as FourQlib's
-+    // 32-bit implementation does. The only value this changes is the redundant encoding of
-+    // zero, where a component holds p rather than 0.
-     mod1271(P->x[0]);
-+    mod1271(P->x[1]);
-     if (is_zero_ct((digit_t*)P->x, NWORDS_FIELD) == true) {
-         sign_dec = ((digit_t*)&P->x[1])[NWORDS_FIELD-1] >> (sizeof(digit_t)*8 - 2);
-     } else {
---- a/third_party/fourq/eccp2.c
-+++ b/third_party/fourq/eccp2.c
-@@ -11,7 +11,7 @@
- * Preprint available at http://eprint.iacr.org/2015/565.
- ************************************************************************************/
- 
--#include "FourQ_internal.h"
-+#include "apsi/fourq/FourQ_internal.h"
- 
- 
- #if (USE_ENDO == true)
---- a/third_party/fourq/eccp2_core.c
-+++ b/third_party/fourq/eccp2_core.c
-@@ -11,15 +11,15 @@
- * Preprint available at http://eprint.iacr.org/2015/565.
- ************************************************************************************/ 
- 
--#include "FourQ_internal.h"
--#include "FourQ_params.h"
--#include "FourQ_tables.h"
-+#include "apsi/fourq/FourQ_internal.h"
-+#include "apsi/fourq/FourQ_params.h"
-+#include "apsi/fourq/FourQ_tables.h"
- #if defined(GENERIC_IMPLEMENTATION)
--    #include "generic/fp.h"
-+    #include "apsi/fourq/generic/fp.h"
- #elif (TARGET == TARGET_AMD64)
--    #include "AMD64/fp_x64.h"
-+    #include "apsi/fourq/AMD64/fp_x64.h"
- #elif (TARGET == TARGET_ARM64)
--    #include "ARM64/fp_arm64.h"
-+    #include "apsi/fourq/ARM64/fp_arm64.h"
- #endif
- 
- 
-@@ -95,21 +95,21 @@
- }
- 
- 
--__inline void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
-+void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
- {// GF(p^2) addition, c = a+b in GF((2^127-1)^2)
-     fpadd1271(a[0], b[0], c[0]);
-     fpadd1271(a[1], b[1], c[1]);
- }
- 
- 
--__inline void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
-+void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
- {// GF(p^2) subtraction, c = a-b in GF((2^127-1)^2) 
-     fpsub1271(a[0], b[0], c[0]);
-     fpsub1271(a[1], b[1], c[1]);
- }
- 
- 
--static __inline void fp2addsub1271(f2elm_t a, f2elm_t b, f2elm_t c)
-+static void fp2addsub1271(f2elm_t a, f2elm_t b, f2elm_t c)
- {// GF(p^2) addition followed by subtraction, c = 2a-b in GF((2^127-1)^2)
-     
- #ifdef ASM_SUPPORT
-@@ -176,7 +176,7 @@
- }
- 
- 
--__inline void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q) 
-+void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q) 
- { // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT), where T = Ta*Tb
-   // Input:  P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
-   // Output: Q = (X1+Y1,Y1-X1,2Z1,2dT1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
-@@ -190,7 +190,7 @@
- }
- 
- 
--__inline void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q)      
-+void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q)      
- { // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T), where T = Ta*Tb 
-   // Input:  P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
-   // Output: Q = (X1+Y1,Y1-X1,Z1,T1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates 
-@@ -213,7 +213,7 @@
- }
- 
- 
--__inline void eccdouble(point_extproj_t P)
-+void eccdouble(point_extproj_t P)
- { // Point doubling 2P
-   // Input: P = (X1:Y1:Z1) in twisted Edwards coordinates
-   // Output: 2P = (Xfinal,Yfinal,Zfinal,Tafinal,Tbfinal), where Tfinal = Tafinal*Tbfinal,
-@@ -239,7 +239,7 @@
- }
- 
- 
--__inline void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R)      
-+void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R)      
- { // Basic point addition R = P+Q or R = P+P
-   // Inputs: P = (X1+Y1,Y1-X1,2Z1,2dT1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
-   //         Q = (X2+Y2,Y2-X2,Z2,T2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates    
-@@ -265,7 +265,7 @@
- }
- 
- 
--__inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)      
-+void eccadd(point_extproj_precomp_t Q, point_extproj_t P)      
- { // Complete point addition P = P+Q or P = P+P
-   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
-   //         Q = (X2+Y2,Y2-X2,2Z2,2dT2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates   
-@@ -282,7 +282,7 @@
- }
- 
- 
--__inline void point_setup(point_t P, point_extproj_t Q)
-+void point_setup(point_t P, point_extproj_t Q)
- { // Point conversion to representation (X,Y,Z,Ta,Tb) 
-   // Input: P = (x,y) in affine coordinates
-   // Output: P = (X,Y,1,Ta,Tb), where Ta=X, Tb=Y and T=Ta*Tb, corresponding to (X:Y:Z:T) in extended twisted Edwards coordinates
-@@ -295,7 +295,7 @@
- }
- 
- 
--__inline bool ecc_point_validate(point_extproj_t P)
-+bool ecc_point_validate(point_extproj_t P)
- { // Point validation: check if point lies on the curve
-   // Input: P = (x,y) in affine coordinates, where x, y in [0, 2^127-1]. 
-   // Output: TRUE (1) if point lies on the curve E: -x^2+y^2-1-dx^2*y^2 = 0, FALSE (0) otherwise.
-@@ -330,7 +330,7 @@
- }
- 
- 
--static __inline void R5_to_R1(point_precomp_t P, point_extproj_t Q)      
-+static void R5_to_R1(point_precomp_t P, point_extproj_t Q)      
- { // Conversion from representation (x+y,y-x,2dt) to (X,Y,Z,Ta,Tb) 
-   // Input:  P = (x1+y1,y1-x1,2dt1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates, where Z1=1
-   // Output: Q = (x1,y1,z1,x1,y1), where z1=1, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates 
-@@ -345,7 +345,7 @@
- }
- 
- 
--static __inline void eccmadd(point_precomp_t Q, point_extproj_t P)
-+static void eccmadd(point_precomp_t Q, point_extproj_t P)
- { // Mixed point addition P = P+Q or P = P+P
-   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
-   //         Q = (x2+y2,y2-x2,2dt2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates, where Z2=1  
-@@ -498,7 +498,7 @@
- }
- 
- 
--static __inline void eccneg_extproj_precomp(point_extproj_precomp_t P, point_extproj_precomp_t Q)
-+static void eccneg_extproj_precomp(point_extproj_precomp_t P, point_extproj_precomp_t Q)
- { // Point negation
-   // Input : point P in coordinates (X+Y,Y-X,2Z,2dT)
-   // Output: point Q = -P = (Y-X,X+Y,2Z,-2dT)
-@@ -510,7 +510,7 @@
- }
- 
- 
--static __inline void eccneg_precomp(point_precomp_t P, point_precomp_t Q)
-+static void eccneg_precomp(point_precomp_t P, point_precomp_t Q)
- { // Point negation
-   // Input : point P in coordinates (x+y,y-x,2dt)
-   // Output: point Q = -P = (y-x,x+y,-2dt)
---- a/third_party/fourq/eccp2_no_endo.c
-+++ b/third_party/fourq/eccp2_no_endo.c
-@@ -11,7 +11,7 @@
- * Preprint available at http://eprint.iacr.org/2015/565.
- ************************************************************************************/
- 
--#include "FourQ_internal.h"
-+#include "apsi/fourq/FourQ_internal.h"
- 
- 
- #if (USE_ENDO == false)
+diff --git a/third_party/fourq/FourQ_api.h b/third_party/fourq/FourQ_api.h
+index 3b046a3..ad06202 100644
 --- a/third_party/fourq/FourQ_api.h
 +++ b/third_party/fourq/FourQ_api.h
-@@ -21,7 +21,7 @@
+@@ -21,7 +21,7 @@ extern "C" {
  #endif
  
  
@@ -538,6 +367,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  
  /**************** Public ECC API ****************/
+diff --git a/third_party/fourq/FourQ_internal.h b/third_party/fourq/FourQ_internal.h
+index 30d4387..6bbe18d 100644
 --- a/third_party/fourq/FourQ_internal.h
 +++ b/third_party/fourq/FourQ_internal.h
 @@ -14,6 +14,10 @@
@@ -551,7 +382,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // For C++
  #ifdef __cplusplus
-@@ -21,14 +25,16 @@
+@@ -21,14 +25,26 @@ extern "C" {
  #endif
  
      
@@ -561,16 +392,28 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // Extended datatype support
   
- #if defined(GENERIC_IMPLEMENTATION)                       
-     typedef uint64_t uint128_t[2];
+-#if defined(GENERIC_IMPLEMENTATION)                       
+-    typedef uint64_t uint128_t[2];
 -#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
++#if defined(GENERIC_IMPLEMENTATION)
++// APSI: the generic field arithmetic and the 128-bit strategy are independent of each
++// other. Where the compiler has a native 128-bit integer, use it: it is the type Microsoft
++// SEAL also names uint128_t, so both headers can appear in one translation unit, and it
++// lets the scalar decomposition in eccp2.c take its native branch. A compiler without one
++// keeps the pair of 64-bit digits, which is what MSVC builds on ARM64.
++    #if defined(__SIZEOF_INT128__)
++        #define UINT128_SUPPORT
++        typedef unsigned uint128_t __attribute__((mode(TI)));
++    #else
++        typedef uint64_t uint128_t[2];
++    #endif
 +// APSI: which 128-bit strategy applies is a property of the compiler. GCC and Clang have a
 +// native 128-bit integer on AMD64; MSVC has none and uses the intrinsic branch below.
 +#elif (TARGET == TARGET_AMD64) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
      #define UINT128_SUPPORT
      typedef unsigned uint128_t __attribute__((mode(TI)));  
  #elif (TARGET == TARGET_ARM64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
-@@ -126,19 +132,40 @@
+@@ -126,19 +142,40 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
  #define SHIFTL(highIn, lowIn, shift, shiftOut, DigitSize)                                         \
      (shiftOut) = ((highIn) << (shift)) ^ ((lowIn) >> (DigitSize - (shift)));
  
@@ -601,14 +444,13 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  // 128-bit addition with output carry
  #define ADC128(addend1, addend2, carry, addition)                                                 \
 -    (carry) = mp_add((digit_t*)(addend1), (digit_t*)(addend2), (digit_t*)(addition), NWORDS_FIELD);
--
--#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_WIN)
 +    { digit_t adc128_a_[NWORDS_FIELD], adc128_b_[NWORDS_FIELD], adc128_r_[NWORDS_FIELD];          \
 +    memcpy(adc128_a_, (addend1), sizeof(adc128_a_));                                              \
 +    memcpy(adc128_b_, (addend2), sizeof(adc128_b_));                                              \
 +    (carry) = mp_add(adc128_a_, adc128_b_, adc128_r_, NWORDS_FIELD);                              \
 +    memcpy((addition), adc128_r_, sizeof(adc128_r_)); }
-+
+ 
+-#elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_WIN)
 +// APSI: these are MSVC intrinsics, and the array-shaped uint128_t they operate on is exactly
 +// what SCALAR_INTRIN_SUPPORT selects above. Keying the branch off that macro rather than
 +// restating the target matrix keeps the two blocks from drifting apart.
@@ -616,7 +458,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // Digit multiplication
  #define MUL(multiplier, multiplicand, hi, lo)                                                     \
-@@ -189,7 +216,10 @@
+@@ -189,7 +226,10 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
      (shiftOut)[1]  = __shiftleft128((Input)[0], (Input)[1], (shift));                             \
      (shiftOut)[0] = (Input)[0] << (shift);  
  
@@ -628,6 +470,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  // Digit multiplication
  #define MUL(multiplier, multiplicand, hi, lo)                                                     \
+diff --git a/third_party/fourq/FourQ_params.h b/third_party/fourq/FourQ_params.h
+index 8a064d6..bcdc069 100644
 --- a/third_party/fourq/FourQ_params.h
 +++ b/third_party/fourq/FourQ_params.h
 @@ -15,7 +15,7 @@
@@ -639,9 +483,226 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  
  // Encoding of field elements, elements over Z_r and elements over GF(p^2):
+diff --git a/third_party/fourq/crypto_util.c b/third_party/fourq/crypto_util.c
+index 6a63402..d9b0644 100644
+--- a/third_party/fourq/crypto_util.c
++++ b/third_party/fourq/crypto_util.c
+@@ -6,8 +6,8 @@
+ * Abstract: crypto utility functions
+ ************************************************************************************/ 
+ 
+-#include "FourQ_internal.h"
+-#include "FourQ_params.h"
++#include "apsi/fourq/FourQ_internal.h"
++#include "apsi/fourq/FourQ_params.h"
+ #include <string.h>
+ 
+ static digit_t mask4000 = (digit_t)1 << (sizeof(digit_t)*8 - 2);
+@@ -103,7 +103,11 @@ ECCRYPTO_STATUS decode(const unsigned char* Pencoded, point_t P)
+         fpcopy1271(t0, P->x[1]);
+     }
+     
++    // APSI: reduce both components before the sign bit is read out of either, as FourQlib's
++    // 32-bit implementation does. The only value this changes is the redundant encoding of
++    // zero, where a component holds p rather than 0.
+     mod1271(P->x[0]);
++    mod1271(P->x[1]);
+     if (is_zero_ct((digit_t*)P->x, NWORDS_FIELD) == true) {
+         sign_dec = ((digit_t*)&P->x[1])[NWORDS_FIELD-1] >> (sizeof(digit_t)*8 - 2);
+     } else {
+diff --git a/third_party/fourq/eccp2.c b/third_party/fourq/eccp2.c
+index 6b50b9a..eb931b8 100644
+--- a/third_party/fourq/eccp2.c
++++ b/third_party/fourq/eccp2.c
+@@ -11,7 +11,7 @@
+ * Preprint available at http://eprint.iacr.org/2015/565.
+ ************************************************************************************/
+ 
+-#include "FourQ_internal.h"
++#include "apsi/fourq/FourQ_internal.h"
+ 
+ 
+ #if (USE_ENDO == true)
+@@ -214,7 +214,10 @@ static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
+     uint128_t tt1, tt2;
+     unsigned int carry1;
+ 
+-#if defined(GENERIC_IMPLEMENTATION) || defined(SCALAR_INTRIN_SUPPORT)
++// APSI: this branch indexes uint128_t as a pair of digits, so it is only valid when
++// uint128_t is that pair. A generic build on a compiler with a native 128-bit integer
++// defines both GENERIC_IMPLEMENTATION and UINT128_SUPPORT, and belongs in the branch below.
++#if (defined(GENERIC_IMPLEMENTATION) || defined(SCALAR_INTRIN_SUPPORT)) && !defined(UINT128_SUPPORT)
+     unsigned int carry2;
+     uint64_t temp;
+ 
+diff --git a/third_party/fourq/eccp2_core.c b/third_party/fourq/eccp2_core.c
+index 0275eb4..d7b2b5e 100644
+--- a/third_party/fourq/eccp2_core.c
++++ b/third_party/fourq/eccp2_core.c
+@@ -11,15 +11,15 @@
+ * Preprint available at http://eprint.iacr.org/2015/565.
+ ************************************************************************************/ 
+ 
+-#include "FourQ_internal.h"
+-#include "FourQ_params.h"
+-#include "FourQ_tables.h"
++#include "apsi/fourq/FourQ_internal.h"
++#include "apsi/fourq/FourQ_params.h"
++#include "apsi/fourq/FourQ_tables.h"
+ #if defined(GENERIC_IMPLEMENTATION)
+-    #include "generic/fp.h"
++    #include "apsi/fourq/generic/fp.h"
+ #elif (TARGET == TARGET_AMD64)
+-    #include "AMD64/fp_x64.h"
++    #include "apsi/fourq/AMD64/fp_x64.h"
+ #elif (TARGET == TARGET_ARM64)
+-    #include "ARM64/fp_arm64.h"
++    #include "apsi/fourq/ARM64/fp_arm64.h"
+ #endif
+ 
+ 
+@@ -95,21 +95,21 @@ void fp2mul1271(f2elm_t a, f2elm_t b, f2elm_t c)
+ }
+ 
+ 
+-__inline void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
++void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
+ {// GF(p^2) addition, c = a+b in GF((2^127-1)^2)
+     fpadd1271(a[0], b[0], c[0]);
+     fpadd1271(a[1], b[1], c[1]);
+ }
+ 
+ 
+-__inline void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
++void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
+ {// GF(p^2) subtraction, c = a-b in GF((2^127-1)^2) 
+     fpsub1271(a[0], b[0], c[0]);
+     fpsub1271(a[1], b[1], c[1]);
+ }
+ 
+ 
+-static __inline void fp2addsub1271(f2elm_t a, f2elm_t b, f2elm_t c)
++static void fp2addsub1271(f2elm_t a, f2elm_t b, f2elm_t c)
+ {// GF(p^2) addition followed by subtraction, c = 2a-b in GF((2^127-1)^2)
+     
+ #ifdef ASM_SUPPORT
+@@ -176,7 +176,7 @@ void eccnorm(point_extproj_t P, point_t Q)
+ }
+ 
+ 
+-__inline void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q) 
++void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q) 
+ { // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT), where T = Ta*Tb
+   // Input:  P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
+   // Output: Q = (X1+Y1,Y1-X1,2Z1,2dT1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
+@@ -190,7 +190,7 @@ __inline void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q)
+ }
+ 
+ 
+-__inline void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q)      
++void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q)      
+ { // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T), where T = Ta*Tb 
+   // Input:  P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
+   // Output: Q = (X1+Y1,Y1-X1,Z1,T1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates 
+@@ -213,7 +213,7 @@ void R2_to_R4(point_extproj_precomp_t P, point_extproj_t Q)
+ }
+ 
+ 
+-__inline void eccdouble(point_extproj_t P)
++void eccdouble(point_extproj_t P)
+ { // Point doubling 2P
+   // Input: P = (X1:Y1:Z1) in twisted Edwards coordinates
+   // Output: 2P = (Xfinal,Yfinal,Zfinal,Tafinal,Tbfinal), where Tfinal = Tafinal*Tbfinal,
+@@ -239,7 +239,7 @@ __inline void eccdouble(point_extproj_t P)
+ }
+ 
+ 
+-__inline void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R)      
++void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R)      
+ { // Basic point addition R = P+Q or R = P+P
+   // Inputs: P = (X1+Y1,Y1-X1,2Z1,2dT1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
+   //         Q = (X2+Y2,Y2-X2,Z2,T2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates    
+@@ -265,7 +265,7 @@ __inline void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q,
+ }
+ 
+ 
+-__inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)      
++void eccadd(point_extproj_precomp_t Q, point_extproj_t P)      
+ { // Complete point addition P = P+Q or P = P+P
+   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
+   //         Q = (X2+Y2,Y2-X2,2Z2,2dT2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates   
+@@ -282,7 +282,7 @@ __inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)
+ }
+ 
+ 
+-__inline void point_setup(point_t P, point_extproj_t Q)
++void point_setup(point_t P, point_extproj_t Q)
+ { // Point conversion to representation (X,Y,Z,Ta,Tb) 
+   // Input: P = (x,y) in affine coordinates
+   // Output: P = (X,Y,1,Ta,Tb), where Ta=X, Tb=Y and T=Ta*Tb, corresponding to (X:Y:Z:T) in extended twisted Edwards coordinates
+@@ -295,7 +295,7 @@ __inline void point_setup(point_t P, point_extproj_t Q)
+ }
+ 
+ 
+-__inline bool ecc_point_validate(point_extproj_t P)
++bool ecc_point_validate(point_extproj_t P)
+ { // Point validation: check if point lies on the curve
+   // Input: P = (x,y) in affine coordinates, where x, y in [0, 2^127-1]. 
+   // Output: TRUE (1) if point lies on the curve E: -x^2+y^2-1-dx^2*y^2 = 0, FALSE (0) otherwise.
+@@ -330,7 +330,7 @@ __inline bool ecc_point_validate(point_extproj_t P)
+ }
+ 
+ 
+-static __inline void R5_to_R1(point_precomp_t P, point_extproj_t Q)      
++static void R5_to_R1(point_precomp_t P, point_extproj_t Q)      
+ { // Conversion from representation (x+y,y-x,2dt) to (X,Y,Z,Ta,Tb) 
+   // Input:  P = (x1+y1,y1-x1,2dt1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates, where Z1=1
+   // Output: Q = (x1,y1,z1,x1,y1), where z1=1, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates 
+@@ -345,7 +345,7 @@ static __inline void R5_to_R1(point_precomp_t P, point_extproj_t Q)
+ }
+ 
+ 
+-static __inline void eccmadd(point_precomp_t Q, point_extproj_t P)
++static void eccmadd(point_precomp_t Q, point_extproj_t P)
+ { // Mixed point addition P = P+Q or P = P+P
+   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
+   //         Q = (x2+y2,y2-x2,2dt2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates, where Z2=1  
+@@ -498,7 +498,7 @@ void mLSB_set_recode(uint64_t* scalar, unsigned int *digits)
+ }
+ 
+ 
+-static __inline void eccneg_extproj_precomp(point_extproj_precomp_t P, point_extproj_precomp_t Q)
++static void eccneg_extproj_precomp(point_extproj_precomp_t P, point_extproj_precomp_t Q)
+ { // Point negation
+   // Input : point P in coordinates (X+Y,Y-X,2Z,2dT)
+   // Output: point Q = -P = (Y-X,X+Y,2Z,-2dT)
+@@ -510,7 +510,7 @@ static __inline void eccneg_extproj_precomp(point_extproj_precomp_t P, point_ext
+ }
+ 
+ 
+-static __inline void eccneg_precomp(point_precomp_t P, point_precomp_t Q)
++static void eccneg_precomp(point_precomp_t P, point_precomp_t Q)
+ { // Point negation
+   // Input : point P in coordinates (x+y,y-x,2dt)
+   // Output: point Q = -P = (y-x,x+y,-2dt)
+diff --git a/third_party/fourq/eccp2_no_endo.c b/third_party/fourq/eccp2_no_endo.c
+index 077d6ad..986f14d 100644
+--- a/third_party/fourq/eccp2_no_endo.c
++++ b/third_party/fourq/eccp2_no_endo.c
+@@ -11,7 +11,7 @@
+ * Preprint available at http://eprint.iacr.org/2015/565.
+ ************************************************************************************/
+ 
+-#include "FourQ_internal.h"
++#include "apsi/fourq/FourQ_internal.h"
+ 
+ 
+ #if (USE_ENDO == false)
+diff --git a/third_party/fourq/generic/fp.h b/third_party/fourq/generic/fp.h
+index 3083c06..e62cbd7 100644
 --- a/third_party/fourq/generic/fp.h
 +++ b/third_party/fourq/generic/fp.h
-@@ -58,7 +58,7 @@
+@@ -58,7 +58,7 @@ void digit_x_digit(digit_t a, digit_t b, digit_t* c)
  }
  
  
@@ -650,7 +711,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Copy of a field element, c = a
      unsigned int i;
  
-@@ -67,7 +67,7 @@
+@@ -67,7 +67,7 @@ __inline void fpcopy1271(felm_t a, felm_t c)
  }
  
  
@@ -659,7 +720,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Zeroing a field element, a = 0
      unsigned int i;
  
-@@ -76,7 +76,7 @@
+@@ -76,7 +76,7 @@ static __inline void fpzero1271(felm_t a)
  }
  
  
@@ -668,7 +729,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field addition, c = a+b mod p  
      unsigned int i;    
      unsigned int carry = 0;
-@@ -92,7 +92,7 @@
+@@ -92,7 +92,7 @@ __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
  }
  
  
@@ -677,7 +738,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field subtraction, c = a-b mod p  
      unsigned int i;
      unsigned int borrow = 0;
-@@ -108,7 +108,7 @@
+@@ -108,7 +108,7 @@ __inline void fpsub1271(felm_t a, felm_t b, felm_t c)
  }
  
  
@@ -686,7 +747,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field negation, a = -a mod p
      unsigned int i;
      unsigned int borrow = 0;
-@@ -218,7 +218,7 @@
+@@ -218,7 +218,7 @@ unsigned int mp_add(digit_t* a, digit_t* b, digit_t* c, unsigned int nwords)
  }
  
  
@@ -695,7 +756,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Exponentiation over GF(p), af = a^(125-1)
      int i;
      felm_t t1, t2, t3, t4, t5;
-@@ -267,14 +267,14 @@
+@@ -267,14 +267,14 @@ void fpinv1271(felm_t a)
  }
  
  
@@ -712,7 +773,7 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Multiprecision addition, c = a+b, where lng(a) = lng(b) = nwords. Returns the carry bit 
      
      return mp_add((digit_t*)a, (digit_t*)b, c, (unsigned int)nwords);
-@@ -374,7 +374,7 @@
+@@ -374,7 +374,7 @@ void conversion_to_odd(digit_t* k, digit_t* k_odd)
  }
  
  
@@ -721,6 +782,8 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  { // Field division by two, c = a/2 mod p
      digit_t mask;
      unsigned int carry = 0;
+diff --git a/third_party/fourq/hash_to_curve.c b/third_party/fourq/hash_to_curve.c
+index e86aa66..be92edb 100644
 --- a/third_party/fourq/hash_to_curve.c
 +++ b/third_party/fourq/hash_to_curve.c
 @@ -6,8 +6,8 @@
@@ -734,9 +797,11 @@ To regenerate, diff the pinned upstream sources against this tree and keep this 
  
  
  static digit_t fpeq1271(digit_t* a, digit_t* b)
+diff --git a/third_party/fourq/table_lookup.h b/third_party/fourq/table_lookup.h
+index 935ccbf..48a08f5 100644
 --- a/third_party/fourq/table_lookup.h
 +++ b/third_party/fourq/table_lookup.h
-@@ -16,7 +16,7 @@
+@@ -16,7 +16,7 @@ extern "C" {
  #endif
  
  

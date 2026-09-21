@@ -214,7 +214,10 @@ static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
     uint128_t tt1, tt2;
     unsigned int carry1;
 
-#if defined(GENERIC_IMPLEMENTATION) || defined(SCALAR_INTRIN_SUPPORT)
+// APSI: this branch indexes uint128_t as a pair of digits, so it is only valid when
+// uint128_t is that pair. A generic build on a compiler with a native 128-bit integer
+// defines both GENERIC_IMPLEMENTATION and UINT128_SUPPORT, and belongs in the branch below.
+#if (defined(GENERIC_IMPLEMENTATION) || defined(SCALAR_INTRIN_SUPPORT)) && !defined(UINT128_SUPPORT)
     unsigned int carry2;
     uint64_t temp;
 
