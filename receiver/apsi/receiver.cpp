@@ -500,6 +500,16 @@ namespace apsi {
             // result-worker threads below, so a process that only receives holds no pool
             // threads at all.
 
+            // A fresh key pair for every query. The relinearization keys travel to the sender
+            // with the query, so a key held across queries would let a sender recognize two of
+            // them as coming from one receiver, even over separate connections, and would leave
+            // every recorded query readable to whoever later obtained that one secret key.
+            //
+            // Only this path can rotate on its own: it owns the whole exchange and returns with
+            // nothing in flight. The create_query and process_result split cannot, since the
+            // result of an earlier query is encrypted under the key that rotating would discard.
+            reset_keys();
+
             // Create query and send to Sender
             auto query = create_query(items);
             chl.send(std::move(query.first));

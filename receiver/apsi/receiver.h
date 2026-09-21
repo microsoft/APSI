@@ -138,6 +138,11 @@ namespace apsi::receiver {
 
         /**
         Generates a new set of keys to use for queries.
+
+        Receiver::request_query calls this itself, so each query it sends carries keys of its own.
+        A caller driving the Receiver::create_query and Receiver::process_result split instead is
+        responsible for calling this between queries, and must not call it while a query is in
+        flight: the result of that query is encrypted under the key this discards.
         */
         void reset_keys();
 
@@ -233,6 +238,12 @@ namespace apsi::receiver {
         sender with Receiver::SendRequest. It also contains an index translation table that
         keeps track of the order of the hashed items vector, and is used internally by the
         Receiver::process_result_part function to sort the results in the correct order.
+
+        This uses the keys the Receiver holds and does not rotate them, since the result of an
+        earlier query is encrypted under the key a rotation would discard. A caller that sends
+        more than one query is responsible for calling Receiver::reset_keys between them, at a
+        point where no query is in flight; otherwise every query it sends carries the same
+        relinearization keys, and a sender can recognize them as coming from one receiver.
         */
         std::pair<Request, IndexTranslationTable> create_query(
             const std::vector<HashedItem> &items);

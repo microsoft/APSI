@@ -74,6 +74,47 @@ namespace APSITests {
             keys.save(gsl::span<unsigned char>(buf.data(), buf.size()), compr_mode_type::none);
             return buf;
         }
+
+        /**
+        Keeps every query the receiver sends and answers each with a response announcing no
+        result packages at all, which is what lets request_query complete without a sender.
+        */
+        class CapturingChannel final : public NetworkChannel {
+        public:
+            void send(unique_ptr<SenderOperation> sop) override
+            {
+                auto query = to_query_request(std::move(sop));
+                if (query) {
+                    sent_relin_keys.push_back(save_relin_keys(query->relin_keys));
+                }
+            }
+
+            unique_ptr<SenderOperation> receive_operation(
+                shared_ptr<SEALContext>, SenderOperationType) override
+            {
+                return nullptr;
+            }
+
+            void send(unique_ptr<SenderOperationResponse>) override
+            {}
+
+            unique_ptr<SenderOperationResponse> receive_response(SenderOperationType) override
+            {
+                auto response = make_unique<SenderOperationResponseQuery>();
+                response->package_count = 0;
+                return response;
+            }
+
+            void send(unique_ptr<ResultPackage>) override
+            {}
+
+            unique_ptr<ResultPackage> receive_result(shared_ptr<SEALContext>) override
+            {
+                return nullptr;
+            }
+
+            vector<vector<unsigned char>> sent_relin_keys;
+        }; // class CapturingChannel
     } // namespace
 
     TEST(ReceiverApiTests, ConstructFromParams)
@@ -226,5 +267,47 @@ namespace APSITests {
         // should differ. (They could in principle collide, but the probability is cryptographically
         // negligible — a collision would be a far bigger bug than this test failing once.)
         ASSERT_NE(buf_before, buf_after);
+    }
+    TEST(ReceiverApiTests, RequestQueryRotatesKeysBetweenQueries)
+    {
+        // The relinearization keys travel to the sender with every query, so two queries from one
+        // Receiver must not carry the same ones: a sender that saw them would know the queries
+        // came from one receiver even across separate connections.
+        Receiver receiver(make_test_params());
+
+        vector<HashedItem> items;
+        items.push_back(make_hashed_item(1, 2));
+        LabelKeyVector label_keys;
+
+        CapturingChannel chl;
+        static_cast<void>(receiver.request_query(items, label_keys, chl));
+        static_cast<void>(receiver.request_query(items, label_keys, chl));
+        static_cast<void>(receiver.request_query(items, label_keys, chl));
+
+        ASSERT_EQ(size_t(3), chl.sent_relin_keys.size());
+        for (const auto &keys : chl.sent_relin_keys) {
+            ASSERT_FALSE(keys.empty());
+        }
+        ASSERT_NE(chl.sent_relin_keys[0], chl.sent_relin_keys[1]);
+        ASSERT_NE(chl.sent_relin_keys[1], chl.sent_relin_keys[2]);
+        ASSERT_NE(chl.sent_relin_keys[0], chl.sent_relin_keys[2]);
+    }
+
+    TEST(ReceiverApiTests, CreateQueryKeepsKeysSoPipelinedResultsStayDecryptable)
+    {
+        // create_query is the other half of the contract: it must not rotate, because a caller
+        // driving the split API may still be holding the result of an earlier query, which is
+        // encrypted under the key a rotation would discard.
+        Receiver receiver(make_test_params());
+
+        vector<HashedItem> items;
+        items.push_back(make_hashed_item(1, 2));
+
+        auto first = to_query_request(receiver.create_query(items).first);
+        auto second = to_query_request(receiver.create_query(items).first);
+        ASSERT_NE(nullptr, first);
+        ASSERT_NE(nullptr, second);
+
+        ASSERT_EQ(save_relin_keys(first->relin_keys), save_relin_keys(second->relin_keys));
     }
 } // namespace APSITests

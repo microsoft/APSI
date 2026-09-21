@@ -4,6 +4,7 @@
 
 ### Breaking changes
 
+- `Receiver::request_query` draws a new key pair for each query, so a sender can no longer recognize two queries as coming from one receiver. A caller using `Receiver::create_query` and `Receiver::process_result` instead must call `Receiver::reset_keys` between queries itself, at a point where none is in flight.
 - Require Microsoft SEAL 4.4.5 or a newer 4.x release, and update the vcpkg baseline.
 - The exported CMake package links `JsonCpp::JsonCpp` rather than `jsoncpp_static`, so APSI can be built against a shared jsoncpp. jsoncpp 1.9.5 or newer is now required.
 - Retuned 31 of the 36 shipped parameter sets: twenty-seven were above the documented 2^-40 false-positive probability per query, and three more left only two or three bits of noise budget once their bins filled. Only `plain_modulus` and `coeff_modulus_bits` changed, and some sets now send a little more than before. A sender and a receiver must agree on their parameters, so both sides of a deployment want the new values.
