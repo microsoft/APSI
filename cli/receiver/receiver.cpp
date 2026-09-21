@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -32,6 +33,54 @@ namespace {
         static constexpr const char *GreenBold = "\033[1;32m";
         static constexpr const char *Reset = "\033[0m";
     };
+
+    /**
+    Rewrites the C0 control characters as escapes. A label is whatever the sender chose to store,
+    and it is printed to a terminal here: an ESC it contains would otherwise move the cursor or
+    recolor what is already on the screen, and a CR would let it overwrite the line just written.
+    Bytes above 0x7E are left as they are, so that a label holding UTF-8 text still reads as text.
+    */
+    string escape_control_bytes(const string &in)
+    {
+        static constexpr array<char, 17> hex_digits{ "0123456789abcdef" };
+
+        string out;
+        out.reserve(in.size());
+        for (unsigned char byte : in) {
+            if (byte < 0x20 || byte == 0x7F) {
+                out += "\\x";
+                out += hex_digits[byte >> 4];
+                out += hex_digits[byte & 0x0F];
+            } else {
+                out += static_cast<char>(byte);
+            }
+        }
+        return out;
+    }
+
+    /**
+    Escapes a field for the CSV output. Control characters are rewritten as above, and a field
+    holding a comma or a quote is quoted with its internal quotes doubled, as RFC 4180 describes.
+    A label could otherwise add columns to the file.
+    */
+    string escape_csv_field(const string &in)
+    {
+        string escaped = escape_control_bytes(in);
+        if (escaped.find_first_of(",\"") == string::npos) {
+            return escaped;
+        }
+
+        string out = "\"";
+        for (char c : escaped) {
+            if (c == '"') {
+                out += "\"\"";
+            } else {
+                out += c;
+            }
+        }
+        out += '"';
+        return out;
+    }
 } // namespace
 
 int remote_query(const CLP &cmd);
@@ -44,7 +93,8 @@ void print_intersection_results(
     const vector<string> &orig_items,
     const vector<Item> &items,
     const vector<MatchRecord> &intersection,
-    const string &out_file);
+    const string &out_file,
+    bool use_color);
 
 void print_transmitted_data(Channel &channel);
 
@@ -127,7 +177,11 @@ int remote_query(const CLP &cmd)
         return -1;
     }
 
-    print_intersection_results(orig_items, items_vec, query_result, cmd.output_file());
+    // Color only when the output is a terminal that will render it. A log file, a pipe or a
+    // redirect receives the escape sequences as literal bytes instead.
+    bool use_color = stdout_is_terminal() && cmd.log_file().empty();
+
+    print_intersection_results(orig_items, items_vec, query_result, cmd.output_file(), use_color);
     print_transmitted_data(channel);
     print_timing_report(recv_stopwatch);
 
@@ -153,7 +207,8 @@ void print_intersection_results(
     const vector<string> &orig_items,
     const vector<Item> &items,
     const vector<MatchRecord> &intersection,
-    const string &out_file)
+    const string &out_file,
+    bool use_color)
 {
     if (orig_items.size() != items.size()) {
         throw invalid_argument("orig_items must have same size as items");
@@ -162,16 +217,20 @@ void print_intersection_results(
         throw invalid_argument("intersection must have same size as items");
     }
 
+    const char *highlight = use_color ? Colors::GreenBold : "";
+    const char *reset = use_color ? Colors::Reset : "";
+
     stringstream csv_output;
     for (size_t i = 0; i < orig_items.size(); i++) {
         stringstream msg;
         if (intersection[i].found) {
-            msg << Colors::GreenBold << orig_items[i] << Colors::Reset << " (FOUND)";
-            csv_output << orig_items[i];
+            msg << highlight << escape_control_bytes(orig_items[i]) << reset << " (FOUND)";
+            csv_output << escape_csv_field(orig_items[i]);
             if (intersection[i].label) {
+                string label = intersection[i].label.to_string();
                 msg << ": ";
-                msg << Colors::GreenBold << intersection[i].label.to_string() << Colors::Reset;
-                csv_output << "," << intersection[i].label.to_string();
+                msg << highlight << escape_control_bytes(label) << reset;
+                csv_output << "," << escape_csv_field(label);
             }
             csv_output << '\n';
             APSI_LOG_INFO(msg.str());

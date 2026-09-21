@@ -4,11 +4,15 @@
 #include "common_utils.h"
 
 // STD
+#include <cstdio>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
 #ifdef _WIN32
 #include <windows.h>
+#include <io.h>
+#else
+#include <unistd.h>
 #endif
 
 // APSI
@@ -37,6 +41,15 @@ void prepare_console()
 
     dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
     SetConsoleMode(hConsole, dwMode);
+#endif
+}
+
+bool stdout_is_terminal()
+{
+#ifdef _WIN32
+    return _isatty(_fileno(stdout)) != 0;
+#else
+    return isatty(fileno(stdout)) != 0;
 #endif
 }
 

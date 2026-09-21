@@ -16,6 +16,12 @@ Prepare console for color output.
 void prepare_console();
 
 /**
+Returns whether standard output is an interactive terminal. Escape sequences written anywhere else
+are not rendered and arrive as literal bytes, so a caller that colors its output asks this first.
+*/
+bool stdout_is_terminal();
+
+/**
 Generate timing report for timespans.
 */
 std::vector<std::string> generate_timespan_report(
