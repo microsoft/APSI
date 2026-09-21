@@ -41,28 +41,63 @@ using namespace seal;
 namespace APSITests {
     namespace {
         /**
-        Hands Receiver::request_query a fixed, caller-supplied script of result packages,
-        modelling a sender that answers a query with whatever it likes.
+        Answers a query exactly as an honest sender would and returns the result packages. A
+        hostile channel calls this with the query it was handed, so that whatever it does next --
+        duplicating packages, renumbering them, dripping them out slowly -- is done with material
+        encrypted under the key of that query, which is the only material the receiver can read.
+        */
+        vector<ResultPackage> AnswerQueryHonestly(
+            unique_ptr<SenderOperation> sop, const shared_ptr<SenderDB> &sender_db)
+        {
+            auto seal_context = sender_db->get_seal_context();
 
-        Deriving from NetworkChannel rather than reusing StreamChannel is forced:
+            stringstream ss;
+            StreamChannel chl(ss);
+
+            chl.send(std::move(sop));
+            Query query(
+                to_query_request(
+                    chl.receive_operation(seal_context, SenderOperationType::sop_query)),
+                sender_db);
+            Sender::RunQuery(query, chl);
+
+            uint32_t package_count = to_query_response(chl.receive_response())->package_count;
+            vector<ResultPackage> packages;
+            packages.reserve(package_count);
+            while (package_count--) {
+                packages.push_back(*chl.receive_result(seal_context));
+            }
+            return packages;
+        }
+
+        /**
+        Answers a query honestly and then hands the receiver whatever the caller's transform
+        makes of the result, modelling a sender that computes a correct answer and misreports it.
+
+        Building the script from the query in hand rather than from one recorded earlier is
+        forced: Receiver::request_query draws a new key for every query, so a package recorded
+        before the call cannot be decrypted by it.
+
+        Deriving from NetworkChannel rather than reusing StreamChannel is also forced:
         request_query only accepts a network::NetworkChannel, NetworkChannel is an empty
         marker class deriving from Channel, and StreamChannel derives from Channel directly.
-        It is also the more precise tool, because it lets a test hand out exactly the
-        packages it wants in exactly the order it wants.
 
-        The script must hold exactly as many packages as the announced package_count. A
+        The transform must leave exactly as many packages as the announced package_count. A
         worker that gets nothing back, from a channel reporting no failure, concludes the
         package is merely late and waits for it.
         */
         class ReplayChannel final : public NetworkChannel {
         public:
-            explicit ReplayChannel(vector<ResultPackage> script) : script_(std::move(script))
+            using Transform = function<vector<ResultPackage>(vector<ResultPackage>)>;
+
+            ReplayChannel(shared_ptr<SenderDB> sender_db, Transform transform)
+                : sender_db_(std::move(sender_db)), transform_(std::move(transform))
             {}
 
-            void send(unique_ptr<SenderOperation>) override
+            void send(unique_ptr<SenderOperation> sop) override
             {
-                // The query is discarded. This channel replays a canned script instead of
-                // computing an answer.
+                lock_guard<mutex> lock(mtx_);
+                script_ = transform_(AnswerQueryHonestly(std::move(sop), sender_db_));
             }
 
             unique_ptr<SenderOperation> receive_operation(
@@ -76,6 +111,7 @@ namespace APSITests {
 
             unique_ptr<SenderOperationResponse> receive_response(SenderOperationType) override
             {
+                lock_guard<mutex> lock(mtx_);
                 auto response = make_unique<SenderOperationResponseQuery>();
                 response->package_count = static_cast<uint32_t>(script_.size());
                 return response;
@@ -93,8 +129,23 @@ namespace APSITests {
                 return make_unique<ResultPackage>(script_[next_++]);
             }
 
+            /**
+            How many packages the transform produced. A test asserts on this so that a transform
+            that quietly stopped misbehaving is caught: the receiver's answer alone would not
+            show it, since a duplicate package carries the same match as its original.
+            */
+            uint32_t announced_count()
+            {
+                lock_guard<mutex> lock(mtx_);
+                return static_cast<uint32_t>(script_.size());
+            }
+
         private:
             mutex mtx_;
+
+            shared_ptr<SenderDB> sender_db_;
+
+            Transform transform_;
 
             vector<ResultPackage> script_;
 
@@ -125,7 +176,38 @@ namespace APSITests {
             // Empty for an unlabeled run. verify_labeled_results needs the sender's full
             // item -> label map, so a labeled run has to carry it along.
             vector<pair<Item, Label>> sender_item_labels;
+
+            // Kept so that a hostile channel can answer a later query honestly before
+            // misbehaving. Receiver::request_query draws a new key for every query, so a package
+            // recorded here does not decrypt under the key of the query the test actually sends.
+            shared_ptr<SenderDB> sender_db;
         }; // struct HonestQuery
+
+        /**
+        Repeats every package, each next to its original, so that two workers pick a pair up at
+        nearly the same instant and land on the same MatchRecord slot concurrently.
+        */
+        vector<ResultPackage> DuplicateEachPackage(vector<ResultPackage> packages)
+        {
+            vector<ResultPackage> script;
+            script.reserve(packages.size() * 2);
+            for (auto &rp : packages) {
+                script.push_back(rp);
+                script.push_back(std::move(rp));
+            }
+            return script;
+        }
+
+        /**
+        Appends a copy of the first package claiming a bundle_idx far outside the parameter set.
+        */
+        vector<ResultPackage> AppendOutOfRangeBundleIdx(vector<ResultPackage> packages)
+        {
+            ResultPackage out_of_range = packages.front();
+            out_of_range.bundle_idx = numeric_limits<uint32_t>::max();
+            packages.push_back(std::move(out_of_range));
+            return packages;
+        }
 
         /**
         Checks a query result against the honest expectation, picking the right verifier for the
@@ -236,6 +318,7 @@ namespace APSITests {
                 std::move(itt),
                 std::move(packages),
                 std::move(sender_item_labels),
+                sender_db,
             };
 
             // Confirm the captured material really is a correct answer, so that a later
@@ -563,8 +646,8 @@ namespace APSITests {
         */
         class DripChannel final : public NetworkChannel {
         public:
-            DripChannel(vector<ResultPackage> script, chrono::milliseconds gap)
-                : script_(std::move(script)), gap_(gap)
+            DripChannel(shared_ptr<SenderDB> sender_db, chrono::milliseconds gap)
+                : sender_db_(std::move(sender_db)), gap_(gap)
             {}
 
             uint32_t announced_count() const
@@ -572,8 +655,11 @@ namespace APSITests {
                 return static_cast<uint32_t>(script_.size());
             }
 
-            void send(unique_ptr<SenderOperation>) override
-            {}
+            void send(unique_ptr<SenderOperation> sop) override
+            {
+                lock_guard<mutex> lock(mtx_);
+                script_ = AnswerQueryHonestly(std::move(sop), sender_db_);
+            }
 
             unique_ptr<SenderOperation> receive_operation(
                 shared_ptr<SEALContext>, SenderOperationType) override
@@ -586,8 +672,9 @@ namespace APSITests {
 
             unique_ptr<SenderOperationResponse> receive_response(SenderOperationType) override
             {
+                lock_guard<mutex> lock(mtx_);
                 auto response = make_unique<SenderOperationResponseQuery>();
-                response->package_count = announced_count();
+                response->package_count = static_cast<uint32_t>(script_.size());
                 return response;
             }
 
@@ -611,6 +698,8 @@ namespace APSITests {
 
         private:
             mutex mtx_;
+
+            shared_ptr<SenderDB> sender_db_;
 
             vector<ResultPackage> script_;
 
@@ -677,18 +766,15 @@ namespace APSITests {
         // pair up at nearly the same instant, which puts them on the same MatchRecord slot
         // concurrently. The receiver must resolve that collision without racing and without
         // letting one hostile package destroy an otherwise valid answer.
-        vector<ResultPackage> script;
-        script.reserve(honest.packages.size() * 2);
-        for (const auto &rp : honest.packages) {
-            script.push_back(rp);
-            script.push_back(rp);
-        }
-
-        ReplayChannel chl(std::move(script));
+        ReplayChannel chl(honest.sender_db, DuplicateEachPackage);
         vector<MatchRecord> query_result;
         ASSERT_NO_THROW(
             query_result =
                 receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl));
+
+        // The receiver really was given each package twice. Without this the test would pass
+        // on an honest answer, since a duplicate carries the same match as its original.
+        ASSERT_EQ(uint32_t(honest.packages.size() * 2), chl.announced_count());
 
         // The duplicates must be dropped, not merged: the answer is exactly the honest one.
         VerifyResults(honest, query_result);
@@ -712,20 +798,17 @@ namespace APSITests {
         ASSERT_LE(size_t(2), honest.packages.size());
         ASSERT_FALSE(honest.sender_item_labels.empty());
 
-        vector<ResultPackage> script;
-        script.reserve(honest.packages.size() * 2);
-        for (const auto &rp : honest.packages) {
-            script.push_back(rp);
-            script.push_back(rp);
-        }
-
-        ReplayChannel chl(std::move(script));
+        ReplayChannel chl(honest.sender_db, DuplicateEachPackage);
         vector<MatchRecord> query_result;
         ASSERT_NO_THROW(
             query_result =
                 receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl));
 
         // Labels must survive intact, not just the match flags.
+        // The receiver really was given each package twice; a duplicate carries the same
+        // match as its original, so the answer alone would not show a transform that stopped.
+        ASSERT_EQ(uint32_t(honest.packages.size() * 2), chl.announced_count());
+
         VerifyResults(honest, query_result);
     }
 
@@ -748,18 +831,15 @@ namespace APSITests {
 
         // Replay on top of that, so the same test covers both properties at once: every honest
         // package must still be merged, and the duplicates must still be dropped.
-        vector<ResultPackage> script;
-        script.reserve(honest.packages.size() * 2);
-        for (const auto &rp : honest.packages) {
-            script.push_back(rp);
-            script.push_back(rp);
-        }
-
-        ReplayChannel chl(std::move(script));
+        ReplayChannel chl(honest.sender_db, DuplicateEachPackage);
         vector<MatchRecord> query_result;
         ASSERT_NO_THROW(
             query_result =
                 receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl));
+
+        // The receiver really was given each package twice; a duplicate carries the same
+        // match as its original, so the answer alone would not show a transform that stopped.
+        ASSERT_EQ(uint32_t(honest.packages.size() * 2), chl.announced_count());
 
         VerifyResults(honest, query_result);
     }
@@ -778,16 +858,14 @@ namespace APSITests {
         // anyway, so such a package is harmless on its own. The receiver rejects it up front
         // to avoid the wasted decryption, and either way the requirement is the same -- a
         // garbage bundle_idx is ignored, never fatal, and the rest of the answer still lands.
-        vector<ResultPackage> script = honest.packages;
-        ResultPackage out_of_range = honest.packages.front();
-        out_of_range.bundle_idx = numeric_limits<uint32_t>::max();
-        script.push_back(std::move(out_of_range));
-
-        ReplayChannel chl(std::move(script));
+        ReplayChannel chl(honest.sender_db, AppendOutOfRangeBundleIdx);
         vector<MatchRecord> query_result;
         ASSERT_NO_THROW(
             query_result =
                 receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl));
+
+        // The out-of-range package really was appended to an otherwise honest answer.
+        ASSERT_EQ(uint32_t(honest.packages.size() + 1), chl.announced_count());
 
         VerifyResults(honest, query_result);
     }
@@ -1146,7 +1224,7 @@ namespace APSITests {
         ASSERT_GT(gap * (package_count - 1), timeout);
         ASSERT_GT(timeout, 5 * gap);
 
-        DripChannel chl(honest.packages, gap);
+        DripChannel chl(honest.sender_db, gap);
 
         auto start = chrono::steady_clock::now();
         auto query_result =

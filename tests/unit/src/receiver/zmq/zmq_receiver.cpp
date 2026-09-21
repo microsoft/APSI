@@ -102,6 +102,16 @@ namespace APSITests {
             }
         }
 
+        /**
+        Points the faked sender at the receiver whose responses it has to encrypt. Receiver
+        rotates its keys on every query, so a secret key copied once goes stale after the first
+        one; the sender thread reads the current key when it answers instead.
+        */
+        void use_receiver_keys(const Receiver &recv)
+        {
+            recv_under_test_ = &recv;
+        }
+
         void start_sender(bool labels = false)
         {
             th_ = thread([this, labels] {
@@ -163,6 +173,12 @@ namespace APSITests {
 
         void dispatch_query(unique_ptr<ZMQSenderOperation> sop, bool labels)
         {
+            // The receiver drew a new key before it sent this query, so take that one. The query
+            // arriving is what orders this read after the rotation that produced the key.
+            if (const Receiver *recv = recv_under_test_.load()) {
+                get_context()->set_secret(*recv->get_crypto_context().secret_key());
+            }
+
             // We'll return 1 package
             uint32_t package_count = 1;
 
@@ -250,6 +266,8 @@ namespace APSITests {
         thread th_;
 
         atomic<bool> stop_token_{ false };
+
+        atomic<const Receiver *> recv_under_test_{ nullptr };
     };
 
     TEST_F(ReceiverTests, Constructor)
@@ -312,8 +330,8 @@ namespace APSITests {
 
         Receiver recv(*get_params());
 
-        // Give the sender the secret key so they can fake responses
-        get_context()->set_secret(*recv.get_crypto_context().secret_key());
+        // Let the faked sender follow the receiver's keys so it can fake responses
+        use_receiver_keys(recv);
 
         // Empty query; empty response
         vector<HashedItem> items;
@@ -364,8 +382,8 @@ namespace APSITests {
 
         Receiver recv(*get_params());
 
-        // Give the sender the secret key so they can fake responses
-        get_context()->set_secret(*recv.get_crypto_context().secret_key());
+        // Let the faked sender follow the receiver's keys so it can fake responses
+        use_receiver_keys(recv);
 
         // Empty query; empty response
         vector<HashedItem> items;
