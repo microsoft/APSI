@@ -1,5 +1,12 @@
 # List of Changes
 
+## Version 1.0.1
+
+- Added a `NOTICE` file for bundled third-party sources. It and `LICENSE` are now installed with APSI.
+- `sender/apsi/bin_bundle.cpp` reports the requirement for a Microsoft SEAL built with `SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF` with `#error` rather than an unconditional `static_assert`, once per translation unit rather than once per function.
+- `ThreadPool::wait_until_nothing_in_flight` documents what it guarantees: the pool being idle rather than the calling thread's own tasks having finished.
+- Fixed a sign-conversion warning in the receiver CLI, which appeared only in a Debug build.
+
 ## Version 1.0.0
 
 ### Breaking changes

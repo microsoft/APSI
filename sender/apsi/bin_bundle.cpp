@@ -17,6 +17,13 @@
 // SEAL
 #include "seal/util/defines.h"
 
+// The polynomial evaluations below deliberately produce ciphertexts that Microsoft SEAL considers
+// transparent, as the comments on each explain, so SEAL has to be built to return one rather than
+// reject it. A sender built the other way would fail to answer a legitimate query.
+#ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
+#error "APSI requires Microsoft SEAL built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF"
+#endif
+
 namespace apsi {
     using namespace std;
     using namespace seal;
@@ -108,10 +115,6 @@ namespace apsi {
         Ciphertext BatchedPlaintextPolyn::eval(
             const vector<Ciphertext> &ciphertext_powers, MemoryPoolHandle &pool) const
         {
-#ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
-            static_assert(
-                false, "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
-#endif
             // We need to have enough ciphertext powers to evaluate this polynomial
             if (ciphertext_powers.size() < max<size_t>(batched_coeffs.size(), 2)) {
                 throw invalid_argument("not enough ciphertext powers available");
@@ -187,10 +190,6 @@ namespace apsi {
             size_t ps_low_degree,
             MemoryPoolHandle &pool) const
         {
-#ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
-            static_assert(
-                false, "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
-#endif
             // We need to have enough ciphertext powers to evaluate this polynomial
             if (ciphertext_powers.size() < max<size_t>(batched_coeffs.size(), 2)) {
                 throw invalid_argument("not enough ciphertext powers available");

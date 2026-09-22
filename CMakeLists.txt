@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 1.0.0 LANGUAGES CXX C)
+project(APSI VERSION 1.0.1 LANGUAGES CXX C)
 
 # This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
 cmake_policy(SET CMP0077 NEW)
@@ -428,6 +428,14 @@ install(
         ${APSI_CONFIG_FILENAME}
         ${APSI_CONFIG_VERSION_FILENAME}
     DESTINATION ${APSI_CONFIG_INSTALL_DIR})
+
+# Install APSI's license and the notices for bundled third-party sources.
+# Binary distributions may require additional dependency licenses and notices.
+install(
+    FILES
+        ${CMAKE_CURRENT_LIST_DIR}/LICENSE
+        ${CMAKE_CURRENT_LIST_DIR}/NOTICE
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/APSI-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 
 # We export SEALTargets from the build tree so it can be used by other projects
 # without requiring an install.

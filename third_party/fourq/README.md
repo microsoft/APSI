@@ -5,8 +5,8 @@ implementation used by APSI's OPRF (`common/apsi/oprf/ecpoint.cpp`).
 
 - **Upstream:** https://github.com/microsoft/FourQlib
 - **Pinned commit:** see `cgmanifest.json` in this directory.
-- **License:** the upstream files carry their own MIT copyright headers; do not
-  re-license.
+- **License:** FourQlib is distributed under the MIT License. Preserve its
+  upstream copyright and license notices.
 
 The sources are pristine upstream plus [`apsi-changes.patch`](apsi-changes.patch),
 and nothing else. Re-pinning is therefore: copy the new sources from
