@@ -133,7 +133,16 @@ namespace apsi::util {
         }
 
         /**
-        Block until every enqueued task has finished executing.
+        Block until the pool is idle: no task is waiting in the queue and no worker is running
+        one. A task this thread enqueued before the call has therefore finished by the time it
+        returns.
+
+        The wait is over the whole pool rather than over this thread's tasks, so it is only as
+        useful as the caller's knowledge of who else is enqueuing. Two consequences follow. A
+        task another thread enqueues is waited for as well, so this returns later than the
+        caller's own work requires; and if other threads keep the pool fed, the condition may
+        not hold at any instant and the wait does not return. Use it where the caller knows the
+        pool is otherwise quiet, and util::TaskGroup where it does not.
         */
         void wait_until_nothing_in_flight()
         {

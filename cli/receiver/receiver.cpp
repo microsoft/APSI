@@ -4,7 +4,6 @@
 // STD
 #include <array>
 #include <cstddef>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -46,13 +45,14 @@ namespace {
 
         string out;
         out.reserve(in.size());
-        for (unsigned char byte : in) {
+        for (char c : in) {
+            auto byte = static_cast<unsigned char>(c);
             if (byte < 0x20 || byte == 0x7F) {
                 out += "\\x";
                 out += hex_digits[byte >> 4];
                 out += hex_digits[byte & 0x0F];
             } else {
-                out += static_cast<char>(byte);
+                out += c;
             }
         }
         return out;

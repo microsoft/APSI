@@ -1,0 +1,54 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+This software incorporates components from the projects listed below. The original copyright notices
+and the licenses under which Microsoft received such components are set forth below and are provided for
+informational purposes only. Microsoft reserves all rights not expressly granted herein, whether by
+implication, estoppel or otherwise.
+
+This software includes parts of FourQlib (https://github.com/microsoft/FourQlib).
+The vendored sources are in third_party/fourq/, at the upstream commit pinned in
+third_party/fourq/cgmanifest.json, with APSI's modifications recorded in
+third_party/fourq/apsi-changes.patch. FourQlib is licensed under the MIT License, the same license
+this software is distributed under, and carries its own copyright notices in each file.
+
+This software includes an altered version of the ThreadPool library
+(https://github.com/progschj/ThreadPool), by way of the log4cplus fork of it
+(https://github.com/log4cplus/ThreadPool), as common/apsi/util/thread_pool.h. The public interface
+and the in-flight-tracking design derive from those works; the worker lifecycle, pool resizing,
+synchronization, and task exception handling have been reimplemented. The file is marked as an
+altered source version as its license requires.
+
+THREADPOOL NOTICES AND INFORMATION BEGIN HERE
+===============================================================================
+Copyright (c) 2012-2015 Jakob Progsch
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+   1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+   2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+   3. This notice may not be removed or altered from any source
+   distribution.
+
+Modified for log4cplus, copyright (c) 2014-2015 Václav Zeman.
+===============================================================================
+END OF THREADPOOL NOTICES AND INFORMATION
+
+APSI also uses externally supplied dependencies: Microsoft SEAL, Microsoft Kuku, Microsoft GSL,
+FlatBuffers, jsoncpp, and optionally ZeroMQ, cppzmq, TCLAP and GoogleTest. Code from these dependencies
+may be compiled into APSI or applications using it, including from headers and through static linking.
+Redistributors must comply with the applicable license and notice requirements for that code.
+This file is not a complete license bundle for redistributing APSI binaries or applications together
+with their dependencies; the dependencies' distributions provide their own licenses and notices.
+For vcpkg manifest-mode builds, vcpkg.json and its pinned baseline select dependency versions.
