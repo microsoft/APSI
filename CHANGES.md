@@ -1,5 +1,10 @@
 # List of Changes
 
+## Version 1.1.0
+
+- The installed paths no longer carry the version: headers go to `include/apsi`, the CMake package to `lib/cmake/APSI`, and the library is named `apsi`. Code can include `apsi/...` from the standard include directory alone. Consumers using `find_package(APSI)` and `APSI::apsi` need no change. Installing over APSI 1.0 leaves its versioned files in place; remove them first.
+- Updated the vcpkg baseline so that Debug builds with the `hexl` feature link.
+
 ## Version 1.0.1
 
 - Added a `NOTICE` file for bundled third-party sources. It and `LICENSE` are now installed with APSI.

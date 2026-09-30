@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 1.0.1 LANGUAGES CXX C)
+project(APSI VERSION 1.1.0 LANGUAGES CXX C)
 
 # This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
 cmake_policy(SET CMP0077 NEW)
@@ -106,8 +106,8 @@ set(APSI_CONFIG_VERSION_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/cmake/APSIConfigVer
 set(APSI_CONFIG_H_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/common/apsi/config.h)
 
 # Install
-set(APSI_CONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/APSI-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+set(APSI_CONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/APSI)
+set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 
 # pkg-config
 # TODO: not provided yet
@@ -262,7 +262,6 @@ endif()
 
 # Create a single library "apsi" for common, sender, and receiver
 add_library(apsi STATIC)
-apsi_set_version_filename(apsi)
 apsi_set_language(apsi)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common>
@@ -416,7 +415,7 @@ install(
     NAMESPACE APSI::
     DESTINATION ${APSI_CONFIG_INSTALL_DIR})
 
-# Version file; we require exact version match for downstream
+# Version file; downstream must match on major.minor
 write_basic_package_version_file(
     ${APSI_CONFIG_VERSION_FILENAME}
     VERSION ${APSI_VERSION}
@@ -435,10 +434,9 @@ install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/LICENSE
         ${CMAKE_CURRENT_LIST_DIR}/NOTICE
-    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/APSI-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/APSI)
 
-# We export SEALTargets from the build tree so it can be used by other projects
-# without requiring an install.
+# Export APSITargets from the build tree so it can be used without an install.
 export(
     EXPORT APSITargets
     NAMESPACE APSI::
