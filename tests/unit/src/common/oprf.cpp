@@ -418,6 +418,16 @@ namespace APSITests {
         }
     }
 
+// AddressSanitizer pads every stack frame with redzones, so in its builds the curve arithmetic
+// reaches deeper than in any build that is deployed
+#if defined(__SANITIZE_ADDRESS__)
+#define APSI_TEST_ADDRESS_SANITIZER
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define APSI_TEST_ADDRESS_SANITIZER
+#endif
+#endif
+
     namespace {
         // Painting a region of stack, letting the frame that held it die, and then looking at
         // what a later call disturbed is how the depth of that call is measured. The canvas is
@@ -493,8 +503,13 @@ namespace APSITests {
 
         // Fail while there is still margin rather than once coverage is already lost. The depth
         // varies by a factor of three between build types, so the margin has to absorb that
-        // without the figure being retuned per compiler.
+        // without the figure being retuned per compiler. AddressSanitizer's redzones deepen it
+        // further still, so a build with it is held to the window itself.
+#ifdef APSI_TEST_ADDRESS_SANITIZER
+        constexpr size_t depth_budget = apsi::util::stack_scrub_byte_count;
+#else
         constexpr size_t depth_budget = (apsi::util::stack_scrub_byte_count * 3) / 4;
+#endif
         ASSERT_LT(normal_depth, depth_budget)
             << "the curve arithmetic now reaches " << normal_depth << " bytes, against a "
             << apsi::util::stack_scrub_byte_count << "-byte scrub window. Raise "
