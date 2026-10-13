@@ -3012,6 +3012,124 @@ namespace APSITests {
         }
     }
 
+    TEST(BinBundleTests, BatchedPlaintextPolynEvalPatstockGivesTheValues)
+    {
+        // eval_patstock adds the free term of each inner polynomial to it before multiplying by the
+        // high power. When the degree is a multiple of ps_low_degree + 1, the last inner polynomial
+        // is only its free term, which multiplies the high power on its own. Whatever the degree,
+        // the result must decrypt to the values of the polynomials, every coefficient of which is
+        // nonzero, the free terms included. The powers are encryptions of the powers of random
+        // values, at the levels Sender::ComputePowers leaves them at, and the low ones in NTT form.
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 8;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 16;
+        table_params.table_size = 1024;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers = { 1, 3, 5 };
+
+        // With ps_low_degree 3, the last inner polynomial is only its free term at degrees 4 and
+        // 12, and has one, three or two terms besides it at degrees 5, 7 and 14. Only at degrees 12
+        // and 14 are there inner polynomials between the first and the last.
+        size_t ps_low_degree = 3;
+        size_t ps_high_degree = ps_low_degree + 1;
+        vector<size_t> degrees = { 4, 5, 7, 12, 14 };
+        size_t max_degree = *max_element(degrees.begin(), degrees.end());
+
+        auto test_fun = [&](const vector<int> &coeff_modulus_bits, bool same_level) {
+            size_t pmd = 8192;
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(pmd);
+            seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, coeff_modulus_bits));
+            seal_params.set_plain_modulus(65537);
+            PSIParams params(item_params, table_params, query_params, seal_params);
+            const Modulus &plain_modulus = params.seal_params().plain_modulus();
+
+            CryptoContext context(params);
+            KeyGenerator keygen(*context.seal_context());
+            context.set_secret(keygen.secret_key());
+            RelinKeys relin_keys;
+            keygen.create_relin_keys(relin_keys);
+            context.set_evaluator(relin_keys);
+            const SEALContext &seal_context = *context.seal_context();
+            Evaluator &evaluator = *context.evaluator();
+            BatchEncoder &encoder = *context.encoder();
+            MemoryPoolHandle pool = MemoryManager::GetPool();
+
+            parms_id_type high_powers_parms_id = get_parms_id_for_chain_idx(seal_context, 1);
+            parms_id_type low_powers_parms_id = get_parms_id_for_chain_idx(seal_context, 2);
+            ASSERT_EQ(same_level, low_powers_parms_id == high_powers_parms_id);
+
+            mt19937_64 rng(1);
+            uniform_int_distribution<felt_t> random_felt(0, plain_modulus.value() - 1);
+            uniform_int_distribution<felt_t> random_nonzero_felt(1, plain_modulus.value() - 1);
+            vector<felt_t> x(encoder.slot_count());
+            for (auto &value : x) {
+                value = random_felt(rng);
+            }
+
+            // Only the powers eval_patstock uses are set
+            vector<Ciphertext> powers(max_degree + 1);
+            vector<felt_t> x_power(x.size(), 1);
+            for (size_t power = 1; power <= max_degree; power++) {
+                for (size_t s = 0; s < x.size(); s++) {
+                    x_power[s] = seal::util::multiply_uint_mod(x_power[s], x[s], plain_modulus);
+                }
+                bool low = power <= ps_low_degree;
+                if (!low && (power % ps_high_degree)) {
+                    continue;
+                }
+
+                Plaintext pt;
+                encoder.encode(x_power, pt);
+                context.encryptor()->encrypt_symmetric(pt, powers[power]);
+                evaluator.mod_switch_to_inplace(
+                    powers[power], low ? low_powers_parms_id : high_powers_parms_id);
+                if (low) {
+                    evaluator.transform_to_ntt_inplace(powers[power]);
+                }
+            }
+
+            // Random polynomials in a few bins, and zero in the others
+            for (size_t degree : degrees) {
+                SCOPED_TRACE("degree " + to_string(degree));
+                vector<FEltPolyn> polyns(64, FEltPolyn(degree + 1));
+                for (auto &polyn : polyns) {
+                    for (auto &coeff : polyn) {
+                        coeff = random_nonzero_felt(rng);
+                    }
+                }
+                BatchedPlaintextPolyn polyn(
+                    polyns, context, static_cast<uint32_t>(ps_low_degree), true);
+                ASSERT_EQ(degree + 1, polyn.batched_coeffs.size());
+
+                Ciphertext result = polyn.eval_patstock(context, powers, ps_low_degree, pool);
+                ASSERT_EQ(seal_context.last_parms_id(), result.parms_id());
+                ASSERT_EQ(size_t(2), result.size());
+                ASSERT_LT(0, context.decryptor()->invariant_noise_budget(result));
+
+                Plaintext plain;
+                context.decryptor()->decrypt(result, plain);
+                vector<felt_t> values;
+                encoder.decode(plain, values);
+                for (size_t s = 0; s < values.size(); s++) {
+                    felt_t expected =
+                        (s < polyns.size()) ? evaluate(polyns[s], x[s], plain_modulus) : 0;
+                    ASSERT_EQ(expected, values[s]) << "slot " << s;
+                }
+            }
+        };
+
+        // The low powers at a level of three primes and the high powers at the next, as with most
+        // shipped parameter sets that use Paterson-Stockmeyer, and both at a level of two primes,
+        // as with 1M-1024-com
+        test_fun({ 60, 60, 60, 36 }, false);
+        test_fun({ 56, 56, 36 }, true);
+    }
+
     namespace {
         /**
         Collects what is logged while it exists about regenerating caches: for how many bins

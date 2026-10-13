@@ -463,6 +463,12 @@ namespace apsi {
 
         Low powers:  C^{1}, ..., C^{l-1}
         High powers: C^{1*l}, ..., C^{l*h}
+
+        The terms of each inner polynomial other than its free term are summed in NTT form at the
+        level of the low powers, and the sum is transformed to coefficient form and switched to the
+        level of the high powers once. For i>0 the free term is then added, so that the whole inner
+        polynomial is multiplied by its high power at once, except when the last inner polynomial
+        is only its free term, which then multiplies the high power on its own.
         */
         Ciphertext BatchedPlaintextPolyn::eval_patstock(
             const CryptoContext &eval_crypto_context,
@@ -508,7 +514,7 @@ namespace apsi {
             //
             // Because the plaintexts in batched_coeffs can be identically zero, SEAL should be
             // built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. We create a result ciphertext
-            // that is identically zero and set its NTT form flag to true so the additions below
+            // that is identically zero and set its NTT form flag to false so the additions below
             // will work. The ciphertext here will have three components; we relinearize only at the
             // end.
             Ciphertext result(pool);
@@ -524,8 +530,8 @@ namespace apsi {
 
             // Calculate polynomial for i=1,...,ps_high_degree_powers-1
             for (size_t i = 1; i < ps_high_degree_powers; i++) {
-                // Evaluate inner polynomial. The free term is left out and added later on.
-                // The evaluation result is stored in temp_in.
+                // Evaluate inner polynomial. The free term is left out and added once the rest is
+                // in coefficient form. The evaluation result is stored in temp_in.
                 for (size_t j = 1; j < ps_high_degree; j++) {
                     coeff.unsafe_load(
                         *seal_context,
@@ -540,6 +546,14 @@ namespace apsi {
                 evaluator->transform_from_ntt_inplace(temp_in);
                 evaluator->mod_switch_to_inplace(temp_in, high_powers_parms_id);
 
+                // Add the free term, which is not in NTT form, so that it is multiplied by the
+                // high power along with the rest of the inner polynomial
+                coeff.unsafe_load(
+                    *seal_context,
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[i * ps_high_degree].data()),
+                    batched_coeffs[i * ps_high_degree].size());
+                evaluator->add_plain_inplace(temp_in, coeff);
+
                 // The high powers are already in coefficient form
                 evaluator->multiply_inplace(temp_in, ciphertext_powers[i * ps_high_degree], pool);
                 evaluator->add_inplace(result, temp_in);
@@ -547,7 +561,7 @@ namespace apsi {
 
             // Calculate polynomial for i=ps_high_degree_powers.
             // Done separately because here the degree of the inner poly is degree % ps_high_degree.
-            // Once again, the free term will only be added later on.
+            // Once again, the free term is added once the rest is in coefficient form.
             if (degree % ps_high_degree > 0) {
                 for (size_t j = 1; j <= degree % ps_high_degree; j++) {
                     coeff.unsafe_load(
@@ -563,10 +577,31 @@ namespace apsi {
                 evaluator->transform_from_ntt_inplace(temp_in);
                 evaluator->mod_switch_to_inplace(temp_in, high_powers_parms_id);
 
+                // Add the free term
+                coeff.unsafe_load(
+                    *seal_context,
+                    reinterpret_cast<const seal_byte *>(
+                        batched_coeffs[ps_high_degree_powers * ps_high_degree].data()),
+                    batched_coeffs[ps_high_degree_powers * ps_high_degree].size());
+                evaluator->add_plain_inplace(temp_in, coeff);
+
                 // The high powers are already in coefficient form
                 evaluator->multiply_inplace(
                     temp_in, ciphertext_powers[ps_high_degree_powers * ps_high_degree], pool);
                 evaluator->add_inplace(result, temp_in);
+            } else {
+                // The inner polynomial is only its free term, so the high power is multiplied by
+                // it directly. The high power is in coefficient form, so multiply_plain takes it
+                // to NTT form and back, but only for this one term.
+                coeff.unsafe_load(
+                    *seal_context,
+                    reinterpret_cast<const seal_byte *>(
+                        batched_coeffs[ps_high_degree_powers * ps_high_degree].data()),
+                    batched_coeffs[ps_high_degree_powers * ps_high_degree].size());
+                evaluator->multiply_plain(
+                    ciphertext_powers[ps_high_degree_powers * ps_high_degree], coeff, temp, pool);
+                evaluator->mod_switch_to_inplace(temp, high_powers_parms_id);
+                evaluator->add_inplace(result, temp);
             }
 
             // Relinearize sum of ciphertext-ciphertext products if relinearization is supported by
@@ -575,32 +610,23 @@ namespace apsi {
                 evaluator->relinearize_inplace(result, *relin_keys, pool);
             }
 
-            // Calculate inner polynomial for i=0.
-            // Done separately since there is no multiplication with a power of high-degree
+            // Calculate inner polynomial for i=0, without its free term, which is the constant
+            // coefficient and is added last. Done separately since there is no multiplication with
+            // a power of high-degree. Its terms too are summed at the level of the low powers, so
+            // that the sum is transformed to coefficient form and switched only once.
             for (size_t j = 1; j < ps_high_degree; j++) {
                 coeff.unsafe_load(
                     *seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
                     batched_coeffs[j].size());
-
-                evaluator->multiply_plain(ciphertext_powers[j], coeff, temp, pool);
-                evaluator->transform_from_ntt_inplace(temp);
-                evaluator->mod_switch_to_inplace(temp, high_powers_parms_id);
-                evaluator->add_inplace(result, temp);
+                inner_sum.add(ciphertext_powers[j], coeff);
             }
+            inner_sum.write(*seal_context, temp);
 
-            // Add the constant coefficients of the inner polynomials multiplied by the respective
-            // powers of high-degree
-            for (size_t i = 1; i < ps_high_degree_powers + 1; i++) {
-                coeff.unsafe_load(
-                    *seal_context,
-                    reinterpret_cast<const seal_byte *>(batched_coeffs[i * ps_high_degree].data()),
-                    batched_coeffs[i * ps_high_degree].size());
-
-                evaluator->multiply_plain(ciphertext_powers[i * ps_high_degree], coeff, temp, pool);
-                evaluator->mod_switch_to_inplace(temp, high_powers_parms_id);
-                evaluator->add_inplace(result, temp);
-            }
+            // Transform inner polynomial to coefficient form
+            evaluator->transform_from_ntt_inplace(temp);
+            evaluator->mod_switch_to_inplace(temp, high_powers_parms_id);
+            evaluator->add_inplace(result, temp);
 
             // Add the constant coefficient
             coeff.unsafe_load(
