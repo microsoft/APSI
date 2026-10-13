@@ -40,4 +40,16 @@ namespace apsi::util {
         const std::vector<std::uint64_t> &points,
         const std::vector<std::uint64_t> &values,
         const seal::Modulus &mod);
+
+    /**
+    Returns the polynomials newton_interpolate_polyn(points, valuesⱼ, mod) for every j. If
+    roots_polyn is not null, it is set to polyn_with_roots(points, mod). The results are identical
+    to calling those functions separately, but sharing the work between the polynomials makes
+    this much faster.
+    */
+    std::vector<std::vector<std::uint64_t>> newton_interpolate_polyns(
+        const std::vector<std::uint64_t> &points,
+        const std::vector<gsl::span<const std::uint64_t>> &values,
+        const seal::Modulus &mod,
+        std::vector<std::uint64_t> *roots_polyn = nullptr);
 } // namespace apsi::util

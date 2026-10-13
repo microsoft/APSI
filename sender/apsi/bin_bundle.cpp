@@ -1001,25 +1001,38 @@ namespace apsi {
             ThreadPoolMgr tpm;
 
             TaskGroup tasks(tpm.thread_pool());
-            // For each bin in the bundle, compute and cache the corresponding "matching
-            // polynomial"
             tasks.reserve(num_bins);
-            for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
-                tasks.add([&, bin_idx] {
-                    // Compute and cache the matching polynomial
-                    FEltPolyn fmp = polyn_with_roots(item_bins_[bin_idx], mod);
-                    cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
-                });
-            }
-
-            // For each bin in the bundle, compute and cache the corresponding "label polynomials"
-            for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+            if (!label_size) {
+                // For each bin in the bundle, compute and cache the corresponding "matching
+                // polynomial"
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
-                    tasks.add([&, label_idx, bin_idx] {
+                    tasks.add([&, bin_idx] {
                         // Compute and cache the matching polynomial
-                        FEltPolyn fip = newton_interpolate_polyn(
-                            item_bins_[bin_idx], label_bins_[label_idx][bin_idx], mod);
-                        cache_.felt_interp_polyns[label_idx][bin_idx] = std::move(fip);
+                        FEltPolyn fmp = polyn_with_roots(item_bins_[bin_idx], mod);
+                        cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
+                    });
+                }
+            } else {
+                // For each bin in the bundle, compute and cache the corresponding "matching
+                // polynomial" and "label polynomials". They have the same roots and interpolation
+                // points, so computing them together shares most of the work.
+                for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
+                    tasks.add([&, bin_idx] {
+                        vector<gsl::span<const felt_t>> label_values;
+                        label_values.reserve(label_size);
+                        for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                            label_values.emplace_back(label_bins_[label_idx][bin_idx]);
+                        }
+
+                        // Compute and cache the matching polynomial and the label polynomials
+                        FEltPolyn fmp;
+                        vector<FEltPolyn> fips =
+                            newton_interpolate_polyns(item_bins_[bin_idx], label_values, mod, &fmp);
+                        cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
+                        for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                            cache_.felt_interp_polyns[label_idx][bin_idx] =
+                                std::move(fips[label_idx]);
+                        }
                     });
                 }
             }

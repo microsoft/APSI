@@ -6,8 +6,13 @@
 
 - Required Microsoft SEAL 4.6.2 or a newer 4.x release. Bit-packed serialization is new in Microsoft SEAL 4.6.0, 4.6.1 corrects wrong results with MSVC for ARM64, and 4.6.2 can be configured with an installed Microsoft GSL 5 (`SEAL_BUILD_DEPS=OFF`, as vcpkg builds it). `vcpkg.json` asks for `seal` 4.6.2 with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query arrived in. If the vcpkg registry does not have Microsoft SEAL 4.6.2, configure with an overlay port for it; see [Microsoft SEAL 4.6.2](README.md#microsoft-seal-462).
 
+### Added
+
+- Added `util::newton_interpolate_polyns`, which interpolates several value vectors at the same points.
+
 ### Changed and fixed
 
+- Setting up a labeled `SenderDB` is 2 to 23 times faster with the labeled parameter sets of APSI 1.x. With 8 threads, for example, 131072 items took 8.5 s instead of 198 s with the `1M-256-288` set of APSI 1.x, and a million items 20 s instead of 408 s with its `1M-4096-32`. A `BinBundle` computes the matching polynomial and the label polynomials of a bin together, with one modular inversion per item in the bin, where the Newton interpolation of each label part needed one for every divided difference. The polynomials are the same as before, so neither query results nor the polynomials a saved `SenderDB` holds change. Setup without labels is unchanged. `util::newton_interpolate_polyn` uses the same method.
 - Results a sender saves in `none`, `zlib` or `zstd` mode can be read by receivers built with Microsoft SEAL 4.0, which cannot read what Microsoft SEAL 4.1 to 4.4 save: Microsoft SEAL 4.5 and later record in what they save the serialization format version, 4.0 for these results, rather than their own version. A serialized `PSIParams`, or an uncompressed `SenderDB`, therefore differs from what APSI 1.1.0 writes with Microsoft SEAL 4.4 only in these version bytes, and both versions load both.
 
 ### Build
