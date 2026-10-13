@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -16,6 +17,7 @@
 // APSI
 #include "apsi/bin_bundle.h"
 #include "apsi/bin_bundle_generated.h"
+#include "apsi/log.h"
 #include "apsi/util/db_encoding.h"
 
 // SEAL
@@ -972,6 +974,48 @@ namespace APSITests {
         test_fun(get_params2(), 3);
     }
 
+    TEST(BinBundleTests, SaveLoadMoreThanAMillionTables)
+    {
+        // A bin bundle is saved with a table for every bin of every label part, and again in its
+        // cache. With 4096 bins and 150 label parts that is more than 1,000,000 tables, the
+        // FlatBuffers verifier's default limit, and the bundle must still load.
+        auto params = get_params1();
+        size_t label_size = 150;
+        ASSERT_GT(params->bins_per_bundle() * (2 * label_size + 1), size_t(1000000));
+
+        CryptoContext context(*params);
+        context.set_evaluator();
+        auto make_bundle = [&] {
+            return BinBundle(
+                context,
+                label_size,
+                params->table_params().max_items_per_bin,
+                params->query_params().ps_low_degree,
+                params->bins_per_bundle(),
+                false,
+                false);
+        };
+
+        BinBundle bb = make_bundle();
+        vector<pair<felt_t, vector<felt_t>>> item_label{ { 1, vector<felt_t>(label_size, 7) } };
+        ASSERT_EQ(1, bb.multi_insert_for_real(item_label, 0));
+        bb.regen_cache();
+
+        stringstream ss;
+        size_t save_size = bb.save(ss, 7);
+
+        BinBundle bb2 = make_bundle();
+        pair<uint32_t, size_t> load_size;
+        ASSERT_NO_THROW(load_size = bb2.load(ss));
+        ASSERT_EQ(7, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_FALSE(bb2.cache_invalid());
+        ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[0], 1));
+        for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+            ASSERT_TRUE(find_in_bin(bb2.get_label_bins()[label_idx][0], 7));
+        }
+    }
+
     TEST(BinBundleTests, StripUnlabeled)
     {
         auto test_fun = [](const shared_ptr<PSIParams> &params) {
@@ -1341,6 +1385,12 @@ namespace APSITests {
             bool empty_first_batched_interp_polyn = false;
 
             bool shorten_last_batched_interp_polyn = false;
+
+            bool empty_felt_polyns = false;
+
+            bool empty_batched_matching_polyn = false;
+
+            bool empty_last_batched_interp_polyn = false;
         };
 
         flatbuffers::Offset<fbs::FEltMatrix> copy_felt_matrix(
@@ -1356,6 +1406,22 @@ namespace APSITests {
                         felts.pop_back();
                     }
                     rows.push_back(fbs::CreateFEltArray(builder, builder.CreateVector(felts)));
+                }
+            }
+            return fbs::CreateFEltMatrix(builder, builder.CreateVector(rows));
+        }
+
+        /**
+        Returns a matrix with as many rows as the given one, each of them empty.
+        */
+        flatbuffers::Offset<fbs::FEltMatrix> empty_felt_matrix(
+            flatbuffers::FlatBufferBuilder &builder, const fbs::FEltMatrix *matrix)
+        {
+            vector<flatbuffers::Offset<fbs::FEltArray>> rows;
+            if (matrix) {
+                for (size_t i = 0; i < matrix->rows()->size(); i++) {
+                    rows.push_back(
+                        fbs::CreateFEltArray(builder, builder.CreateVector(vector<uint64_t>())));
                 }
             }
             return fbs::CreateFEltMatrix(builder, builder.CreateVector(rows));
@@ -1407,8 +1473,14 @@ namespace APSITests {
                 flatbuffers::Offset<fbs::FEltMatrix> felt_matching;
                 flatbuffers::Offset<fbs::BatchedPlaintextPolyn> batched_matching;
                 if (c.felt_matching_polyns() && !changes.drop_matching_polyns) {
-                    felt_matching = copy_felt_matrix(builder, c.felt_matching_polyns());
-                    batched_matching = copy_batched_polyn(builder, *c.batched_matching_polyn());
+                    felt_matching = changes.empty_felt_polyns
+                                        ? empty_felt_matrix(builder, c.felt_matching_polyns())
+                                        : copy_felt_matrix(builder, c.felt_matching_polyns());
+                    const auto &polyn = *c.batched_matching_polyn();
+                    batched_matching = copy_batched_polyn(
+                        builder,
+                        polyn,
+                        changes.empty_batched_matching_polyn ? polyn.coeffs()->size() : 0);
                 } else if (changes.add_matching_polyns) {
                     // Polynomials of the right shape: those of the first label part
                     const fbs::FEltMatrix *first = nullptr;
@@ -1424,10 +1496,15 @@ namespace APSITests {
                 size_t felt_interp_count =
                     min<size_t>(interp_count, c.felt_interp_polyns()->size());
                 for (size_t i = 0; i < felt_interp_count; i++) {
-                    felt_interp.push_back(copy_felt_matrix(
-                        builder,
-                        c.felt_interp_polyns()->Get(static_cast<flatbuffers::uoffset_t>(i)),
-                        changes.shorten_first_felt_interp_polyn && (i == 0)));
+                    const auto *matrix =
+                        c.felt_interp_polyns()->Get(static_cast<flatbuffers::uoffset_t>(i));
+                    felt_interp.push_back(
+                        changes.empty_felt_polyns
+                            ? empty_felt_matrix(builder, matrix)
+                            : copy_felt_matrix(
+                                  builder,
+                                  matrix,
+                                  changes.shorten_first_felt_interp_polyn && (i == 0)));
                 }
                 auto felt_interp_vec = builder.CreateVector(felt_interp);
 
@@ -1436,7 +1513,8 @@ namespace APSITests {
                     const auto &polyn =
                         *c.batched_interp_polyns()->Get(static_cast<flatbuffers::uoffset_t>(i));
                     size_t drop_count = 0;
-                    if (changes.empty_first_batched_interp_polyn && (i == 0)) {
+                    if ((changes.empty_first_batched_interp_polyn && (i == 0)) ||
+                        (changes.empty_last_batched_interp_polyn && (i + 1 == interp_count))) {
                         drop_count = polyn.coeffs()->size();
                     }
                     if (changes.shorten_last_batched_interp_polyn && (i + 1 == interp_count)) {
@@ -2128,5 +2206,160 @@ namespace APSITests {
             c.add_hashed_items = true;
             ASSERT_THROW(load_from_string(target, rebuild_bin_bundle(bytes, c)), runtime_error);
         }
+    }
+
+    namespace {
+        /**
+        Collects the errors logged while it exists, and restores the global logger and log level
+        when it is destroyed.
+        */
+        class ErrorCapture {
+        public:
+            ErrorCapture() : saved_level_(GetLogLevel())
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::error)] = [this](const string &msg) {
+                    errors_.push_back(msg);
+                };
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+                SetLogLevel(LogLevel::error);
+            }
+
+            ~ErrorCapture()
+            {
+                CloseLogger();
+                SetLogLevel(saved_level_);
+            }
+
+            ErrorCapture(const ErrorCapture &) = delete;
+
+            ErrorCapture &operator=(const ErrorCapture &) = delete;
+
+            /**
+            Loads the saved BinBundle into bb, and returns the error logged as loading it failed,
+            as malformed data should, or nothing if it loads.
+            */
+            string load_error(BinBundle &bb, const string &bytes)
+            {
+                errors_.clear();
+                try {
+                    load_from_string(bb, bytes);
+                } catch (const runtime_error &) {
+                    return errors_.empty() ? string("no error was logged") : errors_.back();
+                }
+                return {};
+            }
+
+        private:
+            LogLevel saved_level_;
+
+            vector<string> errors_;
+        };
+    } // namespace
+
+    TEST(BinBundleTests, LoadRefusesEmptyPolynomials)
+    {
+        // A query evaluates the batched matching polynomial and every batched label polynomial of
+        // a BinBundle without match tags, which cannot be done without a coefficient. Every
+        // polynomial APSI makes has one: a matching polynomial has at least the constant 1, and a
+        // label polynomial the zero polynomial's one. So a loaded BinBundle must hold at least one
+        // coefficient for each, and is refused otherwise. In each change below the counts of
+        // coefficients agree with each other, so that only their being zero can be refused.
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+
+        for (size_t label_size : { 0U, 2U }) {
+            SCOPED_TRACE("label_size " + to_string(label_size));
+            auto new_bundle = [&] {
+                return BinBundle(
+                    context,
+                    label_size,
+                    params->table_params().max_items_per_bin,
+                    0,
+                    params->bins_per_bundle(),
+                    true,
+                    false);
+            };
+
+            BinBundle bb = new_bundle();
+            for (felt_t i = 0; i < 12; i++) {
+                size_t bin = static_cast<size_t>(i % 3);
+                if (label_size) {
+                    ASSERT_LT(
+                        0, bb.multi_insert_for_real(AlgItemLabel{ { 100 + i, { i, 7 } } }, bin));
+                } else {
+                    ASSERT_LT(0, bb.multi_insert_for_real(vector<felt_t>{ 100 + i }, bin));
+                }
+            }
+            bb.regen_cache();
+            string bytes = save_to_string(bb);
+            bb.strip();
+            string stripped_bytes = save_to_string(bb);
+
+            // Unchanged, they load, so the refusals below are the changes' doing
+            ErrorCapture log;
+            BinBundle target = new_bundle();
+            for (const string &b : { bytes, stripped_bytes }) {
+                ASSERT_EQ(string(), log.load_error(target, b));
+                ASSERT_EQ(string(), log.load_error(target, rebuild_bin_bundle(b, {})));
+            }
+
+            // Not stripped, with every polynomial emptied, so that the largest number of
+            // coefficients of a matching polynomial is zero
+            BinBundleChanges c;
+            c.empty_felt_polyns = true;
+            c.empty_batched_matching_polyn = true;
+            c.empty_first_batched_interp_polyn = true;
+            c.empty_last_batched_interp_polyn = true;
+            string error = log.load_error(target, rebuild_bin_bundle(bytes, c));
+            ASSERT_NE(string::npos, error.find("matching polynomials with no coefficients"))
+                << error;
+
+            // Stripped, whose polynomials are batched only, with an empty matching polynomial
+            c = {};
+            c.empty_batched_matching_polyn = true;
+            error = log.load_error(target, rebuild_bin_bundle(stripped_bytes, c));
+            ASSERT_NE(string::npos, error.find("batched matching polynomial with no coefficients"))
+                << error;
+
+            // Either label part empty, stripped and not. Not stripped, the count of coefficients
+            // is wrong as well.
+            if (label_size) {
+                for (bool first : { true, false }) {
+                    c = {};
+                    if (first) {
+                        c.empty_first_batched_interp_polyn = true;
+                    } else {
+                        c.empty_last_batched_interp_polyn = true;
+                    }
+
+                    error = log.load_error(target, rebuild_bin_bundle(stripped_bytes, c));
+                    ASSERT_NE(
+                        string::npos,
+                        error.find("batched interpolation polynomial with no coefficients"))
+                        << error;
+                    ASSERT_NE(string(), log.load_error(target, rebuild_bin_bundle(bytes, c)));
+                }
+            }
+        }
+    }
+
+    TEST(BinBundleTests, BatchedPlaintextPolynEvalRefusesAnEmptyPolynomial)
+    {
+        // A polynomial without coefficients has no degree to evaluate it to. There are ciphertext
+        // powers enough for a polynomial of up to five coefficients, so the polynomial being empty
+        // is the only thing to refuse.
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+
+        BatchedPlaintextPolyn empty(context);
+        ASSERT_FALSE(empty);
+        vector<Ciphertext> powers(5);
+        MemoryPoolHandle pool = MemoryManager::GetPool();
+        ASSERT_THROW(static_cast<void>(empty.eval(powers, pool)), invalid_argument);
+        ASSERT_THROW(
+            static_cast<void>(empty.eval_patstock(context, powers, 2, pool)), invalid_argument);
     }
 } // namespace APSITests

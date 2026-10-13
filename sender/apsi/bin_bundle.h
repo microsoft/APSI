@@ -88,10 +88,10 @@ namespace apsi::sender {
         {}
 
         /**
-        Evaluates the polynomial on the given ciphertext. We don't compute the powers of the
-        input ciphertext C ourselves. Instead we assume they've been precomputed and accept the
-        powers: (C, C², C³, ...) as input. The number of powers provided MUST be equal to
-        plaintext_polyn_coeffs_.size()-1.
+        Evaluates the polynomial on the given ciphertext. We don't compute the powers of the input
+        ciphertext C ourselves. Instead we assume they've been precomputed and accept the powers:
+        (C, C², C³, ...) as input. The number of powers provided MUST be at least
+        batched_coeffs.size()-1. Throws std::invalid_argument if the polynomial has no coefficients.
         */
         seal::Ciphertext eval(
             const std::vector<seal::Ciphertext> &ciphertext_powers,
@@ -112,6 +112,8 @@ namespace apsi::sender {
 
         Low powers:  C^{1}, ..., C^{l-1}
         High powers: C^{1*l}, ..., C^{l*h}
+
+        Throws std::invalid_argument if the polynomial has no coefficients.
         */
         seal::Ciphertext eval_patstock(
             const CryptoContext &eval_crypto_context,

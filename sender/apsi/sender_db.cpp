@@ -1811,11 +1811,9 @@ namespace apsi {
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
 
-            // Cap bin_bundle_count to a sane upper bound before reserving. Without this, a
-            // malicious DB blob could set bin_bundle_count to (close to) UINT32_MAX and force
-            // a multi-gigabyte reservation just for the outer vector. The legitimate value is
-            // at most a small multiple of bundle_idx_count; cap at 64K * bundle_idx_count
-            // which leaves enormous headroom over realistic configurations.
+            // Cap bin_bundle_count to a sane upper bound before reading any BinBundle. The
+            // legitimate value is at most a small multiple of bundle_idx_count; cap at 64K *
+            // bundle_idx_count which leaves enormous headroom over realistic configurations.
             uint64_t max_bin_bundle_count = mul_safe<uint64_t>(
                 static_cast<uint64_t>(params->bundle_idx_count()), static_cast<uint64_t>(65536));
             if (bin_bundle_count > max_bin_bundle_count) {
@@ -1833,11 +1831,22 @@ namespace apsi {
             size_t label_size =
                 compute_label_part_count(label_byte_count, nonce_byte_count, *params);
 
-            // Load all BinBundle data
+            // Load all BinBundle data. The count comes from the file, so nothing is reserved for
+            // it: the vector grows only as BinBundles are actually read. A file that ends early is
+            // reported at the first BinBundle missing from it.
             vector<vector<unsigned char>> bin_bundle_data;
-            bin_bundle_data.reserve(bin_bundle_count);
-            while (bin_bundle_count--) {
-                bin_bundle_data.push_back(read_from_stream(in));
+            for (uint32_t bb_idx = 0; bb_idx < bin_bundle_count; bb_idx++) {
+                try {
+                    bin_bundle_data.push_back(read_from_stream(in));
+                } catch (const runtime_error &ex) {
+                    APSI_LOG_ERROR(
+                        "Failed to read BinBundle " << bb_idx + 1 << " of the " << bin_bundle_count
+                                                    << " the SenderDB declares: " << ex.what());
+                    if (in.eof()) {
+                        throw runtime_error("failed to load SenderDB: the data is truncated");
+                    }
+                    throw runtime_error("failed to load SenderDB");
+                }
             }
 
             // Use multiple threads to recreate the BinBundles

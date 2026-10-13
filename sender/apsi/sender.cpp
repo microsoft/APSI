@@ -422,15 +422,29 @@ namespace apsi {
             rp->nonce_byte_count = safe_cast<uint32_t>(sender_db->get_nonce_byte_count());
             rp->label_byte_count = safe_cast<uint32_t>(sender_db->get_label_byte_count());
 
-            // Determine if we use Paterson-Stockmeyer or not
+            // Paterson-Stockmeyer is used for a polynomial of degree greater than ps_low_degree, if
+            // ps_low_degree is greater than 1
             uint32_t ps_low_degree = sender_db->get_params().query_params().ps_low_degree;
+
+            // The degree of a cached polynomial. BinBundle::load refuses a polynomial without
+            // coefficients, and generating a cache never makes one, but should one get here, it is
+            // refused rather than given a degree that wraps around.
+            auto get_degree = [bundle_idx](const BatchedPlaintextPolyn &polyn) {
+                if (!polyn) {
+                    APSI_LOG_ERROR(
+                        "Failed to process query request: a bin bundle cache at bundle index "
+                        << bundle_idx << " holds a polynomial with no coefficients");
+                    throw logic_error("bin bundle cache holds a polynomial with no coefficients");
+                }
+                return safe_cast<uint32_t>(polyn.batched_coeffs.size()) - 1;
+            };
 
             // Compute the matching result and move to rp. With match tags there is no matching
             // polynomial and no PSI result: the tag parts, which come first among the label
             // parts, are what the receiver matches on.
             if (!sender_db->get_params().uses_tags()) {
                 const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
-                uint32_t degree = safe_cast<uint32_t>(matching_polyn.batched_coeffs.size()) - 1;
+                uint32_t degree = get_degree(matching_polyn);
                 bool using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
                 if (using_ps) {
                     rp->psi_result = matching_polyn.eval_patstock(
@@ -445,7 +459,7 @@ namespace apsi {
 
             for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
                 // Compute the label result and move to rp
-                uint32_t degree = safe_cast<uint32_t>(interp_polyn.batched_coeffs.size()) - 1;
+                uint32_t degree = get_degree(interp_polyn);
                 bool using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
                 if (using_ps) {
                     rp->label_result.emplace_back(interp_polyn.eval_patstock(

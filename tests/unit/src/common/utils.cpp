@@ -6,8 +6,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -188,6 +190,79 @@ namespace APSITests {
         ASSERT_EQ(compare.size() - sizeof(uint32_t), bytes.size());
         compare.erase(compare.begin(), compare.begin() + sizeof(uint32_t));
         compare_up_to(compare, bytes, bytes.size());
+    }
+
+    TEST(UtilsTests, ReadFromStreamSizePrefixedRefusesTruncatedInput)
+    {
+        uint32_t size = 100;
+        string buffer(reinterpret_cast<const char *>(&size), sizeof(size));
+        buffer += string(size, '\x5A');
+
+        auto read_error = [](const string &in) {
+            stringstream ss(in);
+            try {
+                (void)read_from_stream(ss);
+            } catch (const runtime_error &ex) {
+                return string(ex.what());
+            }
+            return string();
+        };
+
+        // The whole buffer, and then nothing more
+        stringstream ss(buffer);
+        ASSERT_EQ(buffer.size(), read_from_stream(ss).size());
+        ASSERT_THROW((void)read_from_stream(ss), runtime_error);
+
+        // A stream that ends before the size prefix has been read in full, even after bytes that
+        // would read as a size of zero
+        for (const string &in :
+             { string(), buffer.substr(0, 1), buffer.substr(0, 3), string(3, 0) }) {
+            SCOPED_TRACE(in.size());
+            ASSERT_EQ(
+                string("read_from_stream: size prefix is missing or truncated"), read_error(in));
+        }
+
+        // A stream that ends before the bytes the size prefix announces have been read in full
+        for (size_t length = sizeof(size); length < buffer.size(); length++) {
+            SCOPED_TRACE(length);
+            ASSERT_EQ(
+                string("read_from_stream: truncated input"), read_error(buffer.substr(0, length)));
+        }
+
+        // A stream that has already failed
+        stringstream failed(buffer);
+        failed.setstate(ios_base::failbit);
+        ASSERT_THROW((void)read_from_stream(failed), runtime_error);
+
+        // A size prefix of zero announces an empty buffer, which is not an error
+        uint32_t zero = 0;
+        stringstream empty(string(reinterpret_cast<const char *>(&zero), sizeof(zero)));
+        ASSERT_EQ(sizeof(zero), read_from_stream(empty).size());
+    }
+
+    TEST(UtilsTests, ReadFromStreamSizePrefixedRefusesTooLargeASize)
+    {
+        // A size prefix is accepted only if the buffer it announces, with the prefix, is smaller
+        // than FLATBUFFERS_MAX_BUFFER_SIZE, which is INT32_MAX, so that a peer cannot make the
+        // receiver allocate more. The stream ends right after the prefix, so that a size that is
+        // accepted fails as soon as its bytes are read, having allocated only the first 1 KiB.
+        auto read_error = [](uint32_t size) {
+            stringstream ss(string(reinterpret_cast<const char *>(&size), sizeof(size)));
+            try {
+                (void)read_from_stream(ss);
+            } catch (const runtime_error &ex) {
+                return string(ex.what());
+            }
+            return string();
+        };
+
+        auto int32_max = static_cast<uint32_t>(numeric_limits<int32_t>::max());
+        ASSERT_EQ(string("read_from_stream: truncated input"), read_error(int32_max - 5));
+        for (uint32_t size : { int32_max - 4, int32_max, numeric_limits<uint32_t>::max() }) {
+            SCOPED_TRACE(size);
+            ASSERT_EQ(
+                string("read_from_stream: size prefix exceeds maximum allowed"), read_error(size));
+        }
     }
 
     TEST(UtilsTests, XorBuffers)

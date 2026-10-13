@@ -919,6 +919,155 @@ namespace APSITests {
         ASSERT_THROW((void)SenderDB::Load(ss), runtime_error);
     }
 
+    namespace {
+        /**
+        Returns the size of the size-prefixed buffer at the given offset of saved, including the
+        size prefix.
+        */
+        size_t prefixed_size_at(const string &saved, size_t offset)
+        {
+            uint32_t size = 0;
+            memcpy(&size, saved.data() + offset, sizeof(size));
+            return sizeof(size) + size;
+        }
+
+        /**
+        Returns the header of a saved SenderDB, rebuilt to declare the given number of bin
+        bundles.
+        */
+        string header_declaring(const string &saved, uint32_t bin_bundle_count)
+        {
+            const auto *header = fbs::GetSizePrefixedSenderDB(saved.data());
+
+            flatbuffers::FlatBufferBuilder builder(1024);
+            auto params = builder.CreateVector(header->params()->data(), header->params()->size());
+            auto oprf_key =
+                builder.CreateVector(header->oprf_key()->data(), header->oprf_key()->size());
+            vector<fbs::HashedItem> hashed_items;
+            for (const auto *hashed_item : *header->hashed_items()) {
+                hashed_items.push_back(*hashed_item);
+            }
+            auto hashed_items_vec = builder.CreateVectorOfStructs(hashed_items);
+            fbs::SenderDBBuilder sender_db_builder(builder);
+            sender_db_builder.add_params(params);
+            sender_db_builder.add_info(header->info());
+            sender_db_builder.add_oprf_key(oprf_key);
+            sender_db_builder.add_hashed_items(hashed_items_vec);
+            sender_db_builder.add_bin_bundle_count(bin_bundle_count);
+            builder.FinishSizePrefixed(sender_db_builder.Finish());
+
+            return { reinterpret_cast<const char *>(builder.GetBufferPointer()),
+                     builder.GetSize() };
+        }
+
+        /**
+        Returns the message of the std::runtime_error SenderDB::Load throws for the given data, or
+        an empty string if it throws none.
+        */
+        string load_error(const string &data)
+        {
+            stringstream ss(data);
+            try {
+                (void)SenderDB::Load(ss);
+            } catch (const runtime_error &ex) {
+                return ex.what();
+            }
+            return {};
+        }
+    } // namespace
+
+    TEST(SenderDBTests, LoadRefusesTruncatedData)
+    {
+        // A saved SenderDB is a size-prefixed header followed by a size-prefixed buffer for each
+        // bin bundle. Cut short anywhere, it must be refused, and at the point where it was cut
+        // rather than after reading on for the bin bundles it still declares.
+        PSIParams params = with_shallow_bins(*get_params1(), 3);
+        SenderDB sender_db(params, fixed_oprf_key(), 20, 16, true);
+        for (uint64_t val = 0; sender_db.get_bin_bundle_count() < 2; val++) {
+            sender_db.insert_or_assign(
+                { Item(val, ~val), create_label(static_cast<unsigned char>(val), 20) });
+        }
+
+        stringstream ss;
+        sender_db.save(ss);
+        string saved = ss.str();
+        ASSERT_EQ(string(), load_error(saved));
+
+        size_t header_end = prefixed_size_at(saved, 0);
+        size_t first_bin_bundle_end = header_end + prefixed_size_at(saved, header_end);
+        ASSERT_LT(first_bin_bundle_end, saved.size());
+
+        // Inside the header: in its size prefix, and after it
+        vector<size_t> header_cuts{ 0, 1, 3, 4, header_end - 1 };
+        for (size_t cut : header_cuts) {
+            SCOPED_TRACE(cut);
+            ASSERT_EQ(size_t(0), load_error(saved.substr(0, cut)).find("read_from_stream: "));
+        }
+
+        // After the header, which declares how many bin bundles follow: right after it, in the
+        // size prefix of the first bin bundle and right after it, inside the first bin bundle,
+        // between the first two, and inside the last one
+        for (size_t cut : { header_end,
+                            header_end + 1,
+                            header_end + 2,
+                            header_end + 3,
+                            header_end + 4,
+                            (header_end + first_bin_bundle_end) / 2,
+                            first_bin_bundle_end,
+                            saved.size() - 1 }) {
+            SCOPED_TRACE(cut);
+            ASSERT_EQ(
+                string("failed to load SenderDB: the data is truncated"),
+                load_error(saved.substr(0, cut)));
+        }
+    }
+
+    TEST(SenderDBTests, LoadRefusesDataEndingBeforeTheBinBundlesItDeclares)
+    {
+        // A header declaring as many bin bundles as Load accepts for its parameters, over a
+        // million, with nothing after it. Load must not set memory aside for bin bundles that are
+        // not there, nor go on reading once the first is missing.
+        PSIParams::TableParams table_params = get_params1()->table_params();
+        table_params.table_size = 16 * get_params1()->items_per_bundle();
+        PSIParams params(
+            get_params1()->item_params(),
+            table_params,
+            get_params1()->query_params(),
+            get_params1()->seal_params());
+        ASSERT_EQ(uint32_t(16), params.bundle_idx_count());
+
+        SenderDB sender_db(params, 0);
+        stringstream ss;
+        sender_db.save(ss);
+        uint32_t declared = params.bundle_idx_count() * 65536;
+
+        auto start = chrono::steady_clock::now();
+        ASSERT_EQ(
+            string("failed to load SenderDB: the data is truncated"),
+            load_error(header_declaring(ss.str(), declared)));
+
+        // The bound is loose on purpose: it only catches a pathological regression, not a slow
+        // machine
+        ASSERT_LT(chrono::steady_clock::now() - start, 30s);
+
+        // One more is more than Load accepts, and is refused before any bin bundle is read
+        ASSERT_EQ(
+            string("failed to load SenderDB"),
+            load_error(header_declaring(ss.str(), declared + 1)));
+    }
+
+    TEST(SenderDBTests, LoadRefusesABinBundleSizeLargerThanAnyBuffer)
+    {
+        // A size prefix that no buffer can have is refused as it is read, like a truncated one,
+        // but the data is not reported as truncated
+        SenderDB sender_db(*get_params1(), 0);
+        stringstream ss;
+        sender_db.save(ss);
+        string data = header_declaring(ss.str(), 1) + string(sizeof(uint32_t), '\xFF');
+
+        ASSERT_EQ(string("failed to load SenderDB"), load_error(data));
+    }
+
     TEST(SenderDBTests, SaveLoadUnlabeled)
     {
         auto test_fun = [](const shared_ptr<PSIParams> &params) {

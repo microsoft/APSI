@@ -103,14 +103,17 @@ namespace apsi::util {
     This function reads a given number of bytes from a stream in small parts, writing the result
     to the end of a given vector. This can avoid issues where a large number of bytes is
     requested incorrectly to be read from a stream, causing a larger than necessary memory
-    allocation.
+    allocation. Throws std::runtime_error if the stream ends before byte_count bytes have been
+    read.
     */
     void read_from_stream(
         std::istream &in, std::uint32_t byte_count, std::vector<unsigned char> &destination);
 
     /**
     This function reads a size-prefixed number of bytes from a stream and returns the result in
-    a vector.
+    a vector. Throws std::runtime_error if the stream ends before the size prefix or the bytes
+    it announces have been read in full, or if the bytes with their size prefix would make a
+    larger buffer than the FlatBuffers verifier accepts.
     */
     std::vector<unsigned char> read_from_stream(std::istream &in);
 

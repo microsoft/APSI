@@ -3,9 +3,12 @@
 
 // STD
 #include <chrono>
+#include <cstdint>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 // SEAL
 #include "seal/keygenerator.h"
@@ -268,6 +271,54 @@ namespace APSITests {
         unique_ptr<ZMQSenderOperation> honest;
         ASSERT_NO_THROW(
             honest = svr.receive_network_operation(get_context()->seal_context(), true));
+        ASSERT_NE(nullptr, honest);
+        ASSERT_EQ(SenderOperationType::sop_parms, honest->sop->type());
+    }
+
+    TEST_F(ZMQChannelTests, FramesTooShortForASizePrefixAreReportedAsFailure)
+    {
+        // Each frame is read as a size-prefixed buffer. A frame that ends before its size prefix
+        // does holds no message, even if the bytes it holds would read as a size of zero, and is
+        // reported like any other unreadable message.
+        ZMQSenderChannel svr;
+        svr.bind(any_port_bind_address());
+
+        zmq::context_t ctx;
+        zmq::socket_t peer(ctx, zmq::socket_type::dealer);
+        peer.set(zmq::sockopt::linger, 0);
+        peer.connect(connect_address(svr));
+
+        SenderOperationHeader header;
+        header.type = SenderOperationType::sop_parms;
+        stringstream header_ss;
+        header.save(header_ss);
+
+        // An empty or short header, and a valid header with an empty or short operation
+        vector<vector<string>> messages{ { "", "" },
+                                         { string(2, '\0'), "" },
+                                         { header_ss.str(), "" },
+                                         { header_ss.str(), string(3, '\0') } };
+        for (const auto &frames : messages) {
+            zmq::multipart_t msg;
+            for (const auto &frame : frames) {
+                msg.addstr(frame);
+            }
+            ASSERT_TRUE(msg.send(peer));
+
+            uint64_t failures = svr.receive_failure_count();
+            unique_ptr<ZMQSenderOperation> nsop;
+            ASSERT_NO_THROW(nsop = receive_operation_in_time(svr));
+            ASSERT_EQ(nullptr, nsop);
+            ASSERT_EQ(failures + 1, svr.receive_failure_count());
+        }
+
+        // The channel goes on serving
+        ZMQReceiverChannel clt;
+        clt.connect(connect_address(svr));
+        clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
+
+        unique_ptr<ZMQSenderOperation> honest;
+        ASSERT_NO_THROW(honest = receive_operation_in_time(svr));
         ASSERT_NE(nullptr, honest);
         ASSERT_EQ(SenderOperationType::sop_parms, honest->sop->type());
     }

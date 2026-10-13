@@ -2,6 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
+#include <cstdint>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
@@ -509,6 +511,48 @@ namespace APSITests {
         // will make this call succeed.
         ASSERT_EQ(nullptr, clt.receive_result(nullptr));
         ASSERT_TRUE(clt.receive_failed());
+    }
+
+    TEST_F(StreamChannelTests, StreamThatHasEndedIsReportedAsFailure)
+    {
+        // Every message begins with a size prefix. A stream that ends before one has been read in
+        // full holds no message, even if the bytes it does hold would read as a size of zero, and
+        // a stream does not resume once it has ended. Every receive returns nullptr and records a
+        // failure, every time it is called.
+        for (const string &data : { string(), string(2, '\0'), string(3, '\x7F') }) {
+            SCOPED_TRACE(data.size());
+
+            auto expect_failure = [](Channel &chl, const auto &receive) {
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    uint64_t failures = chl.receive_failure_count();
+                    ASSERT_EQ(nullptr, receive());
+                    ASSERT_EQ(failures + 1, chl.receive_failure_count());
+                }
+            };
+
+            stringstream in(data);
+            stringstream out;
+            StreamChannel chl(in, out);
+            ASSERT_NO_FATAL_FAILURE(expect_failure(
+                chl, [&] { return chl.receive_operation(get_context()->seal_context()); }));
+
+            in.clear();
+            in.str(data);
+            ASSERT_NO_FATAL_FAILURE(expect_failure(chl, [&] { return chl.receive_response(); }));
+
+            in.clear();
+            in.str(data);
+            ASSERT_NO_FATAL_FAILURE(expect_failure(
+                chl, [&] { return chl.receive_result(get_context()->seal_context()); }));
+
+            in.clear();
+            in.str(data);
+            ASSERT_NO_FATAL_FAILURE(expect_failure(chl, [&] {
+                return chl.receive_result_for(get_context()->seal_context(), *get_params());
+            }));
+
+            ASSERT_TRUE(out.str().empty());
+        }
     }
 
     TEST_F(StreamChannelTests, SendingToAStreamThatCannotTakeItFails)

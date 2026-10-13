@@ -532,7 +532,8 @@ namespace apsi::network {
         }
 
         // The FlatBuffers verifier asserts that a buffer is smaller than
-        // FLATBUFFERS_MAX_BUFFER_SIZE, so one that is not is refused before it is verified
+        // FLATBUFFERS_MAX_BUFFER_SIZE, so one that is not is refused before it is verified, as
+        // read_from_stream refuses it
         if (prefixed_size >=
             static_cast<size_t>(FLATBUFFERS_MAX_BUFFER_SIZE) - sizeof(prefixed_size)) {
             throw runtime_error("failed to load SenderOperation: buffer is too large");

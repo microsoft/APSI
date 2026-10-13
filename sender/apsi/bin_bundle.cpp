@@ -170,6 +170,11 @@ namespace apsi {
         Ciphertext BatchedPlaintextPolyn::eval(
             const vector<Ciphertext> &ciphertext_powers, MemoryPoolHandle &pool) const
         {
+            // We need at least the constant coefficient, which is added below
+            if (batched_coeffs.empty()) {
+                throw invalid_argument("batched_coeffs cannot be empty");
+            }
+
             // We need to have enough ciphertext powers to evaluate this polynomial
             if (ciphertext_powers.size() < max<size_t>(batched_coeffs.size(), 2)) {
                 throw invalid_argument("not enough ciphertext powers available");
@@ -245,6 +250,11 @@ namespace apsi {
             size_t ps_low_degree,
             MemoryPoolHandle &pool) const
         {
+            // We need at least the constant coefficient, or the degree below would wrap around
+            if (batched_coeffs.empty()) {
+                throw invalid_argument("batched_coeffs cannot be empty");
+            }
+
             // We need to have enough ciphertext powers to evaluate this polynomial
             if (ciphertext_powers.size() < max<size_t>(batched_coeffs.size(), 2)) {
                 throw invalid_argument("not enough ciphertext powers available");
@@ -1696,8 +1706,17 @@ namespace apsi {
 
         pair<uint32_t, size_t> BinBundle::load(gsl::span<const unsigned char> in)
         {
+            // A BinBundle holds a table for every bin of every label part, and once more in its
+            // cache, which with long labels and many bins comes to more than the 1,000,000 tables
+            // the verifier allows by default. Every table takes at least four bytes, so allowing
+            // one for every four bytes of the buffer still bounds the verifier's work by the size
+            // of the buffer.
+            flatbuffers::Verifier::Options verifier_options;
+            verifier_options.max_tables = max<flatbuffers::uoffset_t>(
+                verifier_options.max_tables,
+                safe_cast<flatbuffers::uoffset_t>(in.size() / sizeof(flatbuffers::uoffset_t)));
             auto verifier = flatbuffers::Verifier(
-                reinterpret_cast<const unsigned char *>(in.data()), in.size());
+                reinterpret_cast<const unsigned char *>(in.data()), in.size(), verifier_options);
             bool safe = fbs::VerifySizePrefixedBinBundleBuffer(verifier);
             if (!safe) {
                 APSI_LOG_ERROR("Failed to load BinBundle: the buffer is invalid");
@@ -1956,8 +1975,19 @@ namespace apsi {
                         throw runtime_error("failed to load BinBundle");
                     }
 
+                    // Nor can it be zero unless the BinBundle is stripped, as every matching
+                    // polynomial has at least one coefficient
+                    if (!stripped_ && !max_coeff_count) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains matching polynomials with no "
+                            "coefficients");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
                     // Each "column" of coefficients is batched into a single plaintext, so check
-                    // that the number of plaintexts actually matches max_coeff_count.
+                    // that the number of plaintexts actually matches max_coeff_count. A query
+                    // evaluates the batched matching polynomial, so a stripped BinBundle must give
+                    // it at least one coefficient as well.
                     const auto &batched_matching_polyn = *cache.batched_matching_polyn()->coeffs();
                     if (!stripped_ && (batched_matching_polyn.size() != max_coeff_count)) {
                         APSI_LOG_ERROR(
@@ -1973,6 +2003,12 @@ namespace apsi {
                             << batched_matching_polyn.size()
                             << ") batched matching polynomial coefficients (maximum is "
                             << max_bin_size_ << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+                    if (stripped_ && !batched_matching_polyn.size()) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains a batched matching polynomial "
+                            "with no coefficients");
                         throw runtime_error("failed to load BinBundle");
                     }
 
@@ -2141,17 +2177,18 @@ namespace apsi {
                         throw runtime_error("failed to load BinBundle");
                     }
 
-                    // A query is answered from these polynomials alone when there are match tags,
-                    // so a stripped BinBundle must give each of them at least one coefficient,
-                    // and the same number for all of them, as every label polynomial of a bin has
-                    // the same number of coefficients.
+                    // A query evaluates each of these polynomials, so each must have at least one
+                    // coefficient, as every label polynomial does. With match tags a query is
+                    // answered from them alone, so a stripped BinBundle must also give them all the
+                    // same number, as every label polynomial of a bin has the same number of
+                    // coefficients.
+                    if (!batched_interp_polyn_coeff_count) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains a batched interpolation "
+                            "polynomial with no coefficients");
+                        throw runtime_error("failed to load BinBundle");
+                    }
                     if (uses_tags() && stripped_) {
-                        if (!batched_interp_polyn_coeff_count) {
-                            APSI_LOG_ERROR(
-                                "The loaded BinBundle cache contains a batched interpolation "
-                                "polynomial with no coefficients");
-                            throw runtime_error("failed to load BinBundle");
-                        }
                         if (label_idx == 0) {
                             stripped_coeff_count = batched_interp_polyn_coeff_count;
                         } else if (batched_interp_polyn_coeff_count != stripped_coeff_count) {
