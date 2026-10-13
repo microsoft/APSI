@@ -3720,6 +3720,120 @@ namespace APSITests {
         test_fun(get_params_with_data_prime(60), 1, 0, true, true);
     }
 
+    TEST(BinBundleTests, SaveWithAComprModeSavesEveryPlaintextInIt)
+    {
+        // Saved with a compression mode, a BinBundle writes every plaintext of its cache loaded and
+        // saved again in that mode, and does not change. It loads with the same items, labels and
+        // polynomials, and with the same plaintexts, all in that mode, stripped or not, with and
+        // without labels and Paterson-Stockmeyer, whether the plaintexts are held bit-packed or
+        // uncompressed. A mode Microsoft SEAL does not support is refused before anything is
+        // written.
+        auto test_fun = [](const shared_ptr<PSIParams> &params,
+                           size_t label_size,
+                           size_t ps_low_degree,
+                           bool compressed) {
+            CryptoContext context(*params);
+            context.set_evaluator();
+            const auto &first_parms = context.seal_context()->first_context_data()->parms();
+            int prime_bits = first_parms.coeff_modulus()[0].bit_count();
+            SCOPED_TRACE(
+                to_string(prime_bits) + "-bit prime, label_size " + to_string(label_size) +
+                ", ps_low_degree " + to_string(ps_low_degree) +
+                (compressed ? ", compressed" : ", uncompressed"));
+
+            auto new_bundle = [&] {
+                return BinBundle(
+                    context,
+                    label_size,
+                    params->table_params().max_items_per_bin,
+                    ps_low_degree,
+                    params->bins_per_bundle(),
+                    compressed,
+                    false);
+            };
+
+            // Every plaintext of the cache, saved uncompressed, and the mode it is held in
+            auto plaintexts_of = [&](const BinBundle &bb) {
+                const BinBundleCache &cache = bb.get_cache();
+                vector<const BatchedPlaintextPolyn *> polyns{ &cache.batched_matching_polyn };
+                for (const auto &bip : cache.batched_interp_polyns) {
+                    polyns.push_back(&bip);
+                }
+
+                vector<vector<unsigned char>> plaintexts;
+                vector<compr_mode_type> modes;
+                for (const BatchedPlaintextPolyn *polyn : polyns) {
+                    for (const auto &data : polyn->batched_coeffs) {
+                        plaintexts.push_back(resaved_uncompressed(context, data));
+                    }
+                    vector<compr_mode_type> polyn_modes = stored_compr_modes(*polyn);
+                    modes.insert(modes.end(), polyn_modes.begin(), polyn_modes.end());
+                }
+                return make_pair(plaintexts, modes);
+            };
+
+            BinBundle bb = new_bundle();
+            for (felt_t i = 0; i < 12; i++) {
+                size_t bin = static_cast<size_t>(i % 3);
+                if (label_size) {
+                    ASSERT_LT(0, bb.multi_insert_for_real(AlgItemLabel{ { 100 + i, { i } } }, bin));
+                } else {
+                    ASSERT_LT(0, bb.multi_insert_for_real(vector<felt_t>{ 100 + i }, bin));
+                }
+            }
+            bb.regen_cache();
+
+            for (bool strip : { false, true }) {
+                if (strip) {
+                    bb.strip();
+                }
+                string held = save_to_string(bb);
+                vector<vector<unsigned char>> expected = plaintexts_of(bb).first;
+                ASSERT_FALSE(expected.empty());
+
+                for (uint8_t value = 0; value < 4; value++) {
+                    auto mode = static_cast<compr_mode_type>(value);
+                    if (!Serialization::IsSupportedComprMode(mode)) {
+                        continue;
+                    }
+
+                    stringstream ss;
+                    size_t save_size = bb.save(ss, 7, mode);
+                    ASSERT_EQ(ss.str().size(), save_size);
+
+                    BinBundle loaded = new_bundle();
+                    ASSERT_EQ(make_pair(uint32_t(7), save_size), loaded.load(ss));
+                    ASSERT_EQ(bb.is_stripped(), loaded.is_stripped());
+                    ASSERT_EQ(bb.get_item_bins(), loaded.get_item_bins());
+                    ASSERT_EQ(bb.get_label_bins(), loaded.get_label_bins());
+                    ASSERT_EQ(
+                        bb.get_cache().felt_matching_polyns,
+                        loaded.get_cache().felt_matching_polyns);
+                    ASSERT_EQ(
+                        bb.get_cache().felt_interp_polyns, loaded.get_cache().felt_interp_polyns);
+
+                    auto [plaintexts, modes] = plaintexts_of(loaded);
+                    ASSERT_EQ(expected, plaintexts);
+                    ASSERT_EQ(vector<compr_mode_type>(expected.size(), mode), modes);
+
+                    ASSERT_EQ(held, save_to_string(bb));
+                }
+            }
+
+            stringstream ss;
+            ASSERT_THROW(bb.save(ss, 0, static_cast<compr_mode_type>(4)), invalid_argument);
+            ASSERT_TRUE(ss.str().empty());
+        };
+
+        // Two 36-bit primes: compressed, every plaintext is held bit-packed
+        test_fun(get_params1(), 0, 0, true);
+        test_fun(get_params1(), 1, 2, true);
+        test_fun(get_params1(), 1, 0, false);
+
+        // A 60-bit prime: compressed, the plaintexts in NTT form are held uncompressed
+        test_fun(get_params_with_data_prime(60), 1, 2, true);
+    }
+
     namespace {
         /**
         Collects what is logged while it exists about regenerating caches: for how many bins

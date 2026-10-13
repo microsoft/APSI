@@ -368,9 +368,43 @@ namespace apsi::sender {
         }
 
         /**
-        Writes the SenderDB to a stream.
+        How SenderDB::save writes the plaintexts with which the sender answers queries.
+        */
+        enum class PlaintextSaveMode : std::uint8_t {
+            /**
+            As the SenderDB holds them. A compressed SenderDB holds bit-packed plaintexts, which
+            Microsoft SEAL older than 4.6 cannot load.
+            */
+            as_stored,
+
+            /**
+            As APSI 1.x saves them: compressed with Zstandard in a compressed SenderDB, and
+            uncompressed otherwise.
+            */
+            apsi_1x
+        };
+
+        /**
+        Writes the SenderDB to a stream, with its plaintexts as it holds them; see
+        PlaintextSaveMode.
         */
         std::size_t save(std::ostream &out) const;
+
+        /**
+        Writes the SenderDB to a stream, with its plaintexts in the given mode. With
+        PlaintextSaveMode::apsi_1x, every plaintext is saved again as it is written, compressed with
+        Zstandard if the SenderDB is compressed and uncompressed otherwise, while the SenderDB keeps
+        it as it is, so that the SenderDB is written as APSI 1.x writes it. Software built with
+        Microsoft SEAL 4.1 to 4.3 cannot load it even so, as those versions load only objects that
+        record their own version. A compressed SenderDB loaded from such a file holds its plaintexts
+        compressed with Zstandard, which take longer to load for every query.
+
+        Throws std::logic_error for PlaintextSaveMode::apsi_1x if the parameters use match tags,
+        which APSI 1.x cannot use, and std::invalid_argument if the SenderDB is compressed and
+        Microsoft SEAL was built without Zstandard, or if the mode is not a PlaintextSaveMode.
+        Nothing is written then.
+        */
+        std::size_t save(std::ostream &out, PlaintextSaveMode mode) const;
 
         /**
         Reads the SenderDB from a stream.

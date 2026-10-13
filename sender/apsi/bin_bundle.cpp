@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstring>
 #include <optional>
+#include <sstream>
 #include <utility>
 
 // APSI
@@ -198,6 +199,19 @@ namespace apsi {
             }
 
             /**
+            Helper function. Returns the bytes Microsoft SEAL saves a plaintext as in the given
+            compression mode.
+            */
+            vector<unsigned char> save_plaintext(const Plaintext &pt, compr_mode_type compr_mode)
+            {
+                vector<unsigned char> data(safe_cast<size_t>(pt.save_size(compr_mode)));
+                size_t size = static_cast<size_t>(
+                    pt.save(reinterpret_cast<seal_byte *>(data.data()), data.size(), compr_mode));
+                data.resize(size);
+                return data;
+            }
+
+            /**
             Helper function. Saves a plaintext of a BatchedPlaintextPolyn. A compressed one is
             bit-packed if that saves at least an eighth of its size, and is saved uncompressed
             otherwise, as evaluation then reads its coefficients in place, or copies them, rather
@@ -209,23 +223,31 @@ namespace apsi {
             */
             vector<unsigned char> save_plaintext(const Plaintext &pt, bool compressed)
             {
-                auto save = [&pt](compr_mode_type compr_mode) {
-                    vector<unsigned char> data(safe_cast<size_t>(pt.save_size(compr_mode)));
-                    size_t size = static_cast<size_t>(pt.save(
-                        reinterpret_cast<seal_byte *>(data.data()), data.size(), compr_mode));
-                    data.resize(size);
-                    return data;
-                };
-
-                vector<unsigned char> uncompressed = save(compr_mode_type::none);
+                vector<unsigned char> uncompressed = save_plaintext(pt, compr_mode_type::none);
                 if (!compressed) {
                     return uncompressed;
                 }
 
-                vector<unsigned char> packed = save(compr_mode_type::bitpack);
+                vector<unsigned char> packed = save_plaintext(pt, compr_mode_type::bitpack);
                 return packed.size() <= uncompressed.size() - uncompressed.size() / 8
                            ? packed
                            : uncompressed;
+            }
+
+            /**
+            Helper function. Loads the plaintext stored as data, as evaluation loads it, and saves
+            it again in the given compression mode. Every mode keeps a plaintext exactly, so the
+            result is what the original plaintext saves as in that mode.
+            */
+            vector<unsigned char> resave_plaintext(
+                const SEALContext &seal_context,
+                const vector<unsigned char> &data,
+                compr_mode_type compr_mode)
+            {
+                Plaintext pt;
+                pt.unsafe_load(
+                    seal_context, reinterpret_cast<const seal_byte *>(data.data()), data.size());
+                return save_plaintext(pt, compr_mode);
             }
 
             /**
@@ -2273,13 +2295,20 @@ namespace apsi {
 
             flatbuffers::Offset<fbs::BatchedPlaintextPolyn> fbs_create_batched_plaintext_polyn(
                 flatbuffers::FlatBufferBuilder &fbs_builder,
-                const vector<vector<unsigned char>> &polyn)
+                const vector<vector<unsigned char>> &polyn,
+                const SEALContext &seal_context,
+                optional<compr_mode_type> compr_mode)
             {
                 auto polyn_data = fbs_builder.CreateVector([&] {
                     vector<flatbuffers::Offset<fbs::Plaintext>> ret;
                     ret.reserve(polyn.size());
                     for (const auto &coeff : polyn) {
-                        ret.push_back(fbs_create_plaintext(fbs_builder, coeff));
+                        if (compr_mode) {
+                            ret.push_back(fbs_create_plaintext(
+                                fbs_builder, resave_plaintext(seal_context, coeff, *compr_mode)));
+                        } else {
+                            ret.push_back(fbs_create_plaintext(fbs_builder, coeff));
+                        }
                     }
                     return ret;
                 }());
@@ -2289,7 +2318,27 @@ namespace apsi {
 
         size_t BinBundle::save(ostream &out, uint32_t bundle_idx) const
         {
+            return save_internal(out, bundle_idx, nullopt);
+        }
+
+        size_t BinBundle::save(
+            ostream &out, uint32_t bundle_idx, compr_mode_type plaintext_compr_mode) const
+        {
+            if (!Serialization::IsSupportedComprMode(plaintext_compr_mode)) {
+                stringstream ss;
+                ss << "compression mode " << static_cast<int>(plaintext_compr_mode)
+                   << " is not supported by this build of Microsoft SEAL";
+                throw invalid_argument(ss.str());
+            }
+
+            return save_internal(out, bundle_idx, plaintext_compr_mode);
+        }
+
+        size_t BinBundle::save_internal(
+            ostream &out, uint32_t bundle_idx, optional<compr_mode_type> plaintext_compr_mode) const
+        {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
+            auto seal_context = crypto_context_.seal_context();
 
             // Write the items and labels
             auto item_bins = fbs_create_felt_matrix(fbs_builder, item_bins_);
@@ -2312,7 +2361,10 @@ namespace apsi {
                     felt_matching_polyns =
                         fbs_create_felt_matrix(fbs_builder, cache_.felt_matching_polyns);
                     batched_matching_polyn = fbs_create_batched_plaintext_polyn(
-                        fbs_builder, cache_.batched_matching_polyn.batched_coeffs);
+                        fbs_builder,
+                        cache_.batched_matching_polyn.batched_coeffs,
+                        *seal_context,
+                        plaintext_compr_mode);
                 }
 
                 auto felt_interp_polyns = fbs_builder.CreateVector([&] {
@@ -2328,8 +2380,8 @@ namespace apsi {
                     vector<flatbuffers::Offset<fbs::BatchedPlaintextPolyn>> ret;
                     ret.reserve(cache_.batched_interp_polyns.size());
                     for (const auto &bips : cache_.batched_interp_polyns) {
-                        ret.push_back(
-                            fbs_create_batched_plaintext_polyn(fbs_builder, bips.batched_coeffs));
+                        ret.push_back(fbs_create_batched_plaintext_polyn(
+                            fbs_builder, bips.batched_coeffs, *seal_context, plaintext_compr_mode));
                     }
                     return ret;
                 }());

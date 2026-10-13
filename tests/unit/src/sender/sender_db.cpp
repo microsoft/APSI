@@ -23,6 +23,7 @@
 
 // APSI
 #include "apsi/bin_bundle.h"
+#include "apsi/bin_bundle_generated.h"
 #include "apsi/crypto_context.h"
 #include "apsi/log.h"
 #include "apsi/network/stream_channel.h"
@@ -34,6 +35,7 @@
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
 #include "apsi/sender_db_generated.h"
+#include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/match_tag.h"
@@ -43,6 +45,8 @@
 #include "kuku/locfunc.h"
 
 // SEAL
+#include "seal/serialization.h"
+#include "seal/util/blake2.h"
 #include "seal/util/uintarithsmallmod.h"
 
 // Google Test
@@ -1211,6 +1215,305 @@ namespace APSITests {
         test_fun(get_params2());
     }
 
+    namespace {
+        /**
+        Returns the 32 bytes that the given 64 hexadecimal digits spell out.
+        */
+        array<unsigned char, 32> hash_from_hex(const string &hex)
+        {
+            array<unsigned char, 32> hash{};
+            for (size_t i = 0; i < hash.size(); i++) {
+                hash[i] = static_cast<unsigned char>(stoul(hex.substr(2 * i, 2), nullptr, 16));
+            }
+            return hash;
+        }
+
+        /**
+        Returns the saved SenderDB with the records of its hashed_items vector sorted.
+        SenderDB::save writes the hashed items in the iteration order of an std::unordered_set,
+        which differs between standard libraries. The records are 16 bytes each, and FlatBuffers
+        writes them in little-endian order on every platform, so sorting them as bytes moves
+        nothing else and gives the same order everywhere.
+        */
+        string with_sorted_hashed_items(string saved)
+        {
+            using record_type = array<unsigned char, sizeof(fbs::HashedItem)>;
+            static_assert(sizeof(record_type) == 16);
+
+            const auto *hashed_items = fbs::GetSizePrefixedSenderDB(saved.data())->hashed_items();
+            auto offset = static_cast<size_t>(
+                reinterpret_cast<const char *>(hashed_items->data()) - saved.data());
+            vector<record_type> records(hashed_items->size());
+            memcpy(records.data(), saved.data() + offset, records.size() * sizeof(record_type));
+
+            sort(records.begin(), records.end());
+            memcpy(saved.data() + offset, records.data(), records.size() * sizeof(record_type));
+            return saved;
+        }
+
+        /**
+        The parameters of the SenderDB that UncompressedSaveWithoutMatchTagsIsAsInAPSI1x and
+        CompressedSaveForAPSI1xIsAsInAPSI1x save; see the former.
+        */
+        PSIParams create_apsi1x_kat_params()
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = 5;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = 3;
+            table_params.max_items_per_bin = 16;
+            table_params.table_size = 3276;
+
+            PSIParams::QueryParams query_params;
+            query_params.ps_low_degree = 4;
+            query_params.query_powers = { 1, 3, 5 };
+
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(8192);
+            seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
+            seal_params.set_plain_modulus(65537);
+
+            return { item_params, table_params, query_params, seal_params };
+        }
+
+        /**
+        The items and 12-byte labels of the SenderDB that
+        UncompressedSaveWithoutMatchTagsIsAsInAPSI1x and CompressedSaveForAPSI1xIsAsInAPSI1x save.
+        */
+        vector<pair<Item, Label>> create_apsi1x_kat_data()
+        {
+            vector<pair<Item, Label>> data;
+            for (uint64_t i = 0; i < 100; i++) {
+                Label label(12);
+                for (size_t j = 0; j < label.size(); j++) {
+                    label[j] = static_cast<unsigned char>(i + j);
+                }
+                data.emplace_back(Item(i + 1, ~i), std::move(label));
+            }
+            return data;
+        }
+
+        /**
+        Returns the Microsoft SEAL header of every plaintext in the caches of the bin bundles of a
+        saved SenderDB.
+        */
+        vector<Serialization::SEALHeader> saved_plaintext_headers(const string &saved)
+        {
+            stringstream ss(saved);
+            vector<unsigned char> sender_db_data = apsi::util::read_from_stream(ss);
+            uint32_t bin_bundle_count =
+                fbs::GetSizePrefixedSenderDB(sender_db_data.data())->bin_bundle_count();
+
+            vector<Serialization::SEALHeader> headers;
+            auto add_headers = [&](const fbs::BatchedPlaintextPolyn &polyn) {
+                for (const auto *pt : *polyn.coeffs()) {
+                    Serialization::SEALHeader header;
+                    static_cast<void>(Serialization::LoadHeader(
+                        reinterpret_cast<const seal_byte *>(pt->data()->data()),
+                        pt->data()->size(),
+                        header));
+                    headers.push_back(header);
+                }
+            };
+            for (uint32_t i = 0; i < bin_bundle_count; i++) {
+                vector<unsigned char> bin_bundle_data = apsi::util::read_from_stream(ss);
+                const auto *cache = fbs::GetSizePrefixedBinBundle(bin_bundle_data.data())->cache();
+                if (cache->batched_matching_polyn()) {
+                    add_headers(*cache->batched_matching_polyn());
+                }
+                for (const auto *polyn : *cache->batched_interp_polyns()) {
+                    add_headers(*polyn);
+                }
+            }
+
+            return headers;
+        }
+
+        /**
+        Returns a saved SenderDB with every plaintext of its bin bundles saved again in the given
+        compression mode: the SenderDB as it was saved, followed by each of its bin bundles loaded
+        and saved with BinBundle::save in that mode. With seal::compr_mode_type::none, the result
+        does not depend on how the plaintexts were compressed.
+        */
+        string with_plaintexts_in(
+            const string &saved, const PSIParams &params, compr_mode_type compr_mode)
+        {
+            stringstream ss(saved);
+            vector<unsigned char> sender_db_data = apsi::util::read_from_stream(ss);
+            uint32_t bin_bundle_count =
+                fbs::GetSizePrefixedSenderDB(sender_db_data.data())->bin_bundle_count();
+
+            CryptoContext context(params);
+            context.set_evaluator();
+
+            stringstream out;
+            out.write(
+                reinterpret_cast<const char *>(sender_db_data.data()),
+                static_cast<streamsize>(sender_db_data.size()));
+            for (uint32_t i = 0; i < bin_bundle_count; i++) {
+                vector<unsigned char> bin_bundle_data = apsi::util::read_from_stream(ss);
+                const auto *saved_bb = fbs::GetSizePrefixedBinBundle(bin_bundle_data.data());
+                BinBundle bb(
+                    context,
+                    saved_bb->cache()->batched_interp_polyns()->size(),
+                    params.table_params().max_items_per_bin,
+                    params.query_params().ps_low_degree,
+                    params.bins_per_bundle(),
+                    true,
+                    saved_bb->stripped(),
+                    params.tag_part_count());
+                uint32_t bundle_idx = bb.load(bin_bundle_data).first;
+                bb.save(out, bundle_idx, compr_mode);
+            }
+
+            return out.str();
+        }
+    } // namespace
+
+    TEST(SenderDBTests, UncompressedSaveWithoutMatchTagsIsAsInAPSI1x)
+    {
+        // An uncompressed SenderDB without match tags saves exactly as APSI 1.x saves it, so that
+        // either version loads what the other saved. The hash below is the Blake2b-256 of what
+        // APSI 1.1.0's code, built with Microsoft SEAL 4.6, saves for this SenderDB, with its
+        // hashed items sorted: two bin bundles, each with its matching polynomials and two label
+        // parts, with Paterson-Stockmeyer. It saves the same bytes with
+        // SenderDB::PlaintextSaveMode::apsi_1x, and so does an uncompressed SenderDB that holds
+        // bit-packed plaintexts. A version of Microsoft SEAL that saves the parameters or the
+        // plaintexts differently calls for recording the hash again.
+        //
+        // The hashed items are sorted because their order depends on the standard library; see
+        // with_sorted_hashed_items. Nothing else depends on the platform: the parameters and the
+        // plaintexts are saved without compression, the labels have no nonce, which makes
+        // encrypting them deterministic, every bin holds its items in the order they are given,
+        // and every bundle index has a single BinBundle, so the order in which an item's
+        // locations are visited does not matter. The SenderDB is built with one thread and with
+        // several, which must not change what it saves.
+        PSIParams params = create_apsi1x_kat_params();
+        ASSERT_FALSE(params.uses_tags());
+        ASSERT_EQ(2, params.bundle_idx_count());
+
+        vector<pair<Item, Label>> data = create_apsi1x_kat_data();
+
+        array<unsigned char, 32> expected =
+            hash_from_hex("81dee5a89f4b74c8783ce18329f549ad928599bc66e1bccbada8341221543fbb");
+
+        vector<pair<size_t, string>> saved;
+        for (size_t thread_count : { 1U, 4U }) {
+            ThreadPoolMgr::SetThreadCount(thread_count);
+            SenderDB sender_db(params, fixed_oprf_key(), 12, 0, false);
+            sender_db.set_data(data);
+
+            stringstream ss;
+            sender_db.save(ss);
+            saved.emplace_back(
+                sender_db.get_bin_bundle_count(), with_sorted_hashed_items(ss.str()));
+
+            stringstream apsi_1x_ss;
+            sender_db.save(apsi_1x_ss, SenderDB::PlaintextSaveMode::apsi_1x);
+            saved.emplace_back(
+                sender_db.get_bin_bundle_count(), with_sorted_hashed_items(apsi_1x_ss.str()));
+        }
+        ThreadPoolMgr::SetThreadCount(0);
+
+        // An uncompressed SenderDB that holds bit-packed plaintexts
+        stringstream packed_ss(
+            with_plaintexts_in(saved.front().second, params, compr_mode_type::bitpack));
+        SenderDB packed_db = SenderDB::Load(packed_ss).first;
+        ASSERT_FALSE(packed_db.is_compressed());
+        stringstream held_ss;
+        packed_db.save(held_ss);
+        for (const auto &header : saved_plaintext_headers(held_ss.str())) {
+            ASSERT_EQ(compr_mode_type::bitpack, header.compr_mode);
+        }
+
+        stringstream apsi_1x_ss;
+        packed_db.save(apsi_1x_ss, SenderDB::PlaintextSaveMode::apsi_1x);
+        saved.emplace_back(
+            packed_db.get_bin_bundle_count(), with_sorted_hashed_items(apsi_1x_ss.str()));
+
+        for (const auto &[bin_bundle_count, bytes] : saved) {
+            ASSERT_EQ(size_t(2), bin_bundle_count);
+            ASSERT_EQ(size_t(4196680), bytes.size());
+
+            array<unsigned char, 32> hash{};
+            ASSERT_EQ(
+                0, APSI_blake2b(hash.data(), hash.size(), bytes.data(), bytes.size(), nullptr, 0));
+            ASSERT_EQ(expected, hash);
+        }
+    }
+
+#ifdef SEAL_USE_ZSTD
+    TEST(SenderDBTests, CompressedSaveForAPSI1xIsAsInAPSI1x)
+    {
+        // A compressed SenderDB without match tags saved with SenderDB::PlaintextSaveMode::apsi_1x
+        // saves exactly as APSI 1.x saves it, with every plaintext compressed with Zstandard, so
+        // that APSI 1.x, which cannot load bit-packed plaintexts, can answer queries from it. This
+        // is the SenderDB of UncompressedSaveWithoutMatchTagsIsAsInAPSI1x, built compressed. The
+        // first hash below is the Blake2b-256 of what APSI 1.1.0's code saves for it, built with
+        // Microsoft SEAL 4.6.1 and Zstandard 1.5.7, with its hashed items sorted, and the second
+        // that of the same bytes with every plaintext loaded and saved again uncompressed by
+        // with_plaintexts_in. The latter bytes differ from those
+        // UncompressedSaveWithoutMatchTagsIsAsInAPSI1x hashes only in the flag that says that the
+        // SenderDB is compressed.
+        //
+        // The second hash does not depend on Zstandard, and is always compared. The first does:
+        // Zstandard compresses the same data alike within a version, but not across versions, and
+        // 1.5.4 to 1.5.6 compress these plaintexts otherwise than 1.5.7. Should only the first
+        // hash differ, only Zstandard can explain it, and its comparison is skipped. A version of
+        // Microsoft SEAL that saves the plaintexts differently calls for recording both hashes
+        // again.
+        //
+        // The SenderDB is built with one thread and with several, which must not change what it
+        // saves.
+        PSIParams params = create_apsi1x_kat_params();
+        vector<pair<Item, Label>> data = create_apsi1x_kat_data();
+
+        auto blake2b_256 = [](const string &bytes) {
+            array<unsigned char, 32> hash{};
+            if (APSI_blake2b(hash.data(), hash.size(), bytes.data(), bytes.size(), nullptr, 0)) {
+                throw runtime_error("failed to compute Blake2b");
+            }
+            return hash;
+        };
+        array<unsigned char, 32> expected =
+            hash_from_hex("4a874d359fbab6eb06876f867e6126b422db62aa8a85c68ede35052616082471");
+        array<unsigned char, 32> expected_uncompressed =
+            hash_from_hex("7adcbf15dafb8d51efc73fd6dea06358dcda51dce78fa7b49e980cbee7e4ad74");
+
+        vector<string> saved;
+        for (size_t thread_count : { 1U, 4U }) {
+            ThreadPoolMgr::SetThreadCount(thread_count);
+            SenderDB sender_db(params, fixed_oprf_key(), 12, 0, true);
+            sender_db.set_data(data);
+            ASSERT_EQ(size_t(2), sender_db.get_bin_bundle_count());
+
+            stringstream ss;
+            sender_db.save(ss, SenderDB::PlaintextSaveMode::apsi_1x);
+            saved.push_back(with_sorted_hashed_items(ss.str()));
+        }
+        ThreadPoolMgr::SetThreadCount(0);
+        ASSERT_TRUE(saved.front() == saved.back());
+
+        const string &bytes = saved.front();
+        vector<Serialization::SEALHeader> headers = saved_plaintext_headers(bytes);
+        ASSERT_FALSE(headers.empty());
+        for (const auto &header : headers) {
+            ASSERT_EQ(compr_mode_type::zstd, header.compr_mode);
+        }
+
+        string uncompressed = with_plaintexts_in(bytes, params, compr_mode_type::none);
+        ASSERT_EQ(size_t(4196680), uncompressed.size());
+        ASSERT_EQ(expected_uncompressed, blake2b_256(uncompressed));
+
+        // The plaintexts are as recorded, so only Zstandard can explain a difference here
+        if ((bytes.size() != 3595288) || (blake2b_256(bytes) != expected)) {
+            GTEST_SKIP() << "The plaintexts are as recorded, but this version of Zstandard "
+                            "compresses them otherwise than the one the hash was recorded with";
+        }
+    }
+#endif
+
     TEST(SenderDBTests, StripUnlabeled)
     {
         auto test_fun = [](const shared_ptr<PSIParams> &params) {
@@ -2243,6 +2546,29 @@ namespace APSITests {
         }
     }
 
+    TEST(SenderDBTagTests, SaveForAPSI1xIsRefused)
+    {
+        // APSI 1.x cannot use match tags, so a SenderDB with match tags refuses
+        // PlaintextSaveMode::apsi_1x before writing anything, compressed or not, as any SenderDB
+        // refuses a mode that does not exist. Saved with PlaintextSaveMode::as_stored, it loads.
+        PSIParams params = create_tag_params();
+        for (bool compressed : { true, false }) {
+            SenderDB sender_db(params, fixed_oprf_key(), 0, 0, compressed);
+            sender_db.set_data(vector<Item>{ Item(1, 2), Item(3, 4) });
+
+            stringstream ss;
+            ASSERT_THROW(sender_db.save(ss, SenderDB::PlaintextSaveMode::apsi_1x), logic_error);
+            ASSERT_TRUE(ss.str().empty());
+            ASSERT_THROW(
+                sender_db.save(ss, static_cast<SenderDB::PlaintextSaveMode>(2)), invalid_argument);
+            ASSERT_TRUE(ss.str().empty());
+
+            size_t save_size = sender_db.save(ss, SenderDB::PlaintextSaveMode::as_stored);
+            ASSERT_EQ(ss.str().size(), save_size);
+            ASSERT_EQ(sender_db.get_item_count(), SenderDB::Load(ss).first.get_item_count());
+        }
+    }
+
     TEST(SenderDBTagTests, Log2Fpp)
     {
         // With match tags, an item matches a bin bundle wrongly only if the bundle gives its
@@ -2470,6 +2796,31 @@ namespace APSITests {
                 sort(item_labels.begin(), item_labels.end());
             }
             return labels;
+        }
+
+        /**
+        Answers, from the SenderDB, the query that request holds as a StreamChannel sends it, and
+        returns the result packages as the sender's StreamChannel writes them, in sorted order, as
+        the order in which they are sent depends on the threads.
+        */
+        vector<string> answer_query(const shared_ptr<SenderDB> &sender_db, const string &request)
+        {
+            stringstream in(request);
+            stringstream out;
+            network::StreamChannel chl(in, out);
+            Query query(
+                to_query_request(chl.receive_operation(sender_db->get_seal_context())), sender_db);
+            Sender::RunQuery(query, chl);
+
+            network::StreamChannel response_chl(out, out);
+            QueryResponse query_response = to_query_response(response_chl.receive_response());
+            vector<string> packages;
+            for (uint32_t i = 0; i < query_response->package_count; i++) {
+                vector<unsigned char> package = apsi::util::read_from_stream(out);
+                packages.emplace_back(package.begin(), package.end());
+            }
+            sort(packages.begin(), packages.end());
+            return packages;
         }
 
         /**
@@ -2862,6 +3213,164 @@ namespace APSITests {
             }
         }
         ASSERT_LT(size_t(0), updated_count);
+    }
+
+    TEST(SenderDBTests, SaveForAPSI1xLoadsAndAnswersAlike)
+    {
+        // Saved with SenderDB::PlaintextSaveMode::apsi_1x, a SenderDB without match tags writes
+        // every plaintext as APSI 1.x stores it, with a header that Microsoft SEAL 4.0 loads:
+        // compressed with Zstandard if the SenderDB is compressed, and otherwise uncompressed, so
+        // that an uncompressed SenderDB is written as PlaintextSaveMode::as_stored writes it,
+        // which is what SenderDB::save writes. Saving changes nothing in memory. The file loads
+        // into a SenderDB with the same items and labels, which holds the plaintexts as they were
+        // saved and answers a query with the same result packages as the SenderDB that was saved,
+        // and as one loaded from what it saves as stored. This holds compressed or not, labeled or
+        // not, stripped or not, and with Paterson-Stockmeyer. Without Zstandard, a compressed
+        // SenderDB refuses the mode before writing anything.
+        auto test_fun = [](const PSIParams &params,
+                           size_t label_byte_count,
+                           bool compressed,
+                           bool strip) {
+            SCOPED_TRACE(
+                string(compressed ? "compressed" : "uncompressed") + ", label_byte_count " +
+                to_string(label_byte_count) + (strip ? ", stripped" : ""));
+            oprf::OPRFKey key = fixed_oprf_key();
+            auto sender_db = make_shared<SenderDB>(params, key, label_byte_count, 16, compressed);
+
+            vector<pair<Item, Label>> data;
+            vector<Item> items;
+            for (uint64_t i = 0; i < 300; i++) {
+                items.emplace_back(i + 1, ~i);
+                data.emplace_back(
+                    items.back(), create_label(static_cast<unsigned char>(i), label_byte_count));
+            }
+            if (label_byte_count) {
+                sender_db->set_data(data);
+            } else {
+                sender_db->set_data(items);
+            }
+            if (strip) {
+                sender_db->strip();
+            }
+
+#ifdef SEAL_USE_ZSTD
+            compr_mode_type apsi_1x_compr_mode =
+                compressed ? compr_mode_type::zstd : compr_mode_type::none;
+#else
+            if (compressed) {
+                stringstream ss;
+                ASSERT_THROW(
+                    sender_db->save(ss, SenderDB::PlaintextSaveMode::apsi_1x), invalid_argument);
+                ASSERT_TRUE(ss.str().empty());
+                return;
+            }
+            compr_mode_type apsi_1x_compr_mode = compr_mode_type::none;
+#endif
+
+            // PlaintextSaveMode::as_stored writes what SenderDB::save writes
+            stringstream saved_ss;
+            size_t saved_size = sender_db->save(saved_ss);
+            string saved = saved_ss.str();
+
+            stringstream as_stored_ss;
+            ASSERT_EQ(
+                saved_size, sender_db->save(as_stored_ss, SenderDB::PlaintextSaveMode::as_stored));
+            ASSERT_TRUE(saved == as_stored_ss.str());
+
+            // PlaintextSaveMode::apsi_1x writes every plaintext as APSI 1.x stores it, and changes
+            // nothing in memory
+            stringstream apsi_1x_ss;
+            size_t apsi_1x_size = sender_db->save(apsi_1x_ss, SenderDB::PlaintextSaveMode::apsi_1x);
+            ASSERT_EQ(apsi_1x_ss.str().size(), apsi_1x_size);
+            if (!compressed) {
+                ASSERT_TRUE(saved == apsi_1x_ss.str());
+            }
+
+            vector<Serialization::SEALHeader> headers = saved_plaintext_headers(apsi_1x_ss.str());
+            ASSERT_FALSE(headers.empty());
+            ASSERT_EQ(saved_plaintext_headers(saved).size(), headers.size());
+            for (const auto &header : headers) {
+                ASSERT_TRUE(Serialization::IsValidHeader(header));
+                ASSERT_EQ(apsi_1x_compr_mode, header.compr_mode);
+                ASSERT_EQ(4, header.version_major);
+                ASSERT_EQ(0, header.version_minor);
+            }
+
+            stringstream again_ss;
+            sender_db->save(again_ss);
+            ASSERT_TRUE(saved == again_ss.str());
+
+            // The file loads, and the SenderDB loaded keeps the plaintexts as they were saved
+            auto [loaded_db, load_size] = SenderDB::Load(apsi_1x_ss);
+            ASSERT_EQ(apsi_1x_size, load_size);
+            ASSERT_EQ(sender_db->is_compressed(), loaded_db.is_compressed());
+            ASSERT_EQ(sender_db->is_stripped(), loaded_db.is_stripped());
+            ASSERT_EQ(sender_db->get_item_count(), loaded_db.get_item_count());
+            ASSERT_EQ(sender_db->get_hashed_items(), loaded_db.get_hashed_items());
+            ASSERT_EQ(sender_db->get_bin_bundle_count(), loaded_db.get_bin_bundle_count());
+            if (label_byte_count && !strip) {
+                for (const auto &[item, label] : data) {
+                    ASSERT_EQ(label, loaded_db.get_label(item));
+                }
+            }
+
+            stringstream resaved_ss;
+            ASSERT_EQ(apsi_1x_size, loaded_db.save(resaved_ss));
+            for (const auto &header : saved_plaintext_headers(resaved_ss.str())) {
+                ASSERT_EQ(apsi_1x_compr_mode, header.compr_mode);
+            }
+
+            // Two items the SenderDB holds and one it does not
+            vector<Item> query_items{ items[0], items[150], Item(1000, 1000) };
+            vector<HashedItem> hashed_items;
+            LabelKeyVector label_keys;
+            for (const auto &item : query_items) {
+                auto [hashed_item, label_key] = oprf::OPRFSender::GetItemHash(item, key);
+                hashed_items.push_back(hashed_item);
+                label_keys.push_back(label_key);
+            }
+            apsi::receiver::Receiver recv(params);
+            auto [request, itt] = recv.create_query(hashed_items);
+            stringstream request_ss;
+            network::StreamChannel request_chl(request_ss);
+            request_chl.send(std::move(request));
+
+            // The three SenderDBs answer with the same result packages, which find the items
+            vector<string> packages = answer_query(sender_db, request_ss.str());
+            ASSERT_TRUE(
+                packages ==
+                answer_query(
+                    make_shared<SenderDB>(SenderDB::Load(saved_ss).first), request_ss.str()));
+            ASSERT_TRUE(
+                packages ==
+                answer_query(make_shared<SenderDB>(std::move(loaded_db)), request_ss.str()));
+
+            vector<ResultPart> result;
+            for (const auto &package : packages) {
+                stringstream package_ss(package);
+                auto result_part = make_unique<network::ResultPackage>();
+                result_part->load(package_ss, recv.get_seal_context(), params);
+                result.push_back(std::move(result_part));
+            }
+            vector<apsi::receiver::MatchRecord> records =
+                recv.process_result(label_keys, itt, result);
+            ASSERT_TRUE(records[0].found);
+            ASSERT_TRUE(records[1].found);
+            ASSERT_FALSE(records[2].found);
+            if (label_byte_count) {
+                ASSERT_EQ(data[0].second, records[0].label.value());
+                ASSERT_EQ(data[150].second, records[1].label.value());
+            }
+        };
+
+        // Shallow bins keep the noise of the results low enough to decrypt
+        PSIParams params = with_shallow_bins(*get_params1(), 3);
+        test_fun(params, 0, true, false);
+        test_fun(params, 20, true, false);
+        test_fun(params, 20, false, false);
+        test_fun(params, 20, true, true);
+        test_fun(create_apsi1x_kat_params(), 12, true, false);
+        test_fun(create_apsi1x_kat_params(), 12, false, false);
     }
 
     namespace {

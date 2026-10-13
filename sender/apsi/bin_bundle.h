@@ -6,6 +6,7 @@
 // STD
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <vector>
 
 // APSI
@@ -14,6 +15,7 @@
 #include "apsi/util/db_encoding.h"
 
 // SEAL
+#include "seal/serialization.h"
 #include "seal/util/uintarithsmallmod.h"
 #include "seal/util/uintcore.h"
 
@@ -359,6 +361,15 @@ namespace apsi::sender {
         in cache_.
         */
         void regen_plaintexts();
+
+        /**
+        Saves the BinBundle to a stream, with the plaintexts of its cache as it holds them, or
+        saved again in the given compression mode.
+        */
+        std::size_t save_internal(
+            std::ostream &out,
+            std::uint32_t bundle_idx,
+            std::optional<seal::compr_mode_type> plaintext_compr_mode) const;
 
     public:
         /**
@@ -706,6 +717,19 @@ namespace apsi::sender {
         plaintexts, or keeps them uncompressed, where APSI 1.x used Zstandard.
         */
         std::size_t save(std::ostream &out, std::uint32_t bundle_idx) const;
+
+        /**
+        Saves the BinBundle to a stream as the overload without a compression mode does, except
+        that each plaintext of its cache is loaded and saved again in the given compression mode,
+        rather than written as the BinBundle holds it. With seal::compr_mode_type::zstd, a
+        compressed BinBundle without match tags is thus written as APSI 1.x writes it. The
+        BinBundle does not change. Throws std::invalid_argument if Microsoft SEAL does not support
+        the compression mode.
+        */
+        std::size_t save(
+            std::ostream &out,
+            std::uint32_t bundle_idx,
+            seal::compr_mode_type plaintext_compr_mode) const;
 
         /**
         Loads the BinBundle from a buffer. The data must have been saved by a BinBundle of the
