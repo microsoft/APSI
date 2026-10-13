@@ -115,7 +115,10 @@ ECCRYPTO_STATUS decode(const unsigned char* Pencoded, point_t P)
     }
 
     if (sign != (unsigned int)sign_dec) {           // If sign of x-coordinate decoded != input sign bit, then negate x-coordinate
-        fp2neg1271(P->x);
+        // APSI: negate the two components one by one, as fp2neg1271 does. GCC 13 warns that
+        // fp2neg1271(P->x) accesses 32 bytes in a region of 16, although P->x has 32.
+        fpneg1271(P->x[0]);
+        fpneg1271(P->x[1]);
     }
 
     point_setup(P, R);

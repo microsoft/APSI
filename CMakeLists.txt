@@ -347,6 +347,15 @@ elseif(APSI_FOURQ_ARM64 AND UNIX)
     message(STATUS "FourQlib optimization: arch=ARM64")
 else()
     target_compile_options(apsi PRIVATE -D_GENERIC_)
+    # FourQ.h takes the word size from an architecture macro even for the generic arithmetic,
+    # which uses nothing else of it. Where none was set above, set the one for the pointer size.
+    if(NOT APSI_FOURQ_ARM64 AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL x86)
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            target_compile_options(apsi PRIVATE -D_AMD64_)
+        else()
+            target_compile_options(apsi PRIVATE -D_X86_)
+        endif()
+    endif()
     message(STATUS "FourQlib optimization: arch=GENERIC")
 endif()
 

@@ -76,6 +76,7 @@
 
 - The configure step reports whether Microsoft SEAL was built with zlib and Zstandard.
 - `apsi/util/match_tag.h` is installed with the other headers.
+- A build with FourQ's generic field arithmetic, which a target without an optimized implementation uses, gets the word size of its target. `CMakeLists.txt` gave one only to x86-64, ARM64 and a processor named x86, so a generic build for any other target, such as 64-bit RISC-V or 32-bit x86 Linux, stopped with "Unsupported ARCHITECTURE".
 
 ## Version 1.1.0
 
