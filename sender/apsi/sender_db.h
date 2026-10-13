@@ -387,6 +387,13 @@ namespace apsi::sender {
         void generate_caches();
 
         /**
+        Calls generate_caches after an update has failed partway, so that the sender answers
+        queries from what the bin bundles hold rather than refusing them for a stale cache. An
+        exception from generate_caches is dropped, as the caller passes on the update's own.
+        */
+        void generate_caches_after_failure() noexcept;
+
+        /**
         Does the work of insert_or_assign for a labeled SenderDB whose parameters use match tags.
         The caller holds the writer lock and has checked the batch.
         */

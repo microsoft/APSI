@@ -2266,13 +2266,12 @@ namespace APSITests {
 
     namespace {
         /**
-        Returns the SenderDB that sender_db would be if it also held the bin bundles of others,
-        after its own: what an older version of APSI could leave behind when it stored an item a
-        second time on updating the item's label. The others must have been built with the same
-        parameters and OPRF key, and hold only items sender_db holds.
+        Returns the SenderDB with the parameters, OPRF key and item set of header_db, and the bin
+        bundles of each of bundle_dbs in turn, all of which must have been built with the same
+        parameters and OPRF key.
         */
-        SenderDB with_extra_bin_bundles(
-            const SenderDB &sender_db, const vector<const SenderDB *> &others)
+        SenderDB assemble_sender_db(
+            const SenderDB &header_db, const vector<const SenderDB *> &bundle_dbs)
         {
             // A saved SenderDB is a size-prefixed header followed by the bin bundles
             auto saved = [](const SenderDB &db) {
@@ -2286,18 +2285,18 @@ namespace APSITests {
                 return sizeof(size) + size;
             };
 
-            string bytes = saved(sender_db);
+            string bytes = saved(header_db);
             const auto *header = fbs::GetSizePrefixedSenderDB(bytes.data());
-            uint32_t bin_bundle_count = header->bin_bundle_count();
-            string bin_bundles = bytes.substr(header_size(bytes));
-            for (const SenderDB *other : others) {
-                string other_bytes = saved(*other);
+            uint32_t bin_bundle_count = 0;
+            string bin_bundles;
+            for (const SenderDB *bundle_db : bundle_dbs) {
+                string bundle_bytes = saved(*bundle_db);
                 bin_bundle_count +=
-                    fbs::GetSizePrefixedSenderDB(other_bytes.data())->bin_bundle_count();
-                bin_bundles += other_bytes.substr(header_size(other_bytes));
+                    fbs::GetSizePrefixedSenderDB(bundle_bytes.data())->bin_bundle_count();
+                bin_bundles += bundle_bytes.substr(header_size(bundle_bytes));
             }
 
-            // The same header, counting the bin bundles appended
+            // The same header, counting those bin bundles
             flatbuffers::FlatBufferBuilder builder(1024);
             auto params = builder.CreateVector(header->params()->data(), header->params()->size());
             auto oprf_key =
@@ -2321,6 +2320,31 @@ namespace APSITests {
                 static_cast<streamsize>(builder.GetSize()));
             ss << bin_bundles;
             return SenderDB::Load(ss).first;
+        }
+
+        /**
+        Returns the SenderDB that sender_db would be if it also held the bin bundles of others,
+        after its own: what an older version of APSI could leave behind when it stored an item a
+        second time on updating the item's label. The others must have been built with the same
+        parameters and OPRF key, and hold only items sender_db holds.
+        */
+        SenderDB with_extra_bin_bundles(
+            const SenderDB &sender_db, const vector<const SenderDB *> &others)
+        {
+            vector<const SenderDB *> bundle_dbs{ &sender_db };
+            bundle_dbs.insert(bundle_dbs.end(), others.begin(), others.end());
+            return assemble_sender_db(sender_db, bundle_dbs);
+        }
+
+        /**
+        Returns the SenderDB that sender_db would be if its item set were that of other: what an
+        older version of APSI could leave behind when an insertion failed partway, as it recorded
+        the new items before storing them. other must have been built with the same parameters
+        and OPRF key, and hold the items of sender_db and more.
+        */
+        SenderDB with_item_set_of(const SenderDB &sender_db, const SenderDB &other)
+        {
+            return assemble_sender_db(other, { &sender_db });
         }
 
         /**
@@ -2623,5 +2647,178 @@ namespace APSITests {
         // them, which take the same path
         test_fun(with_shallow_bins(*get_params1(), 3));
         test_fun(create_tag_params());
+    }
+
+    namespace {
+        /**
+        Installs a logger whose handler throws for every message, at the levels from debug up,
+        that contains any of the given texts, and restores the global logger and log level when it
+        is destroyed.
+        */
+        class ThrowingLog {
+        public:
+            explicit ThrowingLog(vector<string> texts)
+                : saved_level_(GetLogLevel()), texts_(std::move(texts))
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                for (LogLevel level :
+                     { LogLevel::debug, LogLevel::info, LogLevel::warning, LogLevel::error }) {
+                    log_handlers[static_cast<size_t>(level)] = [this](const string &msg) {
+                        for (const string &text : texts_) {
+                            if (msg.find(text) != string::npos) {
+                                throw runtime_error("the log handler failed");
+                            }
+                        }
+                    };
+                }
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+                SetLogLevel(LogLevel::debug);
+            }
+
+            ~ThrowingLog()
+            {
+                CloseLogger();
+                SetLogLevel(saved_level_);
+            }
+
+            ThrowingLog(const ThrowingLog &) = delete;
+
+            ThrowingLog &operator=(const ThrowingLog &) = delete;
+
+        private:
+            LogLevel saved_level_;
+
+            vector<string> texts_;
+        };
+    } // namespace
+
+    TEST(SenderDBTests, UpdatesCompleteWhenTheyCannotLog)
+    {
+        // Logging allocates and calls the user's handler, either of which can throw. An update
+        // also logs once it has begun to change the BinBundles: its workers once they have changed
+        // those at their bundle index, the preprocessing of the new items once the existing ones
+        // have their new labels, and the regeneration of the caches once the change is recorded
+        // in the item set. A throw there would leave the item set and the BinBundles describing
+        // different databases, or the caches stale. The handler here throws for those messages,
+        // and every update still completes.
+        auto test_fun = [](const PSIParams &params) {
+            oprf::OPRFKey key = fixed_oprf_key();
+            auto sender_db = make_shared<SenderDB>(params, key, 8, 16, true);
+            unordered_map<Item, Label> expected;
+            vector<pair<Item, Label>> data;
+            for (uint64_t i = 0; i < 200; i++) {
+                data.emplace_back(Item(i, ~i), create_label(static_cast<unsigned char>(i), 8));
+                expected[data.back().first] = data.back().second;
+            }
+
+            // New labels for 20 items, 20 new items, and 20 items to remove
+            vector<pair<Item, Label>> update;
+            vector<Item> removed;
+            for (uint64_t i = 0; i < 20; i++) {
+                update.emplace_back(
+                    Item(i, ~i), create_label(static_cast<unsigned char>(200 + i), 8));
+                update.emplace_back(
+                    Item(1000 + i, i), create_label(static_cast<unsigned char>(220 + i), 8));
+                removed.emplace_back(20 + i, ~(20 + i));
+            }
+
+            {
+                ThrowingLog log({ "finished processing bundle index", "preprocessing", "caches" });
+                ASSERT_NO_THROW(sender_db->set_data(data));
+                ASSERT_NO_THROW(sender_db->insert_or_assign(update));
+                ASSERT_NO_THROW(sender_db->remove(removed));
+            }
+
+            vector<Item> queried;
+            for (const auto &item_label : update) {
+                expected[item_label.first] = item_label.second;
+            }
+            for (const auto &item : removed) {
+                expected.erase(item);
+                queried.push_back(item);
+            }
+            ASSERT_EQ(expected.size(), sender_db->get_item_count());
+            for (const auto &[item, label] : expected) {
+                ASSERT_EQ(label, sender_db->get_label(item));
+                queried.push_back(item);
+            }
+
+            vector<vector<Label>> results = query_labels(sender_db, key, queried);
+            for (size_t i = 0; i < queried.size(); i++) {
+                auto where = expected.find(queried[i]);
+                vector<Label> expected_labels;
+                if (where != expected.end()) {
+                    expected_labels.push_back(where->second);
+                }
+                ASSERT_EQ(expected_labels, results[i]) << "item " << i;
+            }
+        };
+
+        test_fun(*get_params1());
+        test_fun(create_tag_params());
+    }
+
+    TEST(SenderDBTests, AnUpdateThatFailsPartwayRegeneratesTheCaches)
+    {
+        // An older version of APSI recorded new items before storing them, so that an insertion
+        // that failed partway could leave, and save, a SenderDB whose item set names an item that
+        // no BinBundle holds. Such a database is put together here. An update that gives that
+        // item and the others new labels fails with std::logic_error, once the workers at the
+        // bundle indices without the item have given the items there their new labels: the
+        // item's three locations are at no more than three of the four bundle indices. The update
+        // regenerates the caches of the BinBundles it changed before passing on the exception, so
+        // the SenderDB still answers a query: each item has its old label or its new one, and
+        // some have the new one.
+        PSIParams::TableParams table_params = get_params1()->table_params();
+        table_params.table_size = 4 * get_params1()->items_per_bundle();
+        PSIParams params(
+            get_params1()->item_params(),
+            table_params,
+            get_params1()->query_params(),
+            get_params1()->seal_params());
+        ASSERT_EQ(uint32_t(4), params.bundle_idx_count());
+        ASSERT_EQ(uint32_t(3), params.table_params().hash_func_count);
+
+        oprf::OPRFKey key = fixed_oprf_key();
+        constexpr size_t label_byte_count = 8;
+        vector<Item> items;
+        vector<pair<Item, Label>> data;
+        vector<pair<Item, Label>> update;
+        for (uint64_t i = 0; i < 100; i++) {
+            items.emplace_back(i, ~i);
+            data.emplace_back(
+                items.back(), create_label(static_cast<unsigned char>(i), label_byte_count));
+            update.emplace_back(
+                items.back(), create_label(static_cast<unsigned char>(100 + i), label_byte_count));
+        }
+        Item unstored(1000, 1000);
+
+        SenderDB stored_db(params, key, label_byte_count, 16, true);
+        stored_db.set_data(data);
+        vector<pair<Item, Label>> recorded = data;
+        recorded.emplace_back(unstored, create_label(200, label_byte_count));
+        SenderDB recorded_db(params, key, label_byte_count, 16, true);
+        recorded_db.set_data(recorded);
+        auto sender_db = make_shared<SenderDB>(with_item_set_of(stored_db, recorded_db));
+        ASSERT_EQ(recorded.size(), sender_db->get_item_count());
+        ASSERT_TRUE(sender_db->has_item(unstored));
+
+        update.emplace_back(unstored, create_label(250, label_byte_count));
+        ASSERT_THROW(sender_db->insert_or_assign(update), logic_error);
+
+        for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+            ASSERT_NO_THROW(auto caches = sender_db->get_cache_at(b)) << "bundle index " << b;
+        }
+        vector<vector<Label>> labels = query_labels(sender_db, key, items);
+        size_t updated_count = 0;
+        for (size_t i = 0; i < items.size(); i++) {
+            ASSERT_EQ(size_t(1), labels[i].size()) << "item " << i;
+            if (labels[i][0] == update[i].second) {
+                updated_count++;
+            } else {
+                ASSERT_EQ(data[i].second, labels[i][0]) << "item " << i;
+            }
+        }
+        ASSERT_LT(size_t(0), updated_count);
     }
 } // namespace APSITests

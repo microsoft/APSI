@@ -12,6 +12,7 @@
 #include "apsi/bin_bundle_generated.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/interpolate.h"
+#include "apsi/util/log_noexcept.h"
 #include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
@@ -72,6 +73,35 @@ namespace apsi {
                 }
 
                 return bin.end();
+            }
+
+            /**
+            Helper function. Makes sure that one more element can be appended to the vector
+            without allocating, growing its capacity geometrically, as push_back would.
+            */
+            template <typename T>
+            void reserve_one_more(vector<T> &v)
+            {
+                if (v.size() == v.capacity()) {
+                    v.reserve(max<size_t>(v.size() + 1, 2 * v.capacity()));
+                }
+            }
+
+            /**
+            Helper function. Logs that the cuckoo filters of refused_count of the bins beginning at
+            start_bin_idx refused an item, once the item is stored. Logging allocates and calls the
+            user's handler, either of which can throw, and an exception would report as failed a
+            change that has been made. The message is dropped instead.
+            */
+            void log_filter_refusals(size_t refused_count, size_t start_bin_idx) noexcept
+            {
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Cuckoo filters for " << refused_count << " of the bins beginning at index "
+                                              << start_bin_idx
+                                              << " refused an item; lookups in those bins now "
+                                                 "search them directly");
+                });
             }
 
             /**
@@ -558,37 +588,47 @@ namespace apsi {
 
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
+                max_bin_size =
+                    std::max(max_bin_size, item_bins_[start_bin_idx + item_idx].size() + 1);
+            }
+            auto new_max_bin_size = safe_cast<int32_t>(max_bin_size);
+
+            if (dry_run) {
+                return new_max_bin_size;
+            }
+
+            // Make room for the item in every bin it goes into before changing any of them. An
+            // allocation that fails then leaves the BinBundle as it was, and nothing below
+            // allocates, so the item is stored in full or not at all.
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
+                reserve_one_more(item_bins_[start_bin_idx + item_idx]);
+            }
+
+            // Store the item at the end of each of its bins. A filter is probabilistic and can
+            // refuse an item while holding fewer than the bin does, when enough of them share a
+            // fingerprint. The item still goes into the bin; the filter records that it no longer
+            // knows everything the bin holds, which is what stops is_present from trusting its
+            // negatives.
+            size_t refused_count = 0;
             size_t curr_bin_idx = start_bin_idx;
             for (felt_t curr_item : items) {
-                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
-
-                // Compare the would-be bin size here to the running max
-                max_bin_size = std::max(max_bin_size, curr_bin.size() + 1);
-
-                // Insert if not dry run
-                if (!dry_run) {
-                    // Insert the new item
-                    // A filter is probabilistic and can refuse an item while holding fewer than
-                    // the bin does, when enough of them share a fingerprint. The item still goes
-                    // into the bin; the filter records that it no longer knows everything the
-                    // bin holds, which is what stops is_present from trusting its negatives.
-                    CuckooFilter &curr_filter = filters_[curr_bin_idx];
-                    if (!curr_filter.add(curr_item)) {
-                        APSI_LOG_DEBUG(
-                            "Cuckoo filter for the bin at index "
-                            << curr_bin_idx << " refused an item with " << curr_bin.size()
-                            << " already in the bin; lookups in this bin now search it directly");
-                    }
-                    curr_bin.push_back(curr_item);
-
-                    // Indicate that the polynomials need to be recomputed
-                    cache_invalid_ = true;
+                if (!filters_[curr_bin_idx].add(curr_item)) {
+                    refused_count++;
                 }
+                item_bins_[curr_bin_idx].push_back(curr_item);
 
                 curr_bin_idx++;
             }
 
-            return safe_cast<int32_t>(max_bin_size);
+            // Indicate that the polynomials need to be recomputed
+            cache_invalid_ = true;
+
+            if (refused_count) {
+                log_filter_refusals(refused_count, start_bin_idx);
+            }
+
+            return new_max_bin_size;
         }
 
         template <>
@@ -659,42 +699,57 @@ namespace apsi {
 
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                max_bin_size =
+                    std::max(max_bin_size, item_bins_[start_bin_idx + item_idx].size() + 1);
+            }
+            auto new_max_bin_size = safe_cast<int32_t>(max_bin_size);
+
+            if (dry_run) {
+                return new_max_bin_size;
+            }
+
+            // Make room for the item in every vector it goes into before changing any of them.
+            // An allocation that fails then leaves the BinBundle as it was, and nothing below
+            // allocates, so the item is stored in full or not at all.
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                size_t reserve_bin_idx = start_bin_idx + item_idx;
+                reserve_one_more(item_bins_[reserve_bin_idx]);
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    reserve_one_more(label_bins_[label_idx][reserve_bin_idx]);
+                }
+            }
+
+            // Store the item and its label parts at the end of each of its bins
+            size_t refused_count = 0;
             size_t curr_bin_idx = start_bin_idx;
             for (const auto &curr_item_label : item_labels) {
                 felt_t curr_item = curr_item_label.first;
-                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
 
-                // Compare the would-be bin size here to the running max
-                max_bin_size = std::max(max_bin_size, curr_bin.size() + 1);
+                // See the unlabeled overload: a refusal is recorded rather than refused, so that
+                // the item and its labels stay in step.
+                if (!filters_[curr_bin_idx].add(curr_item)) {
+                    refused_count++;
+                }
+                item_bins_[curr_bin_idx].push_back(curr_item);
 
-                // Insert if not dry run
-                if (!dry_run) {
-                    // See the unlabeled overload: a refusal is recorded rather than refused, so
-                    // that the item and its labels stay in step.
-                    CuckooFilter &curr_filter = filters_[curr_bin_idx];
-                    if (!curr_filter.add(curr_item)) {
-                        APSI_LOG_DEBUG(
-                            "Cuckoo filter for the bin at index "
-                            << curr_bin_idx << " refused an item with " << curr_bin.size()
-                            << " already in the bin; lookups in this bin now search it directly");
-                    }
-                    curr_bin.push_back(curr_item);
-
-                    // Insert the new label; loop over each label part
-                    for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
-                        // Add this label part to the matching bin
-                        felt_t curr_label = curr_item_label.second[label_idx];
-                        label_bins_[label_idx][curr_bin_idx].push_back(curr_label);
-                    }
-
-                    // Indicate that the polynomials need to be recomputed
-                    cache_invalid_ = true;
+                // Insert the new label; loop over each label part
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    label_bins_[label_idx][curr_bin_idx].push_back(
+                        curr_item_label.second[label_idx]);
                 }
 
                 curr_bin_idx++;
             }
 
-            return safe_cast<int>(max_bin_size);
+            // Indicate that the polynomials need to be recomputed
+            cache_invalid_ = true;
+
+            if (refused_count) {
+                log_filter_refusals(refused_count, start_bin_idx);
+            }
+
+            return new_max_bin_size;
         }
 
         template <>
@@ -957,9 +1012,12 @@ namespace apsi {
                 // is a false positive, and those are checked against the bin.
                 CuckooFilter &curr_filter = filters_[curr_bin_idx];
                 if (!curr_filter.remove(*to_remove_item_it) && !curr_filter.has_dropped_items()) {
-                    APSI_LOG_WARNING(
-                        "Cuckoo filter for the bin at index "
-                        << curr_bin_idx << " held no tag for an item being removed from the bin");
+                    log_noexcept([&] {
+                        APSI_LOG_WARNING(
+                            "Cuckoo filter for the bin at index "
+                            << curr_bin_idx
+                            << " held no tag for an item being removed from the bin");
+                    });
                 }
                 item_bins_[curr_bin_idx].erase(to_remove_item_it);
 
@@ -1093,42 +1151,59 @@ namespace apsi {
 
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                max_bin_size =
+                    std::max(max_bin_size, item_bins_[start_bin_idx + item_idx].size() + 1);
+            }
+            auto new_max_bin_size = safe_cast<int32_t>(max_bin_size);
+
+            if (dry_run) {
+                return new_max_bin_size;
+            }
+
+            // Make room for the item in every vector it goes into before changing any of them.
+            // An allocation that fails then leaves the BinBundle as it was, and nothing below
+            // allocates, so the item is stored in full or not at all.
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                size_t reserve_bin_idx = start_bin_idx + item_idx;
+                reserve_one_more(item_bins_[reserve_bin_idx]);
+                reserve_one_more(hashed_item_bins_[reserve_bin_idx]);
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    reserve_one_more(label_bins_[label_idx][reserve_bin_idx]);
+                }
+            }
+
+            // Store the item, its HashedItem and its label parts at the end of each of its bins
+            size_t refused_count = 0;
             curr_bin_idx = start_bin_idx;
             for (const auto &curr_item_label : item_labels) {
                 felt_t curr_item = curr_item_label.first;
-                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
 
-                // Compare the would-be bin size here to the running max
-                max_bin_size = std::max(max_bin_size, curr_bin.size() + 1);
+                // See the unlabeled overload: a refusal is recorded rather than refused, so that
+                // the item, its labels and its HashedItem stay in step.
+                if (!filters_[curr_bin_idx].add(curr_item)) {
+                    refused_count++;
+                }
+                item_bins_[curr_bin_idx].push_back(curr_item);
+                hashed_item_bins_[curr_bin_idx].push_back(item.item);
 
-                // Insert if not dry run
-                if (!dry_run) {
-                    // See the unlabeled overload: a refusal is recorded rather than refused, so
-                    // that the item, its labels and its HashedItem stay in step.
-                    CuckooFilter &curr_filter = filters_[curr_bin_idx];
-                    if (!curr_filter.add(curr_item)) {
-                        APSI_LOG_DEBUG(
-                            "Cuckoo filter for the bin at index "
-                            << curr_bin_idx << " refused an item with " << curr_bin.size()
-                            << " already in the bin; lookups in this bin now search it directly");
-                    }
-                    curr_bin.push_back(curr_item);
-                    hashed_item_bins_[curr_bin_idx].push_back(item.item);
-
-                    // Insert the new label; loop over each label part
-                    for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
-                        label_bins_[label_idx][curr_bin_idx].push_back(
-                            curr_item_label.second[label_idx]);
-                    }
-
-                    // Indicate that the polynomials need to be recomputed
-                    cache_invalid_ = true;
+                // Insert the new label; loop over each label part
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    label_bins_[label_idx][curr_bin_idx].push_back(
+                        curr_item_label.second[label_idx]);
                 }
 
                 curr_bin_idx++;
             }
 
-            return safe_cast<int32_t>(max_bin_size);
+            // Indicate that the polynomials need to be recomputed
+            cache_invalid_ = true;
+
+            if (refused_count) {
+                log_filter_refusals(refused_count, start_bin_idx);
+            }
+
+            return new_max_bin_size;
         }
 
         bool BinBundle::try_multi_overwrite(const TaggedAlgItemLabel &item, size_t start_bin_idx)
@@ -1285,9 +1360,12 @@ namespace apsi {
                 // item
                 CuckooFilter &curr_filter = filters_[curr_bin_idx];
                 if (!curr_filter.remove(items[item_idx]) && !curr_filter.has_dropped_items()) {
-                    APSI_LOG_WARNING(
-                        "Cuckoo filter for the bin at index "
-                        << curr_bin_idx << " held no tag for an item being removed from the bin");
+                    log_noexcept([&] {
+                        APSI_LOG_WARNING(
+                            "Cuckoo filter for the bin at index "
+                            << curr_bin_idx
+                            << " held no tag for an item being removed from the bin");
+                    });
                 }
 
                 // Remove the item, its HashedItem and its label parts, all at the same position

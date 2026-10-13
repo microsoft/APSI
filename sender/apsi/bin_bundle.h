@@ -332,8 +332,10 @@ namespace apsi::sender {
         already in its bin, since the label polynomials need distinct points. If dry_run is
         specified, no change is made to the BinBundle. On success, returns the size of the largest
         bin in the modified range, after insertion has taken place. On failed insertion, returns -1,
-        and no modification is made to the BinBundle. Throws std::logic_error if the BinBundle does
-        not use match tags.
+        and no modification is made to the BinBundle. Memory is reserved before anything is changed,
+        so if it cannot be, the exception leaves the BinBundle as it was, and nothing is thrown once
+        the BinBundle has begun to change. Throws std::logic_error if the BinBundle does not use
+        match tags.
         */
         std::int32_t multi_insert(
             const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx, bool dry_run);

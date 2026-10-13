@@ -7,7 +7,7 @@ set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/cuckoo_filter_table.cpp
 )
 
-# Add header files for installation
+# Add header files for installation; log_noexcept.h is internal to APSI and is not installed
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/cuckoo_filter.h

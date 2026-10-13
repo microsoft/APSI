@@ -1323,6 +1323,46 @@ namespace APSITests {
         }
 
         /**
+        While it exists, makes the user's log handler throw on every debug message that reports
+        that a cuckoo filter refused an item, and counts those messages.
+        */
+        class RefusalLogThrows {
+        public:
+            RefusalLogThrows() : saved_level_(GetLogLevel())
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::debug)] = [this](const string &msg) {
+                    if (msg.find("refused an item") != string::npos) {
+                        refusal_count_++;
+                        throw runtime_error("the log handler failed");
+                    }
+                };
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+                SetLogLevel(LogLevel::debug);
+            }
+
+            ~RefusalLogThrows()
+            {
+                CloseLogger();
+                SetLogLevel(saved_level_);
+            }
+
+            RefusalLogThrows(const RefusalLogThrows &) = delete;
+
+            RefusalLogThrows &operator=(const RefusalLogThrows &) = delete;
+
+            size_t refusal_count() const
+            {
+                return refusal_count_;
+            }
+
+        private:
+            LogLevel saved_level_;
+
+            size_t refusal_count_ = 0;
+        };
+
+        /**
         The labels try_get_multi_label gives for an item: part p of its field element s at
         p * felts_per_item + s.
         */
@@ -1825,6 +1865,61 @@ namespace APSITests {
         ASSERT_FALSE(bb.multi_contains(items.back(), 0));
         for (size_t i = 0; i + 1 < items.size(); i++) {
             ASSERT_TRUE(bb.multi_contains(items[i], 0));
+        }
+    }
+
+    TEST(BinBundleTests, AnInsertionCompletesWhenLoggingThrows)
+    {
+        // Without match tags, an insertion also logs that a cuckoo filter refused the item only
+        // once the item is stored, with its label parts if it has any, so that a log handler that
+        // throws cannot leave the item partly stored. The values of
+        // AnItemTheFilterRefusesIsStillFound make the filter refuse the last of them.
+        const vector<felt_t> values{
+            1, 252, 11389, 12874, 17547, 21064, 37127, 40541, 41546, 100000
+        };
+
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+
+        // Labeled
+        {
+            BinBundle bb(context, 1, 50, 0, params->bins_per_bundle(), true, false);
+
+            RefusalLogThrows log;
+            for (felt_t value : values) {
+                vector<pair<felt_t, vector<felt_t>>> one{ { value, { value } } };
+                int32_t inserted = -1;
+                ASSERT_NO_THROW(inserted = bb.multi_insert_for_real(one, 0));
+                ASSERT_LT(0, inserted);
+            }
+            ASSERT_EQ(1, log.refusal_count());
+
+            ASSERT_EQ(values.size(), bb.get_item_bins()[0].size());
+            ASSERT_EQ(values.size(), bb.get_label_bins()[0][0].size());
+            for (felt_t value : values) {
+                vector<felt_t> labels;
+                ASSERT_TRUE(bb.try_get_multi_label({ value }, 0, labels));
+                ASSERT_EQ(vector<felt_t>{ value }, labels);
+            }
+        }
+
+        // Unlabeled
+        {
+            BinBundle bb(context, 0, 50, 0, params->bins_per_bundle(), true, false);
+
+            RefusalLogThrows log;
+            for (felt_t value : values) {
+                int32_t inserted = -1;
+                ASSERT_NO_THROW(inserted = bb.multi_insert_for_real(vector<felt_t>{ value }, 0));
+                ASSERT_LT(0, inserted);
+            }
+            ASSERT_EQ(1, log.refusal_count());
+
+            ASSERT_EQ(values.size(), bb.get_item_bins()[0].size());
+            for (felt_t value : values) {
+                ASSERT_TRUE(bb.multi_contains(vector<felt_t>{ value }, 0));
+            }
         }
     }
 

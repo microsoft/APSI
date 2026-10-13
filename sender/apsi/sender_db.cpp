@@ -20,6 +20,7 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/log_noexcept.h"
 #include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
@@ -40,6 +41,8 @@ namespace apsi {
     using namespace oprf;
 
     namespace sender {
+        using util::log_noexcept;
+
         namespace {
             /**
             Creates and returns the vector of hash functions similarly to how Kuku 2.x sets them
@@ -131,7 +134,10 @@ namespace apsi {
                 const PSIParams &params)
             {
                 STOPWATCH(sender_stopwatch, "preprocess_labeled_data");
-                APSI_LOG_DEBUG("Start preprocessing " << distance(begin, end) << " labeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Start preprocessing " << distance(begin, end) << " labeled items");
+                });
 
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
@@ -164,8 +170,10 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Finished preprocessing " << distance(begin, end) << " labeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Finished preprocessing " << distance(begin, end) << " labeled items");
+                });
 
                 return data_with_indices;
             }
@@ -180,8 +188,10 @@ namespace apsi {
                 const PSIParams &params)
             {
                 STOPWATCH(sender_stopwatch, "preprocess_unlabeled_data");
-                APSI_LOG_DEBUG(
-                    "Start preprocessing " << distance(begin, end) << " unlabeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Start preprocessing " << distance(begin, end) << " unlabeled items");
+                });
 
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
@@ -213,8 +223,10 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Finished preprocessing " << distance(begin, end) << " unlabeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Finished preprocessing " << distance(begin, end) << " unlabeled items");
+                });
 
                 return data_with_indices;
             }
@@ -248,7 +260,10 @@ namespace apsi {
                 const PSIParams &params)
             {
                 STOPWATCH(sender_stopwatch, "preprocess_tagged_data");
-                APSI_LOG_DEBUG("Start preprocessing " << distance(begin, end) << " tagged items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Start preprocessing " << distance(begin, end) << " tagged items");
+                });
 
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
@@ -274,8 +289,10 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Finished preprocessing " << distance(begin, end) << " tagged items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Finished preprocessing " << distance(begin, end) << " tagged items");
+                });
 
                 return data_with_indices;
             }
@@ -367,10 +384,12 @@ namespace apsi {
                 bool compressed)
             {
                 STOPWATCH(sender_stopwatch, "insert_or_assign_worker");
-                APSI_LOG_DEBUG(
-                    "Insert-or-Assign worker for bundle index "
-                    << bundle_index << "; mode of operation: "
-                    << (overwrite ? "overwriting existing" : "inserting new"));
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Insert-or-Assign worker for bundle index "
+                        << bundle_index << "; mode of operation: "
+                        << (overwrite ? "overwriting existing" : "inserting new"));
+                });
 
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices) {
@@ -414,13 +433,15 @@ namespace apsi {
                         }
 
                         if (holders.size() > 1) {
-                            APSI_LOG_WARNING(
-                                "Insert-or-Assign worker: overwriting all "
-                                << holders.size() << " copies of an item at bundle index "
-                                << bundle_idx
-                                << "; an older version of APSI stored the item more than once "
-                                   "when it updated its label. Removing the item and inserting it "
-                                   "again drops the extra copies.");
+                            log_noexcept([&] {
+                                APSI_LOG_WARNING(
+                                    "Insert-or-Assign worker: overwriting all "
+                                    << holders.size() << " copies of an item at bundle index "
+                                    << bundle_index
+                                    << "; an older version of APSI stored the item more than "
+                                       "once when it updated its label. Removing the item and "
+                                       "inserting it again drops the extra copies.");
+                            });
                         }
 
                         for (BinBundle *holder : holders) {
@@ -494,8 +515,11 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Insert-or-Assign worker: finished processing bundle index " << bundle_index);
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Insert-or-Assign worker: finished processing bundle index "
+                        << bundle_index);
+                });
             }
 
             /**
@@ -543,8 +567,10 @@ namespace apsi {
                 // Run the threads on the partitions
                 TaskGroup tasks(tpm.thread_pool());
                 tasks.reserve(bundle_indices.size());
-                APSI_LOG_INFO(
-                    "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
+                log_noexcept([&] {
+                    APSI_LOG_INFO(
+                        "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
+                });
                 for (auto &bundle_idx : bundle_indices) {
                     tasks.add([&, bundle_idx] {
                         insert_or_assign_worker(
@@ -565,7 +591,7 @@ namespace apsi {
                 // Wait for the tasks to finish
                 tasks.join();
 
-                APSI_LOG_INFO("Finished insert-or-assign worker tasks");
+                log_noexcept([] { APSI_LOG_INFO("Finished insert-or-assign worker tasks"); });
             }
 
             /**
@@ -628,7 +654,7 @@ namespace apsi {
                 uint32_t bins_per_bundle)
             {
                 STOPWATCH(sender_stopwatch, "remove_worker");
-                APSI_LOG_INFO("Remove worker [" << bundle_index << "]");
+                log_noexcept([&] { APSI_LOG_INFO("Remove worker [" << bundle_index << "]"); });
 
                 // Iteratively remove each item-label pair at the given cuckoo index
                 for (const auto &data_with_idx : data_with_indices) {
@@ -657,10 +683,12 @@ namespace apsi {
                     }
 
                     if (removed_count > 1) {
-                        APSI_LOG_WARNING(
-                            "Remove worker: removed an item stored in "
-                            << removed_count << " BinBundles at bundle index " << bundle_idx
-                            << " instead of one");
+                        log_noexcept([&] {
+                            APSI_LOG_WARNING(
+                                "Remove worker: removed an item stored in "
+                                << removed_count << " BinBundles at bundle index " << bundle_index
+                                << " instead of one");
+                        });
                     }
 
                     // We may have produced some empty BinBundles so just remove them all
@@ -682,7 +710,10 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_INFO("Remove worker: finished processing bundle index " << bundle_index);
+                log_noexcept([&] {
+                    APSI_LOG_INFO(
+                        "Remove worker: finished processing bundle index " << bundle_index);
+                });
             }
 
             /**
@@ -1002,7 +1033,7 @@ namespace apsi {
         void SenderDB::generate_caches()
         {
             STOPWATCH(sender_stopwatch, "SenderDB::generate_caches");
-            APSI_LOG_INFO("Start generating bin bundle caches");
+            log_noexcept([] { APSI_LOG_INFO("Start generating bin bundle caches"); });
 
             for (auto &bundle_idx : bin_bundles_) {
                 for (auto &bb : bundle_idx) {
@@ -1010,7 +1041,15 @@ namespace apsi {
                 }
             }
 
-            APSI_LOG_INFO("Finished generating bin bundle caches");
+            log_noexcept([] { APSI_LOG_INFO("Finished generating bin bundle caches"); });
+        }
+
+        void SenderDB::generate_caches_after_failure() noexcept
+        {
+            try {
+                generate_caches();
+            } catch (...) { // NOLINT(bugprone-empty-catch): the update's exception is passed on
+            }
         }
 
         vector<reference_wrapper<const BinBundleCache>> SenderDB::get_cache_at(uint32_t bundle_idx)
@@ -1054,7 +1093,7 @@ namespace apsi {
             // Wait for the tasks to finish
             tasks.join();
 
-            APSI_LOG_INFO("SenderDB has been stripped");
+            log_noexcept([] { APSI_LOG_INFO("SenderDB has been stripped"); });
 
             return oprf_key_copy;
         }
@@ -1152,56 +1191,65 @@ namespace apsi {
             auto new_item_count = distance(hashed_data.begin(), new_data_end);
             auto existing_item_count = distance(new_data_end, hashed_data.end());
 
-            if (existing_item_count) {
-                APSI_LOG_INFO(
-                    "Found " << existing_item_count << " existing items to replace in SenderDB");
+            try {
+                if (existing_item_count) {
+                    APSI_LOG_INFO(
+                        "Found " << existing_item_count
+                                 << " existing items to replace in SenderDB");
 
-                // Break the data into field element representation. Also compute the items' cuckoo
-                // indices.
-                vector<pair<AlgItemLabel, size_t>> data_with_indices =
-                    preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
+                    // Break the data into field element representation. Also compute the items'
+                    // cuckoo indices.
+                    vector<pair<AlgItemLabel, size_t>> data_with_indices =
+                        preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
 
-                dispatch_insert_or_assign(
-                    data_with_indices,
-                    bin_bundles_,
-                    crypto_context_,
-                    bins_per_bundle,
-                    label_size,
-                    0, /* tag part count */
-                    max_bin_size,
-                    ps_low_degree,
-                    true, /* overwrite items */
-                    compressed_);
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        0, /* tag part count */
+                        max_bin_size,
+                        ps_low_degree,
+                        true, /* overwrite items */
+                        compressed_);
+                }
+
+                if (new_item_count) {
+                    log_noexcept([&] {
+                        APSI_LOG_INFO(
+                            "Found " << new_item_count << " new items to insert in SenderDB");
+                    });
+
+                    // Process and add the new data. Break the data into field element
+                    // representation. Also compute the items' cuckoo indices.
+                    vector<pair<AlgItemLabel, size_t>> data_with_indices =
+                        preprocess_labeled_data(hashed_data.begin(), new_data_end, params_);
+
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        0, /* tag part count */
+                        max_bin_size,
+                        ps_low_degree,
+                        false, /* don't overwrite items */
+                        compressed_);
+                }
+
+                // Both dispatches have succeeded, so the new items can be recorded. Recording them
+                // only now keeps the item set from naming an item that no bin bundle holds; a
+                // dispatch that throws partway can leave new items stored but not recorded.
+                for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                    hashed_items_.insert(it->first);
+                }
+                item_count_ += static_cast<size_t>(new_item_count);
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
-
-            if (new_item_count) {
-                APSI_LOG_INFO("Found " << new_item_count << " new items to insert in SenderDB");
-
-                // Process and add the new data. Break the data into field element representation.
-                // Also compute the items' cuckoo indices.
-                vector<pair<AlgItemLabel, size_t>> data_with_indices =
-                    preprocess_labeled_data(hashed_data.begin(), new_data_end, params_);
-
-                dispatch_insert_or_assign(
-                    data_with_indices,
-                    bin_bundles_,
-                    crypto_context_,
-                    bins_per_bundle,
-                    label_size,
-                    0, /* tag part count */
-                    max_bin_size,
-                    ps_low_degree,
-                    false, /* don't overwrite items */
-                    compressed_);
-            }
-
-            // Both dispatches have succeeded, so the new items really are in bin bundles now and
-            // can be recorded. Doing this last is what keeps the item set and the bin bundles
-            // describing the same database when an insertion fails.
-            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
-                hashed_items_.insert(it->first);
-            }
-            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
@@ -1273,25 +1321,30 @@ namespace apsi {
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
             uint32_t ps_low_degree = params_.query_params().ps_low_degree;
 
-            dispatch_insert_or_assign(
-                data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                0, /* label size */
-                0, /* tag part count */
-                max_bin_size,
-                ps_low_degree,
-                false, /* don't overwrite items */
-                compressed_);
+            try {
+                dispatch_insert_or_assign(
+                    data_with_indices,
+                    bin_bundles_,
+                    crypto_context_,
+                    bins_per_bundle,
+                    0, /* label size */
+                    0, /* tag part count */
+                    max_bin_size,
+                    ps_low_degree,
+                    false, /* don't overwrite items */
+                    compressed_);
 
-            // The dispatch has succeeded, so the new items really are in bin bundles now and can
-            // be recorded. Doing this last is what keeps the item set and the bin bundles
-            // describing the same database when an insertion fails.
-            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
-                hashed_items_.insert(*it);
+                // The dispatch has succeeded, so the new items can be recorded. Recording them
+                // only now keeps the item set from naming an item that no bin bundle holds; a
+                // dispatch that throws partway can leave new items stored but not recorded.
+                for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                    hashed_items_.insert(*it);
+                }
+                item_count_ += static_cast<size_t>(new_item_count);
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
-            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
@@ -1330,51 +1383,60 @@ namespace apsi {
             auto new_item_count = distance(hashed_data.begin(), new_data_end);
             auto existing_item_count = distance(new_data_end, hashed_data.end());
 
-            if (existing_item_count) {
-                APSI_LOG_INFO(
-                    "Found " << existing_item_count << " existing items to replace in SenderDB");
+            try {
+                if (existing_item_count) {
+                    APSI_LOG_INFO(
+                        "Found " << existing_item_count
+                                 << " existing items to replace in SenderDB");
 
-                vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
-                    preprocess_tagged_data(new_data_end, hashed_data.end(), params_);
+                    vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
+                        preprocess_tagged_data(new_data_end, hashed_data.end(), params_);
 
-                dispatch_insert_or_assign(
-                    data_with_indices,
-                    bin_bundles_,
-                    crypto_context_,
-                    bins_per_bundle,
-                    label_size,
-                    params_.tag_part_count(),
-                    max_bin_size,
-                    ps_low_degree,
-                    true, /* overwrite items */
-                    compressed_);
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        params_.tag_part_count(),
+                        max_bin_size,
+                        ps_low_degree,
+                        true, /* overwrite items */
+                        compressed_);
+                }
+
+                if (new_item_count) {
+                    log_noexcept([&] {
+                        APSI_LOG_INFO(
+                            "Found " << new_item_count << " new items to insert in SenderDB");
+                    });
+
+                    vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
+                        preprocess_tagged_data(hashed_data.begin(), new_data_end, params_);
+
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        params_.tag_part_count(),
+                        max_bin_size,
+                        ps_low_degree,
+                        false, /* don't overwrite items */
+                        compressed_);
+                }
+
+                // Both dispatches have succeeded, so the new items can be recorded; see the
+                // overload without match tags
+                for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                    hashed_items_.insert(get<0>(*it));
+                }
+                item_count_ += static_cast<size_t>(new_item_count);
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
-
-            if (new_item_count) {
-                APSI_LOG_INFO("Found " << new_item_count << " new items to insert in SenderDB");
-
-                vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
-                    preprocess_tagged_data(hashed_data.begin(), new_data_end, params_);
-
-                dispatch_insert_or_assign(
-                    data_with_indices,
-                    bin_bundles_,
-                    crypto_context_,
-                    bins_per_bundle,
-                    label_size,
-                    params_.tag_part_count(),
-                    max_bin_size,
-                    ps_low_degree,
-                    false, /* don't overwrite items */
-                    compressed_);
-            }
-
-            // Both dispatches have succeeded, so the new items can be recorded; see the overload
-            // without match tags
-            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
-                hashed_items_.insert(get<0>(*it));
-            }
-            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
@@ -1417,24 +1479,29 @@ namespace apsi {
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
             uint32_t ps_low_degree = params_.query_params().ps_low_degree;
 
-            dispatch_insert_or_assign(
-                data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                compute_label_part_count(label_byte_count_, nonce_byte_count_, params_),
-                params_.tag_part_count(),
-                max_bin_size,
-                ps_low_degree,
-                false, /* don't overwrite items */
-                compressed_);
+            try {
+                dispatch_insert_or_assign(
+                    data_with_indices,
+                    bin_bundles_,
+                    crypto_context_,
+                    bins_per_bundle,
+                    compute_label_part_count(label_byte_count_, nonce_byte_count_, params_),
+                    params_.tag_part_count(),
+                    max_bin_size,
+                    ps_low_degree,
+                    false, /* don't overwrite items */
+                    compressed_);
 
-            // The dispatch has succeeded, so the new items can be recorded; see the overload
-            // without match tags
-            for (const auto &tagged_item : hashed_data) {
-                hashed_items_.insert(get<0>(tagged_item));
+                // The dispatch has succeeded, so the new items can be recorded; see the overload
+                // without match tags
+                for (const auto &tagged_item : hashed_data) {
+                    hashed_items_.insert(get<0>(tagged_item));
+                }
+                item_count_ += new_item_count;
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
-            item_count_ += new_item_count;
 
             // Generate the BinBundle caches
             generate_caches();
@@ -1473,8 +1540,9 @@ namespace apsi {
 
             // An item that is not in the database cannot be removed. Removal fans out across
             // worker threads and cannot be unwound partway, so the batch is refused before it has
-            // had any effect, and nothing is recorded until the removal below has succeeded: the
-            // item set must keep describing the bin bundles if it fails.
+            // had any effect, and the item set is changed only once the removal below has
+            // succeeded; a removal that throws partway can leave items removed from the bin
+            // bundles but still in the item set.
             auto missing_item_count =
                 count_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
                     return hashed_items_.find(item) == hashed_items_.end();
@@ -1490,14 +1558,20 @@ namespace apsi {
             // cuckoo indices. Then dispatch the removal, which changes nothing unless every item
             // can be removed. With match tags, an item is found by its HashedItem.
             uint32_t bins_per_bundle = params_.bins_per_bundle();
-            if (params_.uses_tags()) {
-                vector<pair<AlgItemWithHash, size_t>> data_with_indices =
-                    preprocess_tagged_lookup_data(hashed_data.begin(), hashed_data.end(), params_);
-                dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
-            } else {
-                vector<pair<AlgItem, size_t>> data_with_indices =
-                    preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
-                dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+            try {
+                if (params_.uses_tags()) {
+                    vector<pair<AlgItemWithHash, size_t>> data_with_indices =
+                        preprocess_tagged_lookup_data(
+                            hashed_data.begin(), hashed_data.end(), params_);
+                    dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+                } else {
+                    vector<pair<AlgItem, size_t>> data_with_indices =
+                        preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
+                    dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+                }
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
 
             // The items are gone from the bin bundles, so they can now be removed from the item
