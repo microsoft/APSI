@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <optional>
 #include <utility>
 
 // APSI
@@ -17,6 +18,7 @@
 #include "apsi/util/utils.h"
 
 // SEAL
+#include "seal/serialization.h"
 #include "seal/util/common.h"
 #include "seal/util/defines.h"
 #include "seal/util/uintarith.h"
@@ -198,12 +200,12 @@ namespace apsi {
             /**
             Helper function. Saves a plaintext of a BatchedPlaintextPolyn. A compressed one is
             bit-packed if that saves at least an eighth of its size, and is saved uncompressed
-            otherwise, as copying the coefficients then loads faster than unpacking them, for little
-            more memory. Plaintexts modulo primes of up to 55 bits are therefore bit-packed, and
-            those modulo primes of 56 bits or more are not: Microsoft SEAL's 2-byte header on each
-            block of 1024 bytes leaves 56-bit coefficients a saving of only 12.3%. The plaintexts of
-            the constant coefficients, which are not in NTT form, hold values below the plain
-            modulus and are bit-packed as well.
+            otherwise, as evaluation then reads its coefficients in place, or copies them, rather
+            than unpacking them, for little more memory. Plaintexts modulo primes of up to 55 bits
+            are therefore bit-packed, and those modulo primes of 56 bits or more are not: Microsoft
+            SEAL's 2-byte header on each block of 1024 bytes leaves 56-bit coefficients a saving of
+            only 12.3%. The plaintexts of the constant coefficients, which are not in NTT form, hold
+            values below the plain modulus and are bit-packed as well.
             */
             vector<unsigned char> save_plaintext(const Plaintext &pt, bool compressed)
             {
@@ -224,6 +226,99 @@ namespace apsi {
                 return packed.size() <= uncompressed.size() - uncompressed.size() / 8
                            ? packed
                            : uncompressed;
+            }
+
+            /**
+            Helper function. Returns whether data holds the whole of a plaintext saved uncompressed:
+            whether its header is valid, has compression mode none, and gives the size of data.
+            */
+            bool is_saved_uncompressed(const vector<unsigned char> &data)
+            {
+                if (data.size() < sizeof(Serialization::SEALHeader)) {
+                    return false;
+                }
+
+                Serialization::SEALHeader header;
+                Serialization::LoadHeader(
+                    reinterpret_cast<const seal_byte *>(data.data()), data.size(), header);
+                return Serialization::IsValidHeader(header) &&
+                       (header.compr_mode == compr_mode_type::none) && (header.size == data.size());
+            }
+
+            /**
+            Helper function. Loads the plaintext stored as data into pt, as evaluation loads it, and
+            returns whether it loaded. A plaintext that does not load is never read in place, so
+            that evaluation still loads it and fails there, as it would without reading in place.
+            */
+            bool try_load_plaintext(
+                const SEALContext &seal_context, const vector<unsigned char> &data, Plaintext &pt)
+            {
+                try {
+                    pt.unsafe_load(
+                        seal_context,
+                        reinterpret_cast<const seal_byte *>(data.data()),
+                        data.size());
+                } catch (const logic_error &) {
+                    return false;
+                } catch (const runtime_error &) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            using InPlaceRead = BatchedPlaintextPolyn::InPlaceRead;
+
+            /**
+            Helper function. Given data, the bytes pt is saved uncompressed as, returns how
+            evaluation can read pt in place, if it can: if pt is in NTT form and its coefficients
+            are the last bytes of data, after the rest of the plaintext. Microsoft SEAL writes them
+            there, but this checks that they are rather than rely on it.
+            */
+            optional<InPlaceRead> find_in_place_read(
+                const vector<unsigned char> &data, const Plaintext &pt)
+            {
+                size_t coeff_byte_count = mul_safe(pt.coeff_count(), sizeof(uint64_t));
+                if (!pt.is_ntt_form() || !pt.coeff_count() || (data.size() <= coeff_byte_count)) {
+                    return nullopt;
+                }
+
+                size_t prefix_size = data.size() - coeff_byte_count;
+                if (memcmp(data.data() + prefix_size, pt.data(), coeff_byte_count) != 0) {
+                    return nullopt;
+                }
+
+                InPlaceRead read;
+                read.parms_id = pt.parms_id();
+                read.coeff_count = pt.coeff_count();
+                read.prefix.assign(data.data(), data.data() + prefix_size);
+                return read;
+            }
+
+            /**
+            Helper function. Appends to reads how a plaintext is read in place, or nothing if it is
+            loaded. The plaintexts of a polynomial are usually all read alike, so a plaintext read
+            as the last one before it that is read in place shares its InPlaceRead.
+            */
+            void add_in_place_read(
+                vector<shared_ptr<const InPlaceRead>> &reads, optional<InPlaceRead> read)
+            {
+                if (!read) {
+                    reads.emplace_back();
+                    return;
+                }
+
+                auto last =
+                    find_if(reads.rbegin(), reads.rend(), [](const auto &r) { return !!r; });
+                if ((last != reads.rend()) && ((*last)->parms_id == read->parms_id) &&
+                    ((*last)->coeff_count == read->coeff_count) &&
+                    ((*last)->prefix == read->prefix)) {
+                    shared_ptr<const InPlaceRead> shared = *last;
+                    reads.push_back(std::move(shared));
+                    return;
+                }
+
+                reads.push_back(make_shared<const InPlaceRead>(std::move(*read)));
             }
 
             /**
@@ -254,7 +349,8 @@ namespace apsi {
             ciphertext and then adding, and reduce after every product and every addition. This
             takes one pass, keeps every coefficient of the sum in 128 bits, and reduces only when
             another product could overflow it, and at the end. A query spends most of its time
-            here.
+            here. A plaintext is given either loaded or as its coefficients alone, such as those
+            read in place from the bytes it is stored as.
 
             The 128 bits are sized for coefficients below their primes, as those of the plaintexts
             of a SenderDB, which is trusted, and of the ciphertexts the sender computes are. A
@@ -299,25 +395,45 @@ namespace apsi {
                 */
                 void add(const Ciphertext &encrypted, const Plaintext &plain)
                 {
+                    add(encrypted,
+                        reinterpret_cast<const unsigned char *>(plain.data()),
+                        plain.parms_id(),
+                        plain.coeff_count());
+                }
+
+                /**
+                Adds encrypted * plain to the sum, for a plaintext plain in NTT form at
+                plain_parms_id whose plain_coeff_count coefficients are the bytes at plain_coeffs,
+                as are those of a plaintext read in place. Throws std::invalid_argument unless both
+                are at the level of the sum, and encrypted is in NTT form and has size 2.
+                */
+                void add(
+                    const Ciphertext &encrypted,
+                    const unsigned char *plain_coeffs,
+                    const parms_id_type &plain_parms_id,
+                    size_t plain_coeff_count)
+                {
                     if (encrypted.parms_id() != parms_id_ || !encrypted.is_ntt_form() ||
                         encrypted.size() != 2 ||
                         encrypted.dyn_array().size() != 2 * poly_uint64_count_) {
                         throw invalid_argument("encrypted does not match the sum");
                     }
-                    if (plain.parms_id() != parms_id_ ||
-                        plain.coeff_count() != poly_uint64_count_) {
+                    if (plain_parms_id != parms_id_ || plain_coeff_count != poly_uint64_count_) {
                         throw invalid_argument("plain does not match the sum");
                     }
 
-                    // Both components at once, so that each coefficient of plain is read once
-                    const uint64_t *plain_data = plain.data();
+                    // Both components at once, so that each coefficient of plain is read once. The
+                    // bytes need not hold uint64_t objects, nor be aligned for them, so each
+                    // coefficient is copied out with memcpy, which compiles to a plain load.
                     const uint64_t *encrypted0 = encrypted.data(0);
                     const uint64_t *encrypted1 = encrypted.data(1);
                     uint64_t *sum0 = sum_.get();
                     uint64_t *sum1 = sum_.get() + 2 * poly_uint64_count_;
                     for (size_t i = 0; i < poly_uint64_count_; i++) {
-                        add_product(plain_data[i], encrypted0[i], sum0 + 2 * i);
-                        add_product(plain_data[i], encrypted1[i], sum1 + 2 * i);
+                        uint64_t plain_coeff = 0;
+                        memcpy(&plain_coeff, plain_coeffs + i * sizeof(uint64_t), sizeof(uint64_t));
+                        add_product(plain_coeff, encrypted0[i], sum0 + 2 * i);
+                        add_product(plain_coeff, encrypted1[i], sum1 + 2 * i);
                     }
 
                     if (++unreduced_term_count_ == max_unreduced_term_count_) {
@@ -381,6 +497,37 @@ namespace apsi {
 
                 size_t max_unreduced_term_count_ = 0;
             };
+
+            /**
+            Helper function. Adds encrypted times the plaintext at the given index of the
+            batched_coeffs of polyn to sum. The coefficients of the plaintext are read in place if
+            polyn has decided that they can be, and the plaintext is loaded into plain otherwise.
+            */
+            void add_term(
+                ProductSum &sum,
+                const Ciphertext &encrypted,
+                const BatchedPlaintextPolyn &polyn,
+                size_t index,
+                const SEALContext &seal_context,
+                Plaintext &plain)
+            {
+                const vector<unsigned char> &data = polyn.batched_coeffs[index];
+                const BatchedPlaintextPolyn::InPlaceRead *read = polyn.in_place_read(index);
+                if (read) {
+                    // The coefficients follow the prefix
+                    sum.add(
+                        encrypted,
+                        data.data() + read->prefix.size(),
+                        read->parms_id,
+                        read->coeff_count);
+                } else {
+                    plain.unsafe_load(
+                        seal_context,
+                        reinterpret_cast<const seal_byte *>(data.data()),
+                        data.size());
+                    sum.add(encrypted, plain);
+                }
+            }
         } // namespace
 
         /**
@@ -415,15 +562,12 @@ namespace apsi {
             //
             // Because the plaintexts in batched_coeffs can be identically zero, SEAL should be
             // built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. The sum of the terms is a
-            // ciphertext in NTT form that is identically zero if they all are.
+            // ciphertext in NTT form that is identically zero if they all are. A plaintext is read
+            // in place where decide_in_place_reads has found that it can be, and loaded otherwise.
             ProductSum sum(*seal_context, encode_parms_id, pool);
             Plaintext coeff(pool);
             for (size_t deg = 1; deg < batched_coeffs.size(); deg++) {
-                coeff.unsafe_load(
-                    *seal_context,
-                    reinterpret_cast<const seal_byte *>(batched_coeffs[deg].data()),
-                    batched_coeffs[deg].size());
-                sum.add(ciphertext_powers[deg], coeff);
+                add_term(sum, ciphertext_powers[deg], *this, deg, *seal_context, coeff);
             }
 
             Ciphertext result(pool);
@@ -522,7 +666,8 @@ namespace apsi {
             result.is_ntt_form() = false;
 
             // Temporary variables. The inner polynomials are sums of products of the low powers,
-            // which are in NTT form at their own level, with plaintexts.
+            // which are in NTT form at their own level, with plaintexts, which are read in place
+            // where they can be, as in eval.
             Ciphertext temp(pool);
             Ciphertext temp_in(pool);
             Plaintext coeff(pool);
@@ -533,12 +678,13 @@ namespace apsi {
                 // Evaluate inner polynomial. The free term is left out and added once the rest is
                 // in coefficient form. The evaluation result is stored in temp_in.
                 for (size_t j = 1; j < ps_high_degree; j++) {
-                    coeff.unsafe_load(
+                    add_term(
+                        inner_sum,
+                        ciphertext_powers[j],
+                        *this,
+                        (i * ps_high_degree) + j,
                         *seal_context,
-                        reinterpret_cast<const seal_byte *>(
-                            batched_coeffs[(i * ps_high_degree) + j].data()),
-                        batched_coeffs[(i * ps_high_degree) + j].size());
-                    inner_sum.add(ciphertext_powers[j], coeff);
+                        coeff);
                 }
                 inner_sum.write(*seal_context, temp_in);
 
@@ -564,12 +710,13 @@ namespace apsi {
             // Once again, the free term is added once the rest is in coefficient form.
             if (degree % ps_high_degree > 0) {
                 for (size_t j = 1; j <= degree % ps_high_degree; j++) {
-                    coeff.unsafe_load(
+                    add_term(
+                        inner_sum,
+                        ciphertext_powers[j],
+                        *this,
+                        (ps_high_degree_powers * ps_high_degree) + j,
                         *seal_context,
-                        reinterpret_cast<const seal_byte *>(
-                            batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].data()),
-                        batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].size());
-                    inner_sum.add(ciphertext_powers[j], coeff);
+                        coeff);
                 }
                 inner_sum.write(*seal_context, temp_in);
 
@@ -615,11 +762,7 @@ namespace apsi {
             // a power of high-degree. Its terms too are summed at the level of the low powers, so
             // that the sum is transformed to coefficient form and switched only once.
             for (size_t j = 1; j < ps_high_degree; j++) {
-                coeff.unsafe_load(
-                    *seal_context,
-                    reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
-                    batched_coeffs[j].size());
-                inner_sum.add(ciphertext_powers[j], coeff);
+                add_term(inner_sum, ciphertext_powers[j], *this, j, *seal_context, coeff);
             }
             inner_sum.write(*seal_context, temp);
 
@@ -706,7 +849,54 @@ namespace apsi {
 
                 // Push the new Plaintext
                 batched_coeffs.push_back(save_plaintext(pt, compressed));
+
+                // Decide whether evaluation reads it in place instead, while pt is at hand
+                const vector<unsigned char> &data = batched_coeffs.back();
+                add_in_place_read(
+                    in_place_reads_,
+                    is_saved_uncompressed(data) ? find_in_place_read(data, pt) : nullopt);
             }
+        }
+
+        void BatchedPlaintextPolyn::decide_in_place_reads()
+        {
+            // Decisions are added only as they are made, so that should this throw, the plaintexts
+            // not yet decided on are loaded
+            in_place_reads_.clear();
+            in_place_reads_.reserve(batched_coeffs.size());
+
+            // Only a plaintext saved uncompressed is loaded, to be compared with its last bytes
+            auto seal_context = crypto_context.seal_context();
+            Plaintext pt;
+            for (const auto &data : batched_coeffs) {
+                optional<InPlaceRead> read;
+                if (seal_context && is_saved_uncompressed(data) &&
+                    try_load_plaintext(*seal_context, data, pt)) {
+                    read = find_in_place_read(data, pt);
+                }
+                add_in_place_read(in_place_reads_, std::move(read));
+            }
+        }
+
+        const BatchedPlaintextPolyn::InPlaceRead *BatchedPlaintextPolyn::in_place_read(
+            size_t index) const noexcept
+        {
+            // A plaintext added since the decisions were made is loaded, as is one decided to be
+            if ((index >= in_place_reads_.size()) || (index >= batched_coeffs.size()) ||
+                !in_place_reads_[index]) {
+                return nullptr;
+            }
+
+            // So is one that no longer has the bytes before its coefficients, and as many bytes in
+            // all, as when it was decided on
+            const InPlaceRead &read = *in_place_reads_[index];
+            const vector<unsigned char> &data = batched_coeffs[index];
+            if ((data.size() != read.prefix.size() + (read.coeff_count * sizeof(uint64_t))) ||
+                (memcmp(data.data(), read.prefix.data(), read.prefix.size()) != 0)) {
+                return nullptr;
+            }
+
+            return &read;
         }
 
         BinBundleCache::BinBundleCache(const CryptoContext &crypto_context, size_t label_size)
@@ -2523,6 +2713,9 @@ namespace apsi {
                         // Move the loaded data to the cache
                         cache_.batched_matching_polyn.batched_coeffs.push_back(std::move(pt_data));
                     }
+
+                    // Decide which of the plaintexts a query reads in place
+                    cache_.batched_matching_polyn.decide_in_place_reads();
                 } else {
                     // With match tags, the label polynomial of a bin of k items has k
                     // coefficients, or the single coefficient of the zero polynomial when the bin
@@ -2716,6 +2909,9 @@ namespace apsi {
                         cache_.batched_interp_polyns[label_idx].batched_coeffs.push_back(
                             std::move(pt_data));
                     }
+
+                    // Decide which of the plaintexts a query reads in place
+                    cache_.batched_interp_polyns[label_idx].decide_in_place_reads();
                 }
 
                 // Mark the cache as valid

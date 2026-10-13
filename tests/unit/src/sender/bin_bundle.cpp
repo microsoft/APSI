@@ -13,6 +13,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -158,6 +160,72 @@ namespace APSITests {
                 static_cast<size_t>(pt.save(
                     reinterpret_cast<seal_byte *>(out.data()), out.size(), compr_mode_type::none)));
             return out;
+        }
+
+        /**
+        Whether each plaintext of a BatchedPlaintextPolyn is read in place
+        */
+        vector<bool> reads_in_place(const BatchedPlaintextPolyn &bpp)
+        {
+            vector<bool> reads;
+            for (size_t i = 0; i < bpp.batched_coeffs.size(); i++) {
+                reads.push_back(bpp.in_place_read(i) != nullptr);
+            }
+
+            return reads;
+        }
+
+        /**
+        For each plaintext of a BatchedPlaintextPolyn, whether it is read in place and, if it is,
+        the parms_id, coefficient count and bytes before the coefficients with which it is read
+        */
+        using InPlaceReadDetails =
+            vector<tuple<bool, parms_id_type, size_t, vector<unsigned char>>>;
+
+        InPlaceReadDetails in_place_read_details(const BatchedPlaintextPolyn &bpp)
+        {
+            InPlaceReadDetails reads;
+            for (size_t i = 0; i < bpp.batched_coeffs.size(); i++) {
+                const BatchedPlaintextPolyn::InPlaceRead *read = bpp.in_place_read(i);
+                if (read) {
+                    reads.emplace_back(true, read->parms_id, read->coeff_count, read->prefix);
+                } else {
+                    reads.emplace_back(false, parms_id_zero, 0, vector<unsigned char>());
+                }
+            }
+
+            return reads;
+        }
+
+        /**
+        The plaintext saved as Plaintext::save saves it uncompressed, except that its coefficients
+        are bit-packed: its header says that it is uncompressed and counts all of its bytes, and it
+        loads as the plaintext, but its last bytes are not its coefficients
+        */
+        vector<unsigned char> saved_with_packed_coeffs(const Plaintext &pt)
+        {
+            stringstream packed;
+            pt.dyn_array().save(packed, compr_mode_type::bitpack);
+            string coeffs = packed.str();
+
+            // The members in the order Plaintext::save writes them
+            uint64_t coeff_count = pt.coeff_count();
+            double scale = pt.scale();
+            auto save_members = [&](ostream &stream) {
+                stream.write(
+                    reinterpret_cast<const char *>(pt.parms_id().data()), sizeof(parms_id_type));
+                stream.write(reinterpret_cast<const char *>(&coeff_count), sizeof(coeff_count));
+                stream.write(reinterpret_cast<const char *>(&scale), sizeof(scale));
+                stream.write(coeffs.data(), static_cast<streamsize>(coeffs.size()));
+            };
+            size_t size = sizeof(Serialization::SEALHeader) + sizeof(parms_id_type) +
+                          sizeof(coeff_count) + sizeof(scale) + coeffs.size();
+
+            stringstream out;
+            Serialization::Save(
+                save_members, static_cast<streamoff>(size), out, compr_mode_type::none, false);
+            string bytes = out.str();
+            return vector<unsigned char>(bytes.begin(), bytes.end());
         }
 
         bool find_in_bin(const vector<felt_t> &bin, felt_t element)
@@ -2871,8 +2939,9 @@ namespace APSITests {
     {
         // eval sums the products of the powers and the plaintexts in 128 bits, and reduces the sum
         // only when another product could overflow it, so it must give exactly the ciphertext that
-        // multiply_plain and add_inplace give. The last prime has 29 bits, too few for eval to
-        // clear any of them from the result, so the reference below has no such step.
+        // multiply_plain and add_inplace give, whether it reads the plaintexts in place or loads
+        // them. The last prime has 29 bits, too few for eval to clear any of them from the result,
+        // so the reference below has no such step.
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = 8;
 
@@ -2907,7 +2976,8 @@ namespace APSITests {
         ASSERT_EQ(size_t(2), coeff_modulus.size());
 
         // Evaluates polyn on powers with multiply_plain and add_inplace, and checks that eval
-        // gives exactly that
+        // gives exactly that, both with polyn and with a copy of its plaintexts that has not been
+        // decided on, which loads every plaintext
         auto check = [&](const BatchedPlaintextPolyn &polyn, const vector<Ciphertext> &powers) {
             auto load = [&](size_t deg) {
                 Plaintext coeff;
@@ -2930,12 +3000,44 @@ namespace APSITests {
             evaluator.add_plain_inplace(expected, load(0));
             evaluator.mod_switch_to_inplace(expected, seal_context.last_parms_id());
 
-            Ciphertext result = polyn.eval(powers, pool);
-            ASSERT_EQ(expected.parms_id(), result.parms_id());
-            ASSERT_EQ(expected.size(), result.size());
-            ASSERT_FALSE(result.is_ntt_form());
-            ASSERT_TRUE(equal(
-                expected.data(), expected.data() + expected.dyn_array().size(), result.data()));
+            BatchedPlaintextPolyn loaded(context);
+            loaded.batched_coeffs = polyn.batched_coeffs;
+            for (size_t deg = 0; deg < loaded.batched_coeffs.size(); deg++) {
+                ASSERT_EQ(nullptr, loaded.in_place_read(deg));
+            }
+
+            for (const BatchedPlaintextPolyn *p : { &polyn, &as_const(loaded) }) {
+                Ciphertext result = p->eval(powers, pool);
+                ASSERT_EQ(expected.parms_id(), result.parms_id());
+                ASSERT_EQ(expected.size(), result.size());
+                ASSERT_FALSE(result.is_ntt_form());
+                ASSERT_TRUE(equal(
+                    expected.data(), expected.data() + expected.dyn_array().size(), result.data()));
+            }
+        };
+
+        // Checks that polyn reads in place exactly the plaintexts in NTT form, all but the first,
+        // that it stores uncompressed, and that it finds their coefficients where they are, after
+        // the bytes it recorded
+        auto check_in_place_reads = [&](const BatchedPlaintextPolyn &polyn) {
+            vector<compr_mode_type> modes = stored_compr_modes(polyn);
+            for (size_t deg = 0; deg < modes.size(); deg++) {
+                SCOPED_TRACE("plaintext " + to_string(deg));
+                const BatchedPlaintextPolyn::InPlaceRead *read = polyn.in_place_read(deg);
+                if (!deg || (modes[deg] != compr_mode_type::none)) {
+                    ASSERT_EQ(nullptr, read);
+                    continue;
+                }
+
+                ASSERT_NE(nullptr, read);
+                ASSERT_EQ(encode_parms_id, read->parms_id);
+                ASSERT_EQ(coeff_modulus.size() * pmd, read->coeff_count);
+
+                const vector<unsigned char> &data = polyn.batched_coeffs[deg];
+                ASSERT_EQ(
+                    data.size(), read->prefix.size() + (read->coeff_count * sizeof(uint64_t)));
+                ASSERT_TRUE(equal(read->prefix.begin(), read->prefix.end(), data.begin()));
+            }
         };
 
         // Every coefficient at its largest. A product modulo the 60-bit prime is then just below
@@ -2977,6 +3079,13 @@ namespace APSITests {
                 coeff.parms_id() = encode_parms_id;
                 largest.batched_coeffs.push_back(save(coeff));
             }
+
+            // Pushed by hand, the plaintexts are loaded until they are decided on
+            for (size_t deg = 0; deg <= degree; deg++) {
+                ASSERT_EQ(nullptr, largest.in_place_read(deg));
+            }
+            largest.decide_in_place_reads();
+            ASSERT_NO_FATAL_FAILURE(check_in_place_reads(largest));
             ASSERT_NO_FATAL_FAILURE(check(largest, largest_powers));
         }
 
@@ -3008,6 +3117,7 @@ namespace APSITests {
             SCOPED_TRACE(compressed ? "compressed" : "uncompressed");
             BatchedPlaintextPolyn polyn(polyns, context, 0, compressed);
             ASSERT_EQ(size_t(41), polyn.batched_coeffs.size());
+            ASSERT_NO_FATAL_FAILURE(check_in_place_reads(polyn));
             ASSERT_NO_FATAL_FAILURE(check(polyn, powers));
         }
     }
@@ -3018,8 +3128,10 @@ namespace APSITests {
         // high power. When the degree is a multiple of ps_low_degree + 1, the last inner polynomial
         // is only its free term, which multiplies the high power on its own. Whatever the degree,
         // the result must decrypt to the values of the polynomials, every coefficient of which is
-        // nonzero, the free terms included. The powers are encryptions of the powers of random
-        // values, at the levels Sender::ComputePowers leaves them at, and the low ones in NTT form.
+        // nonzero, the free terms included, and must be exactly the result of loading every
+        // plaintext rather than reading some in place. The powers are encryptions of the powers of
+        // random values, at the levels Sender::ComputePowers leaves them at, and the low ones in
+        // NTT form.
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = 8;
 
@@ -3106,6 +3218,13 @@ namespace APSITests {
                     polyns, context, static_cast<uint32_t>(ps_low_degree), true);
                 ASSERT_EQ(degree + 1, polyn.batched_coeffs.size());
 
+                // The plaintexts in NTT form are kept uncompressed, as their primes have 56 bits or
+                // more, and are read in place. Those of the free terms are not in NTT form.
+                for (size_t i = 0; i <= degree; i++) {
+                    ASSERT_EQ((i % ps_high_degree) != 0, polyn.in_place_read(i) != nullptr)
+                        << "plaintext " << i;
+                }
+
                 Ciphertext result = polyn.eval_patstock(context, powers, ps_low_degree, pool);
                 ASSERT_EQ(seal_context.last_parms_id(), result.parms_id());
                 ASSERT_EQ(size_t(2), result.size());
@@ -3120,6 +3239,19 @@ namespace APSITests {
                         (s < polyns.size()) ? evaluate(polyns[s], x[s], plain_modulus) : 0;
                     ASSERT_EQ(expected, values[s]) << "slot " << s;
                 }
+
+                // A copy of the plaintexts that has not been decided on loads every plaintext, and
+                // gives exactly the same result
+                BatchedPlaintextPolyn loaded(context);
+                loaded.batched_coeffs = polyn.batched_coeffs;
+                Ciphertext loaded_result =
+                    loaded.eval_patstock(context, powers, ps_low_degree, pool);
+                ASSERT_EQ(result.parms_id(), loaded_result.parms_id());
+                ASSERT_EQ(result.size(), loaded_result.size());
+                ASSERT_TRUE(equal(
+                    result.data(),
+                    result.data() + result.dyn_array().size(),
+                    loaded_result.data()));
             }
         };
 
@@ -3128,6 +3260,464 @@ namespace APSITests {
         // as with 1M-1024-com
         test_fun({ 60, 60, 60, 36 }, false);
         test_fun({ 56, 56, 36 }, true);
+    }
+
+    TEST(BinBundleTests, BatchedPlaintextPolynReadsUncompressedPlaintextsInPlace)
+    {
+        // eval and eval_patstock read in place the plaintexts in NTT form that are stored
+        // uncompressed, and load the others: the bit-packed ones, and those of the constant
+        // coefficients and, with Paterson-Stockmeyer, of the free terms of the inner polynomials,
+        // which are not in NTT form. A compressed BatchedPlaintextPolyn keeps plaintexts modulo a
+        // prime of 56 bits or more uncompressed, so it reads those in place too.
+        // decide_in_place_reads decides as the constructor does. The decisions move with the
+        // plaintexts. A plaintext replaced with one read otherwise, and one added, are loaded
+        // until they are decided on again, and the others are read as before.
+        vector<FEltPolyn> polyns;
+        polyns.push_back({ 1, 2, 3, 4, 5, 6 });
+        polyns.push_back({ 7, 8 });
+        polyns.push_back({ 9, 10, 11, 12, 13, 14 });
+
+        auto test_fun = [&](const shared_ptr<PSIParams> &params,
+                            uint32_t ps_low_degree,
+                            bool compressed,
+                            const vector<bool> &expected) {
+            CryptoContext context(*params);
+            context.set_evaluator();
+            const SEALContext &seal_context = *context.seal_context();
+            const auto &first_parms = seal_context.first_context_data()->parms();
+            int prime_bits = first_parms.coeff_modulus()[0].bit_count();
+            SCOPED_TRACE(
+                to_string(prime_bits) + "-bit prime, ps_low_degree " + to_string(ps_low_degree) +
+                (compressed ? ", compressed" : ", uncompressed"));
+
+            auto load = [&](const vector<unsigned char> &data) {
+                Plaintext pt;
+                pt.unsafe_load(
+                    seal_context, reinterpret_cast<const seal_byte *>(data.data()), data.size());
+                return pt;
+            };
+
+            BatchedPlaintextPolyn polyn(polyns, context, ps_low_degree, compressed);
+            ASSERT_EQ(expected, reads_in_place(polyn));
+            ASSERT_EQ(nullptr, polyn.in_place_read(expected.size()));
+
+            // Each plaintext read in place is read with the parms_id and coefficient count it
+            // loads with, as the last bytes of all of its bytes
+            for (size_t i = 0; i < expected.size(); i++) {
+                const BatchedPlaintextPolyn::InPlaceRead *read = polyn.in_place_read(i);
+                if (!read) {
+                    continue;
+                }
+
+                const vector<unsigned char> &data = polyn.batched_coeffs[i];
+                Plaintext pt = load(data);
+                ASSERT_EQ(pt.parms_id(), read->parms_id);
+                ASSERT_EQ(pt.coeff_count(), read->coeff_count);
+                ASSERT_EQ(
+                    data.size(), read->prefix.size() + (read->coeff_count * sizeof(uint64_t)));
+                ASSERT_TRUE(equal(read->prefix.begin(), read->prefix.end(), data.begin()));
+            }
+
+            // A copy of the plaintexts is loaded until it is decided on, and then read as the
+            // constructor decided
+            BatchedPlaintextPolyn copy(context);
+            copy.batched_coeffs = polyn.batched_coeffs;
+            ASSERT_EQ(vector<bool>(expected.size(), false), reads_in_place(copy));
+            copy.decide_in_place_reads();
+            ASSERT_EQ(in_place_read_details(polyn), in_place_read_details(copy));
+
+            // The decisions move with the plaintexts
+            BatchedPlaintextPolyn moved(std::move(copy));
+            ASSERT_EQ(expected, reads_in_place(moved));
+
+            BatchedPlaintextPolyn assigned(context);
+            assigned = std::move(moved);
+            ASSERT_EQ(expected, reads_in_place(assigned));
+
+            // The second plaintext saved bit-packed instead is loaded, and so is a copy of the
+            // third added at the end, until they are decided on again
+            Plaintext pt = load(assigned.batched_coeffs[1]);
+            vector<unsigned char> packed(
+                static_cast<size_t>(pt.save_size(compr_mode_type::bitpack)));
+            packed.resize(
+                static_cast<size_t>(pt.save(
+                    reinterpret_cast<seal_byte *>(packed.data()),
+                    packed.size(),
+                    compr_mode_type::bitpack)));
+
+            assigned.batched_coeffs[1] = packed;
+            vector<bool> changed = expected;
+            changed[1] = false;
+            ASSERT_EQ(changed, reads_in_place(assigned));
+
+            assigned.batched_coeffs.push_back(assigned.batched_coeffs[2]);
+            changed.push_back(false);
+            ASSERT_EQ(changed, reads_in_place(assigned));
+
+            assigned.decide_in_place_reads();
+            changed.back() = expected[2];
+            ASSERT_EQ(changed, reads_in_place(assigned));
+        };
+
+        vector<bool> none(6, false);
+        vector<bool> all_but_constant(6, true);
+        all_but_constant[0] = false;
+
+        // With ps_low_degree 2, the free terms are the coefficients of degrees 0 and 3
+        vector<bool> all_but_free_terms = all_but_constant;
+        all_but_free_terms[3] = false;
+
+        // Two 36-bit primes at the level plaintexts are encoded at: compressed, every plaintext is
+        // bit-packed
+        test_fun(get_params1(), 0, true, none);
+        test_fun(get_params1(), 0, false, all_but_constant);
+        test_fun(get_params1(), 2, false, all_but_free_terms);
+
+        // A 60-bit prime: compressed, the plaintexts in NTT form are kept uncompressed
+        test_fun(get_params_with_data_prime(60), 0, true, all_but_constant);
+        test_fun(get_params_with_data_prime(60), 2, true, all_but_free_terms);
+
+        // The boundary: modulo a 55-bit prime they are bit-packed, and modulo a 56-bit prime kept
+        // uncompressed
+        test_fun(get_params_with_data_prime(55), 0, true, none);
+        test_fun(get_params_with_data_prime(56), 0, true, all_but_constant);
+    }
+
+    TEST(BinBundleTests, BatchedPlaintextPolynChecksWhatItReadsInPlace)
+    {
+        // A plaintext is read in place only if its header says that it is saved uncompressed and
+        // gives its size, it loads in NTT form, and its coefficients are its last bytes, as in
+        // every plaintext Microsoft SEAL saves uncompressed. Each plaintext crafted below loads in
+        // NTT form but fails one of these checks, so it is loaded instead. The first is followed
+        // by a copy of its coefficients, which its header does not count. The others have headers
+        // that say they are uncompressed and count all of their bytes, but have their coefficients
+        // bit-packed: in the second they are below their prime and take fewer bytes packed, and
+        // in the third they are arbitrary 64-bit values and take more. Plaintexts that do not load
+        // are not read in place either, and evaluation fails to load them, as it would anyway.
+        // Nor is a plaintext changed by hand, without deciding again, into one read otherwise.
+        auto params = get_params_with_data_prime(60);
+        CryptoContext context(*params);
+        KeyGenerator keygen(*context.seal_context());
+        context.set_secret(keygen.secret_key());
+        context.set_evaluator();
+        const SEALContext &seal_context = *context.seal_context();
+        MemoryPoolHandle pool = MemoryManager::GetPool();
+
+        // Uncompressed, every plaintext but the constant coefficient is read in place
+        vector<FEltPolyn> polyns;
+        polyns.push_back({ 1, 2, 3, 4, 5 });
+        polyns.push_back({ 6, 7, 8, 9, 10 });
+        BatchedPlaintextPolyn polyn(polyns, context, 0, false);
+        vector<bool> expected(5, true);
+        expected[0] = false;
+        ASSERT_EQ(expected, reads_in_place(polyn));
+
+        // Encryptions of random values, at the level the plaintexts are encoded at, in NTT form
+        parms_id_type encode_parms_id = get_parms_id_for_chain_idx(seal_context, 1);
+        mt19937_64 rng(1);
+        uniform_int_distribution<felt_t> random_felt(
+            0, params->seal_params().plain_modulus().value() - 1);
+        vector<Ciphertext> powers(polyn.batched_coeffs.size());
+        for (size_t deg = 1; deg < powers.size(); deg++) {
+            vector<uint64_t> values(context.encoder()->slot_count());
+            for (auto &value : values) {
+                value = random_felt(rng);
+            }
+
+            Plaintext pt;
+            context.encoder()->encode(values, pt);
+            context.encryptor()->encrypt_symmetric(pt, powers[deg]);
+            context.evaluator()->mod_switch_to_inplace(powers[deg], encode_parms_id);
+            context.evaluator()->transform_to_ntt_inplace(powers[deg]);
+        }
+
+        Ciphertext result = polyn.eval(powers, pool);
+
+        // The second plaintext, and one like it with arbitrary 64-bit coefficients
+        const vector<unsigned char> &data = polyn.batched_coeffs[1];
+        Plaintext pt;
+        pt.unsafe_load(seal_context, reinterpret_cast<const seal_byte *>(data.data()), data.size());
+        ASSERT_TRUE(pt.is_ntt_form());
+        size_t coeff_byte_count = pt.coeff_count() * sizeof(uint64_t);
+        Plaintext arbitrary = pt;
+        generate_n(arbitrary.data(), arbitrary.coeff_count(), rng);
+
+        auto header_of = [](const vector<unsigned char> &bytes) {
+            Serialization::SEALHeader header;
+            static_cast<void>(Serialization::LoadHeader(
+                reinterpret_cast<const seal_byte *>(bytes.data()), bytes.size(), header));
+            return header;
+        };
+
+        // Whether the last bytes of bytes are the coefficients of source
+        auto ends_with_coeffs = [&](const vector<unsigned char> &bytes, const Plaintext &source) {
+            return (bytes.size() >= coeff_byte_count) &&
+                   equal(
+                       bytes.data() + (bytes.size() - coeff_byte_count),
+                       bytes.data() + bytes.size(),
+                       reinterpret_cast<const unsigned char *>(source.data()));
+        };
+        ASSERT_TRUE(ends_with_coeffs(data, pt));
+
+        // Checks that bytes load as source and, in the place of the second plaintext, are loaded,
+        // while the other plaintexts are still read in place. If they load as pt, also checks
+        // that the result is the same.
+        auto check = [&](const vector<unsigned char> &bytes, const Plaintext &source) {
+            Plaintext loaded;
+            loaded.unsafe_load(
+                seal_context, reinterpret_cast<const seal_byte *>(bytes.data()), bytes.size());
+            ASSERT_EQ(source.parms_id(), loaded.parms_id());
+            ASSERT_EQ(source.coeff_count(), loaded.coeff_count());
+            ASSERT_TRUE(equal(source.data(), source.data() + source.coeff_count(), loaded.data()));
+
+            BatchedPlaintextPolyn changed(context);
+            changed.batched_coeffs = polyn.batched_coeffs;
+            changed.batched_coeffs[1] = bytes;
+            changed.decide_in_place_reads();
+            vector<bool> changed_expected = expected;
+            changed_expected[1] = false;
+            ASSERT_EQ(changed_expected, reads_in_place(changed));
+
+            if (&source == &pt) {
+                Ciphertext changed_result = changed.eval(powers, pool);
+                ASSERT_TRUE(equal(
+                    result.data(),
+                    result.data() + result.dyn_array().size(),
+                    changed_result.data()));
+            }
+        };
+
+        // Followed by a copy of its coefficients, which its header does not count
+        vector<unsigned char> appended = data;
+        appended.insert(
+            appended.end(), data.end() - static_cast<ptrdiff_t>(coeff_byte_count), data.end());
+        ASSERT_EQ(compr_mode_type::none, header_of(appended).compr_mode);
+        ASSERT_EQ(data.size(), header_of(appended).size);
+        ASSERT_TRUE(ends_with_coeffs(appended, pt));
+        ASSERT_NO_FATAL_FAILURE(check(appended, pt));
+
+        // Coefficients below their prime bit-packed, into fewer bytes than they take
+        vector<unsigned char> packed = saved_with_packed_coeffs(pt);
+        ASSERT_EQ(compr_mode_type::none, header_of(packed).compr_mode);
+        ASSERT_EQ(packed.size(), header_of(packed).size);
+        ASSERT_LT(packed.size(), coeff_byte_count);
+        ASSERT_NO_FATAL_FAILURE(check(packed, pt));
+
+        // Arbitrary 64-bit coefficients bit-packed, into more bytes than they take, the last of
+        // which are not the coefficients
+        vector<unsigned char> packed_arbitrary = saved_with_packed_coeffs(arbitrary);
+        ASSERT_EQ(compr_mode_type::none, header_of(packed_arbitrary).compr_mode);
+        ASSERT_EQ(packed_arbitrary.size(), header_of(packed_arbitrary).size);
+        ASSERT_GT(packed_arbitrary.size(), coeff_byte_count);
+        ASSERT_FALSE(ends_with_coeffs(packed_arbitrary, arbitrary));
+        ASSERT_NO_FATAL_FAILURE(check(packed_arbitrary, arbitrary));
+
+        // The coefficients of the result of evaluating p, or the type of the exception evaluation
+        // fails with
+        auto outcome = [&](const BatchedPlaintextPolyn &p) -> pair<vector<uint64_t>, string> {
+            try {
+                Ciphertext ct = p.eval(powers, pool);
+                return { vector<uint64_t>(ct.data(), ct.data() + ct.dyn_array().size()), {} };
+            } catch (const exception &ex) {
+                return { {}, typeid(ex).name() };
+            }
+        };
+
+        // Checks that p evaluates exactly as a copy of its plaintexts that has not been decided
+        // on, which loads every plaintext: with the same error if fails is set, and otherwise to
+        // the same result
+        auto check_as_loaded = [&](const BatchedPlaintextPolyn &p, bool fails) {
+            BatchedPlaintextPolyn loaded(context);
+            loaded.batched_coeffs = p.batched_coeffs;
+            auto p_outcome = outcome(p);
+            ASSERT_EQ(fails, !p_outcome.second.empty()) << p_outcome.second;
+            ASSERT_EQ(outcome(loaded), p_outcome);
+        };
+
+        // Plaintexts that do not load: with no bytes, with too few for a header, with a header
+        // that counts a parms_id after it and nothing more, so that loading runs out of bytes, and
+        // with a parms_id of no level of the parameters
+        vector<unsigned char> parms_id_only(
+            sizeof(Serialization::SEALHeader) + sizeof(parms_id_type));
+        Serialization::Save(
+            [&](ostream &stream) {
+                stream.write(
+                    reinterpret_cast<const char *>(pt.parms_id().data()), sizeof(parms_id_type));
+            },
+            static_cast<streamoff>(parms_id_only.size()),
+            reinterpret_cast<seal_byte *>(parms_id_only.data()),
+            parms_id_only.size(),
+            compr_mode_type::none,
+            false);
+        ASSERT_EQ(compr_mode_type::none, header_of(parms_id_only).compr_mode);
+        ASSERT_EQ(parms_id_only.size(), header_of(parms_id_only).size);
+        ASSERT_THROW(
+            Plaintext().unsafe_load(
+                seal_context,
+                reinterpret_cast<const seal_byte *>(parms_id_only.data()),
+                parms_id_only.size()),
+            runtime_error);
+
+        Plaintext stray = pt;
+        stray.parms_id() = parms_id_type{ 1, 2, 3, 4 };
+        vector<unsigned char> stray_bytes(
+            static_cast<size_t>(stray.save_size(compr_mode_type::none)));
+        stray_bytes.resize(
+            static_cast<size_t>(stray.save(
+                reinterpret_cast<seal_byte *>(stray_bytes.data()),
+                stray_bytes.size(),
+                compr_mode_type::none)));
+
+        for (const vector<unsigned char> &bytes :
+             { vector<unsigned char>(), vector<unsigned char>(8), parms_id_only, stray_bytes }) {
+            SCOPED_TRACE(to_string(bytes.size()) + " bytes");
+            BatchedPlaintextPolyn changed(context);
+            changed.batched_coeffs = polyn.batched_coeffs;
+            changed.batched_coeffs[1] = bytes;
+
+            ASSERT_NO_THROW(changed.decide_in_place_reads());
+            ASSERT_EQ(nullptr, changed.in_place_read(1));
+            ASSERT_NE(nullptr, changed.in_place_read(2));
+            ASSERT_NO_FATAL_FAILURE(check_as_loaded(changed, true));
+        }
+
+        // Changed by hand without deciding again, a plaintext is read in place only while it has
+        // the bytes before its coefficients, and as many bytes, as when it was decided on, and
+        // evaluation then gives exactly what loading every plaintext gives. So another plaintext
+        // in NTT form is read in place. The constant coefficient, which is not in NTT form, has as
+        // many bytes as the others here, but is loaded, and evaluation fails to multiply by it,
+        // and a plaintext cut short is loaded, and fails to load.
+        const vector<unsigned char> &constant = polyn.batched_coeffs[0];
+        ASSERT_EQ(data.size(), constant.size());
+        vector<unsigned char> cut_short(data.data(), data.data() + data.size() - sizeof(uint64_t));
+        vector<pair<string, const vector<unsigned char> *>> changes = {
+            { "another plaintext", &polyn.batched_coeffs[3] },
+            { "the constant coefficient", &constant },
+            { "a plaintext cut short", &cut_short }
+        };
+        for (bool at_end : { false, true }) {
+            for (const auto &change : changes) {
+                bool in_place = (change.second == &polyn.batched_coeffs[3]);
+                SCOPED_TRACE(change.first + (at_end ? " pushed back" : " in place of the second"));
+
+                BatchedPlaintextPolyn changed(polyns, context, 0, false);
+                size_t index = 1;
+                if (at_end) {
+                    index = changed.batched_coeffs.size() - 1;
+                    changed.batched_coeffs.pop_back();
+                    changed.batched_coeffs.push_back(*change.second);
+                } else {
+                    changed.batched_coeffs[index] = *change.second;
+                }
+
+                ASSERT_EQ(in_place, changed.in_place_read(index) != nullptr);
+                ASSERT_NO_FATAL_FAILURE(check_as_loaded(changed, !in_place));
+            }
+        }
+
+        // A plaintext with another scale, which BFV ignores, differs from the others only in bytes
+        // before its coefficients, so it is loaded until decided on again, and is then read in
+        // place on its own, while the others still share how they are read
+        Plaintext rescaled = pt;
+        rescaled.scale() = 2.0;
+        vector<unsigned char> rescaled_bytes(
+            static_cast<size_t>(rescaled.save_size(compr_mode_type::none)));
+        rescaled_bytes.resize(
+            static_cast<size_t>(rescaled.save(
+                reinterpret_cast<seal_byte *>(rescaled_bytes.data()),
+                rescaled_bytes.size(),
+                compr_mode_type::none)));
+        ASSERT_EQ(data.size(), rescaled_bytes.size());
+
+        BatchedPlaintextPolyn changed(polyns, context, 0, false);
+        ASSERT_EQ(changed.in_place_read(2), changed.in_place_read(1));
+        changed.batched_coeffs[1] = rescaled_bytes;
+        ASSERT_EQ(nullptr, changed.in_place_read(1));
+        ASSERT_NO_FATAL_FAILURE(check_as_loaded(changed, false));
+
+        changed.decide_in_place_reads();
+        ASSERT_EQ(expected, reads_in_place(changed));
+        ASSERT_NE(changed.in_place_read(2)->prefix, changed.in_place_read(1)->prefix);
+        ASSERT_EQ(changed.in_place_read(2), changed.in_place_read(4));
+        ASSERT_NO_FATAL_FAILURE(check_as_loaded(changed, false));
+    }
+
+    TEST(BinBundleTests, SaveLoadKeepsInPlaceReads)
+    {
+        // A loaded BinBundle reads in place exactly the plaintexts the BinBundle it was saved from
+        // reads in place, stripped or not, in either storage mode, with and without labels and
+        // Paterson-Stockmeyer: BinBundle::load decides on the plaintexts it loads as the
+        // constructor of BatchedPlaintextPolyn decides on those it makes.
+        auto test_fun = [](const shared_ptr<PSIParams> &params,
+                           size_t label_size,
+                           size_t ps_low_degree,
+                           bool compressed,
+                           bool any_in_place) {
+            CryptoContext context(*params);
+            context.set_evaluator();
+            const auto &first_parms = context.seal_context()->first_context_data()->parms();
+            int prime_bits = first_parms.coeff_modulus()[0].bit_count();
+            SCOPED_TRACE(
+                to_string(prime_bits) + "-bit prime, label_size " + to_string(label_size) +
+                ", ps_low_degree " + to_string(ps_low_degree) +
+                (compressed ? ", compressed" : ", uncompressed"));
+
+            auto new_bundle = [&] {
+                return BinBundle(
+                    context,
+                    label_size,
+                    params->table_params().max_items_per_bin,
+                    ps_low_degree,
+                    params->bins_per_bundle(),
+                    compressed,
+                    false);
+            };
+
+            // For each polynomial in the cache, the decisions on its plaintexts
+            auto in_place_read_details_of = [](const BinBundle &bb) {
+                const BinBundleCache &cache = bb.get_cache();
+                vector<InPlaceReadDetails> reads;
+                reads.push_back(in_place_read_details(cache.batched_matching_polyn));
+                for (const auto &bip : cache.batched_interp_polyns) {
+                    reads.push_back(in_place_read_details(bip));
+                }
+                return reads;
+            };
+
+            BinBundle bb = new_bundle();
+            for (felt_t i = 0; i < 12; i++) {
+                size_t bin = static_cast<size_t>(i % 3);
+                if (label_size) {
+                    ASSERT_LT(0, bb.multi_insert_for_real(AlgItemLabel{ { 100 + i, { i } } }, bin));
+                } else {
+                    ASSERT_LT(0, bb.multi_insert_for_real(vector<felt_t>{ 100 + i }, bin));
+                }
+            }
+            bb.regen_cache();
+            auto expected = in_place_read_details_of(bb);
+            ASSERT_EQ(
+                any_in_place, bb.get_cache().batched_matching_polyn.in_place_read(1) != nullptr);
+
+            BinBundle loaded = new_bundle();
+            load_from_string(loaded, save_to_string(bb));
+            ASSERT_EQ(expected, in_place_read_details_of(loaded));
+
+            bb.strip();
+            ASSERT_EQ(expected, in_place_read_details_of(bb));
+            load_from_string(loaded, save_to_string(bb));
+            ASSERT_EQ(expected, in_place_read_details_of(loaded));
+        };
+
+        // Two 36-bit primes: uncompressed, the plaintexts in NTT form are read in place, and
+        // compressed, none is, as all are bit-packed
+        test_fun(get_params1(), 0, 0, false, true);
+        test_fun(get_params1(), 1, 2, false, true);
+        test_fun(get_params1(), 1, 0, true, false);
+
+        // A 60-bit prime: compressed, the plaintexts in NTT form are kept uncompressed and read in
+        // place
+        test_fun(get_params_with_data_prime(60), 0, 2, true, true);
+        test_fun(get_params_with_data_prime(60), 1, 0, true, true);
     }
 
     namespace {

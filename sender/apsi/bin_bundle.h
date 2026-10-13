@@ -48,8 +48,23 @@ namespace apsi::sender {
     */
     struct BatchedPlaintextPolyn {
         /**
-        A sequence of coefficients represented as batched plaintexts. The length of this vector
-        is the degree of the highest-degree polynomial in the sequence.
+        How eval and eval_patstock read a plaintext of batched_coeffs in place instead of loading
+        it: the plaintext is in NTT form at parms_id, and its bytes are prefix followed by its
+        coeff_count coefficients.
+        */
+        struct InPlaceRead {
+            seal::parms_id_type parms_id = seal::parms_id_zero;
+
+            std::size_t coeff_count = 0;
+
+            std::vector<unsigned char> prefix;
+        };
+
+        /**
+        A sequence of coefficients represented as batched plaintexts. The length of this vector is
+        one more than the degree of the highest-degree polynomial in the sequence. A plaintext added
+        or changed other than through the constructor may be loaded rather than read in place until
+        decide_in_place_reads is called, which never changes the results.
         */
         std::vector<std::vector<unsigned char>> batched_coeffs;
 
@@ -124,12 +139,44 @@ namespace apsi::sender {
             seal::MemoryPoolHandle &pool) const;
 
         /**
+        Decides, for each plaintext in batched_coeffs, whether eval and eval_patstock read its
+        coefficients in place, from the bytes it is stored as, instead of loading it. They can for
+        a plaintext in NTT form saved uncompressed, as Microsoft SEAL writes its coefficients last.
+        Rather than rely on that, this loads each plaintext whose header says that it is saved
+        uncompressed and gives its size, and compares its coefficients with the last bytes; one
+        that does not load is not read in place. The constructor decides as it makes the
+        plaintexts, and BinBundle::load calls this as it loads them. The results never depend on
+        the decisions: after batched_coeffs has changed, deciding again only makes the new or
+        changed plaintexts read in place again. Nothing decided here is saved.
+        */
+        void decide_in_place_reads();
+
+        /**
+        Returns how eval and eval_patstock read the plaintext at the given index of
+        batched_coeffs in place, or nullptr if they load it. A plaintext decided on is read in
+        place only while it has the bytes before its coefficients, and as many bytes in all, as
+        when it was decided on. A plaintext saved by Microsoft SEAL then loads with the same
+        metadata and with its last bytes as its coefficients, so reading it in place gives exactly
+        what loading it would, whatever has been done to batched_coeffs since.
+        */
+        [[nodiscard]] const InPlaceRead *in_place_read(std::size_t index) const noexcept;
+
+        /**
         Returns whether this polynomial has non-zero size.
         */
         explicit operator bool() const noexcept
         {
             return !batched_coeffs.empty();
         }
+
+    private:
+        /**
+        For each plaintext in batched_coeffs decided on, how eval and eval_patstock read it in
+        place, or nothing if they load it. Plaintexts read alike, as all of those of a polynomial
+        usually are, share one InPlaceRead. This is decided as the plaintexts are made or loaded,
+        and never during evaluation, which runs concurrently and only reads it.
+        */
+        std::vector<std::shared_ptr<const InPlaceRead>> in_place_reads_;
     };
 
     // A cache of all the polynomial and plaintext computations on a single BinBundle
