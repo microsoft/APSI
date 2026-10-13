@@ -173,6 +173,16 @@ namespace apsi {
                 }
             }
 
+            // The parameter fingerprint is checked again for the same reason. The SenderDB may have
+            // been replaced with one whose parameters agree with the query on everything checked
+            // above, but which the query was not created for.
+            if (!query.check_params_fingerprint(params)) {
+                APSI_LOG_ERROR(
+                    "Failed to process query request: query was not created for the current "
+                    "SenderDB parameters");
+                throw invalid_argument("query is invalid");
+            }
+
             APSI_LOG_DEBUG(
                 "Query uses compression mode " << compr_mode_str(query.compr_mode())
                                                << "; result packages will use the same");

@@ -21,6 +21,10 @@ table QueryRequest {
     compression_type:ubyte;
     relin_keys:[ubyte];
     query:[QueryRequestPart] (required);
+    // The PSIParams::fingerprint of the parameters the query was created for. Receivers since APSI
+    // 2.0 always send it. It is optional so that queries from APSI 1.x receivers still load, and
+    // APSI 1.x senders ignore it.
+    params_fingerprint:[ubyte];
 }
 
 union Request { ParmsRequest, OPRFRequest, QueryRequest }

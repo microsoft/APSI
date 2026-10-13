@@ -4,9 +4,12 @@
 // STD
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
 // APSI
 #include "apsi/log.h"
@@ -18,6 +21,7 @@
 // SEAL
 #include "seal/context.h"
 #include "seal/modulus.h"
+#include "seal/util/blake2.h"
 #include "seal/util/common.h"
 #include "seal/util/defines.h"
 
@@ -289,6 +293,64 @@ namespace apsi {
             safe_cast<streamsize>(fbs_builder.GetSize()));
 
         return fbs_builder.GetSize();
+    }
+
+    PSIParams::Fingerprint PSIParams::fingerprint() const
+    {
+        // Hash the canonical encoding the declaration describes. Senders and receivers of other
+        // versions must compute the same fingerprint, so changing the encoding needs a new domain.
+        vector<unsigned char> bytes;
+        auto append_le = [&bytes](uint64_t value, size_t byte_count) {
+            for (size_t i = 0; i < byte_count; i++) {
+                bytes.push_back(static_cast<unsigned char>(value >> (8 * i)));
+            }
+        };
+        auto append_u8 = [&append_le](uint8_t value) {
+            append_le(value, 1);
+        };
+        auto append_u32 = [&append_le](uint32_t value) {
+            append_le(value, 4);
+        };
+        auto append_u64 = [&append_le](uint64_t value) {
+            append_le(value, 8);
+        };
+
+        // The domain, without a terminating null
+        static constexpr string_view domain = "apsi.params.fingerprint.v1";
+        bytes.insert(bytes.end(), domain.begin(), domain.end());
+
+        // The format version and the item parameters; tag_part_count is 0 without match tags
+        append_u32(uses_tags() ? tag_serialization_version : apsi_serialization_version);
+        append_u32(item_params_.felts_per_item);
+        append_u32(item_params_.tag_part_count);
+
+        // The table parameters
+        append_u32(table_params_.table_size);
+        append_u32(table_params_.max_items_per_bin);
+        append_u32(table_params_.hash_func_count);
+
+        // The query parameters, with the powers in increasing order, as the set holds them
+        append_u32(query_params_.ps_low_degree);
+        append_u32(safe_cast<uint32_t>(query_params_.query_powers.size()));
+        for (uint32_t power : query_params_.query_powers) {
+            append_u32(power);
+        }
+
+        // The Microsoft SEAL parameters
+        append_u8(static_cast<uint8_t>(seal_params_.scheme()));
+        append_u64(safe_cast<uint64_t>(seal_params_.poly_modulus_degree()));
+        append_u64(seal_params_.plain_modulus().value());
+        append_u32(safe_cast<uint32_t>(seal_params_.coeff_modulus().size()));
+        for (const auto &prime : seal_params_.coeff_modulus()) {
+            append_u64(prime.value());
+        }
+
+        Fingerprint result{};
+        if (APSI_blake2b(result.data(), result.size(), bytes.data(), bytes.size(), nullptr, 0)) {
+            throw runtime_error("blake2b failed");
+        }
+
+        return result;
     }
 
     pair<PSIParams, size_t> PSIParams::Load(istream &in)

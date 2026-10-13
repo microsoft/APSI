@@ -6,8 +6,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <random>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -86,9 +89,9 @@ namespace APSITests {
         }
 
         /**
-        Keeps the relinearization keys and compression mode of every query the receiver sends, and
-        answers each with a response announcing no result packages at all, which is what lets
-        request_query complete without a sender.
+        Keeps the relinearization keys, compression mode and parameter fingerprint of every query
+        the receiver sends, and answers each with a response announcing no result packages at all,
+        which is what lets request_query complete without a sender.
         */
         class CapturingChannel final : public NetworkChannel {
         public:
@@ -98,6 +101,7 @@ namespace APSITests {
                 if (query) {
                     sent_relin_keys.push_back(save_relin_keys(query->relin_keys));
                     sent_compr_modes.push_back(query->compr_mode);
+                    sent_fingerprints.push_back(query->params_fingerprint);
                 }
             }
 
@@ -128,6 +132,8 @@ namespace APSITests {
             vector<vector<unsigned char>> sent_relin_keys;
 
             vector<compr_mode_type> sent_compr_modes;
+
+            vector<optional<PSIParams::Fingerprint>> sent_fingerprints;
         }; // class CapturingChannel
     } // namespace
 
@@ -395,6 +401,33 @@ namespace APSITests {
 
         vector<compr_mode_type> expected{ compr_mode_type::bitpack, compr_mode_type::none };
         ASSERT_EQ(expected, chl.sent_compr_modes);
+    }
+
+    TEST(ReceiverFingerprintTests, QueriesCarryTheParamsFingerprint)
+    {
+        PSIParams params = make_test_params();
+        Receiver receiver(params);
+
+        QueryRequest query = create_query(receiver);
+        ASSERT_EQ(params.fingerprint(), query->params_fingerprint);
+
+        // The fingerprint is what a sender reads from the serialized query
+        stringstream ss;
+        query->save(ss);
+        string saved = ss.str();
+        ASSERT_EQ(
+            params.fingerprint(),
+            SenderOperationQuery::ExtractParamsFingerprint(
+                gsl::span<const unsigned char>(
+                    reinterpret_cast<const unsigned char *>(saved.data()), saved.size())));
+
+        // And request_query sends it, too
+        CapturingChannel chl;
+        vector<HashedItem> items{ HashedItem{ 1, 2 } };
+        LabelKeyVector label_keys;
+        static_cast<void>(receiver.request_query(items, label_keys, chl));
+        ASSERT_EQ(size_t(1), chl.sent_fingerprints.size());
+        ASSERT_EQ(params.fingerprint(), chl.sent_fingerprints[0]);
     }
 
     namespace {

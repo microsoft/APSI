@@ -2,7 +2,9 @@
 // Licensed under the MIT license.
 
 // STD
+#include <array>
 #include <stdexcept>
+#include <string>
 
 // APSI
 #include "apsi/log.h"
@@ -17,6 +19,36 @@ namespace apsi {
     using namespace util;
 
     namespace sender {
+        namespace {
+            /**
+            Returns true if a SenderDB with the given parameters must refuse a query that carries
+            no parameter fingerprint. Receivers before APSI 2.0 send none, and cannot use the
+            answer of a SenderDB with match tags: their schema requires a PSI result, which such
+            an answer does not have, so their query fails at the first result package. The query
+            is refused rather than evaluated for nothing.
+            */
+            bool requires_params_fingerprint(const PSIParams &params)
+            {
+                return params.uses_tags();
+            }
+
+            /**
+            Returns the fingerprint in lowercase hexadecimal, for log messages.
+            */
+            string to_hex(const PSIParams::Fingerprint &fingerprint)
+            {
+                static constexpr array<char, 17> hex_digits{ "0123456789abcdef" };
+
+                string out;
+                out.reserve(2 * fingerprint.size());
+                for (unsigned char byte : fingerprint) {
+                    out += hex_digits[byte >> 4];
+                    out += hex_digits[byte & 0x0F];
+                }
+                return out;
+            }
+        } // namespace
+
         Query Query::deep_copy() const
         {
             Query result;
@@ -24,8 +56,35 @@ namespace apsi {
             result.data_ = data_;
             result.sender_db_ = sender_db_;
             result.compr_mode_ = compr_mode_;
+            result.params_fingerprint_ = params_fingerprint_;
 
             return result;
+        }
+
+        bool Query::check_params_fingerprint(const PSIParams &params) const
+        {
+            if (!params_fingerprint_) {
+                if (requires_params_fingerprint(params)) {
+                    APSI_LOG_ERROR(
+                        "Query carries no parameter fingerprint, as queries from receivers before "
+                        "APSI 2.0 do not, but such receivers cannot use the SenderDB's parameters");
+                    return false;
+                }
+
+                return true;
+            }
+
+            PSIParams::Fingerprint expected = params.fingerprint();
+            if (*params_fingerprint_ != expected) {
+                APSI_LOG_ERROR(
+                    "Query was created for different parameters than the SenderDB uses: its "
+                    "parameter fingerprint is "
+                    << to_hex(*params_fingerprint_) << " but the SenderDB's is "
+                    << to_hex(expected));
+                return false;
+            }
+
+            return true;
         }
 
         Query::Query(QueryRequest query_request, shared_ptr<SenderDB> sender_db)
@@ -38,9 +97,15 @@ namespace apsi {
             }
 
             compr_mode_ = query_request->compr_mode;
+            params_fingerprint_ = query_request->params_fingerprint;
 
             sender_db_ = std::move(sender_db);
             auto seal_context = sender_db_->get_seal_context();
+
+            // A query created for other parameters is refused before anything is extracted from it
+            if (!check_params_fingerprint(sender_db_->get_params())) {
+                return;
+            }
 
             // Extract and validate relinearization keys
             if (seal_context->using_keyswitching()) {

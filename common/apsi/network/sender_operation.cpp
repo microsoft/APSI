@@ -2,9 +2,12 @@
 // Licensed under the MIT license.
 
 // STD
+#include <cstdint>
 #include <iterator>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 // APSI
 #include "apsi/network/sender_operation.h"
@@ -24,6 +27,28 @@ using namespace seal::util;
 
 namespace apsi::network {
     using namespace util;
+
+    namespace {
+        /**
+        Reads the parameter fingerprint of a verified QueryRequest. Returns std::nullopt if the
+        query carries none, and throws if it carries one of the wrong size, which no receiver sends.
+        */
+        optional<PSIParams::Fingerprint> read_params_fingerprint(const fbs::QueryRequest &req)
+        {
+            const auto *fingerprint_data = req.params_fingerprint();
+            if (!fingerprint_data) {
+                return nullopt;
+            }
+
+            PSIParams::Fingerprint fingerprint{};
+            if (fingerprint_data->size() != fingerprint.size()) {
+                throw runtime_error("invalid parameter fingerprint");
+            }
+            copy_bytes(fingerprint_data->data(), fingerprint.size(), fingerprint.data());
+
+            return fingerprint;
+        }
+    } // namespace
 
     const char *sender_operation_type_str(SenderOperationType sop_type)
     {
@@ -258,8 +283,21 @@ namespace apsi::network {
             return ret;
         }());
 
+        // The fingerprint is written only if it is set, so that a query without one is exactly
+        // what an APSI 1.x receiver writes
+        flatbuffers::Offset<flatbuffers::Vector<uint8_t>> params_fingerprint_data;
+        if (params_fingerprint) {
+            params_fingerprint_data = fbs_builder.CreateVector(
+                reinterpret_cast<const uint8_t *>(params_fingerprint->data()),
+                params_fingerprint->size());
+        }
+
         auto req = fbs::CreateQueryRequest(
-            fbs_builder, static_cast<uint8_t>(compr_mode), relin_keys_data, query_request_parts);
+            fbs_builder,
+            static_cast<uint8_t>(compr_mode),
+            relin_keys_data,
+            query_request_parts,
+            params_fingerprint_data);
 
         fbs::SenderOperationBuilder sop_builder(fbs_builder);
         sop_builder.add_request_type(fbs::Request_QueryRequest);
@@ -286,6 +324,7 @@ namespace apsi::network {
 
         // Clear the current data
         data.clear();
+        params_fingerprint.reset();
 
         vector<unsigned char> in_data(util::read_from_stream(in));
 
@@ -311,6 +350,10 @@ namespace apsi::network {
         }
 
         compr_mode = static_cast<compr_mode_type>(req.compression_type());
+
+        // Read the parameter fingerprint before the expensive parts. Whether a query without one
+        // is acceptable depends on the SenderDB, so that is for sender::Query to decide.
+        params_fingerprint = read_params_fingerprint(req);
 
         // Load relin_keys if they are needed in this case
         if (context->using_keyswitching()) {
@@ -378,5 +421,51 @@ namespace apsi::network {
         }
 
         return in_data.size();
+    }
+
+    optional<PSIParams::Fingerprint> SenderOperationQuery::ExtractParamsFingerprint(
+        gsl::span<const unsigned char> in)
+    {
+        // Frame the buffer as load does when it reads the query from a stream: a size prefix and
+        // exactly that many bytes after it
+        flatbuffers::uoffset_t prefixed_size = 0;
+        if (in.size() < sizeof(prefixed_size)) {
+            throw runtime_error("failed to load SenderOperation: buffer is too small");
+        }
+        copy_bytes(in.data(), sizeof(prefixed_size), &prefixed_size);
+        prefixed_size = flatbuffers::EndianScalar(prefixed_size);
+        if (prefixed_size > in.size() - sizeof(prefixed_size)) {
+            throw runtime_error("failed to load SenderOperation: buffer is truncated");
+        }
+
+        // The FlatBuffers verifier asserts that a buffer is smaller than
+        // FLATBUFFERS_MAX_BUFFER_SIZE, so one that is not is refused before it is verified
+        if (prefixed_size >=
+            static_cast<size_t>(FLATBUFFERS_MAX_BUFFER_SIZE) - sizeof(prefixed_size)) {
+            throw runtime_error("failed to load SenderOperation: buffer is too large");
+        }
+        size_t buffer_size = sizeof(prefixed_size) + static_cast<size_t>(prefixed_size);
+
+        // FlatBuffers reads scalars in place, so it needs a buffer aligned for them, which the
+        // caller's need not be. Copying is cheap next to loading the query.
+        const auto *buffer = reinterpret_cast<const uint8_t *>(in.data());
+        vector<uint8_t> aligned_copy;
+        if (reinterpret_cast<uintptr_t>(buffer) % alignof(flatbuffers::largest_scalar_t)) {
+            aligned_copy.assign(buffer, buffer + buffer_size);
+            buffer = aligned_copy.data();
+        }
+
+        auto verifier = flatbuffers::Verifier(buffer, buffer_size);
+        bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
+        if (!safe) {
+            throw runtime_error("failed to load SenderOperation: invalid buffer");
+        }
+
+        const auto *sop = fbs::GetSizePrefixedSenderOperation(buffer);
+        if (sop->request_type() != fbs::Request_QueryRequest) {
+            throw runtime_error("unexpected operation type");
+        }
+
+        return read_params_fingerprint(*sop->request_as_QueryRequest());
     }
 } // namespace apsi::network

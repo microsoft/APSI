@@ -8,12 +8,14 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 // APSI
+#include "apsi/psi_params.h"
 #include "apsi/seal_object.h"
 #include "apsi/version.h"
 
@@ -22,6 +24,9 @@
 #include "seal/relinkeys.h"
 #include "seal/serialization.h"
 #include "seal/util/common.h"
+
+// GSL
+#include "gsl/span"
 
 namespace apsi::network {
     enum class SenderOperationType : std::uint32_t {
@@ -139,6 +144,27 @@ namespace apsi::network {
         }
 
         /**
+        Reads the parameter fingerprint from a serialized query without loading the rest of it.
+
+        An application serving several SenderDBs can use this to find the one a query is for
+        before calling SenderOperationQuery::load, which needs that SenderDB's SEALContext and
+        decompresses and validates every ciphertext in the query. The fingerprint identifies
+        parameters, not a SenderDB, so this tells apart only SenderDBs with different parameters,
+        and the receiver's OPRF request must still go to the same SenderDB as its query. The input
+        is a query as SenderOperation::save writes it: a size-prefixed buffer, without the
+        SenderOperationHeader that a network::Channel sends in front of it. Any bytes after the
+        buffer are ignored.
+
+        Returns std::nullopt for a query without a fingerprint, such as one from an APSI 1.x
+        receiver.
+
+        Throws std::runtime_error if in does not hold a valid serialized query, or if the
+        fingerprint in it has the wrong size.
+        */
+        [[nodiscard]] static std::optional<PSIParams::Fingerprint> ExtractParamsFingerprint(
+            gsl::span<const unsigned char> in);
+
+        /**
         The compression mode for the relinearization keys and the ciphertexts in the query. The
         sender saves the result packages for the query in the same mode.
         */
@@ -151,5 +177,13 @@ namespace apsi::network {
         ciphertext and the vector holds the ciphertext data for different bundle indices.
         */
         std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data;
+
+        /**
+        The fingerprint of the parameters the query was created for (see PSIParams::fingerprint),
+        or std::nullopt for a query without one. Receivers since APSI 2.0 always set it, and a
+        sender uses it to refuse queries meant for other parameters. A query without a
+        fingerprint is saved exactly as an APSI 1.x receiver saves it.
+        */
+        std::optional<PSIParams::Fingerprint> params_fingerprint;
     }; // class SenderOperationQuery
 } // namespace apsi::network

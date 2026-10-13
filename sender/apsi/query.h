@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -14,6 +15,7 @@
 // APSI
 #include "apsi/network/sender_operation.h"
 #include "apsi/powers.h"
+#include "apsi/psi_params.h"
 #include "apsi/requests.h"
 #include "apsi/sender_db.h"
 
@@ -74,6 +76,27 @@ namespace apsi::sender {
             return compr_mode_;
         }
 
+        /**
+        Returns the fingerprint of the parameters the receiver created the query for (see
+        PSIParams::fingerprint), or std::nullopt if the query carries none, as queries from
+        receivers before APSI 2.0 do not.
+        */
+        [[nodiscard]] const std::optional<PSIParams::Fingerprint> &params_fingerprint()
+            const noexcept
+        {
+            return params_fingerprint_;
+        }
+
+        /**
+        Returns true if the query's parameter fingerprint allows running the query against a
+        SenderDB with the given parameters, and otherwise logs why not and returns false. A query
+        with a fingerprint is allowed only if it equals params.fingerprint(). A query without one
+        is allowed only if receivers before APSI 2.0 can use the parameters. The constructor checks
+        this against the parameters of the SenderDB; Sender::RunQuery checks it again in case the
+        SenderDB has been replaced since.
+        */
+        [[nodiscard]] bool check_params_fingerprint(const PSIParams &params) const;
+
     private:
         seal::RelinKeys relin_keys_;
 
@@ -86,5 +109,7 @@ namespace apsi::sender {
         bool valid_ = false;
 
         seal::compr_mode_type compr_mode_ = seal::compr_mode_type::none;
+
+        std::optional<PSIParams::Fingerprint> params_fingerprint_;
     };
 } // namespace apsi::sender

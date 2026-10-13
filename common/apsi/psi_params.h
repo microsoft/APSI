@@ -5,7 +5,9 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <set>
@@ -302,7 +304,8 @@ namespace apsi {
         the receiver accepts an item exactly when the sender returns the item's own tag. The
         receiver therefore needs the label keys of its items, which the OPRF provides, whether or
         not the sender's items have labels. Without match tags, everything is as in APSI 1.x, except
-        that queries are bit-packed by default, as are their results.
+        that queries carry a fingerprint of the parameters and are bit-packed by default, as are
+        their results.
         */
         [[nodiscard]]
         bool uses_tags() const
@@ -374,6 +377,47 @@ namespace apsi {
         tag_serialization_version and the tag part count; see tag_serialization_version for why.
         */
         std::size_t save(std::ostream &out) const;
+
+        /**
+        The size in bytes of a parameter fingerprint.
+        */
+        constexpr static std::size_t fingerprint_byte_count = 32;
+
+        /**
+        A parameter fingerprint, as returned by PSIParams::fingerprint.
+        */
+        using Fingerprint = std::array<unsigned char, fingerprint_byte_count>;
+
+        /**
+        Returns a fingerprint of these parameters: the Blake2b-256 hash of a canonical encoding of
+        their values.
+
+        A receiver sends the fingerprint of its parameters with every query, and the sender
+        refuses a query whose fingerprint differs from that of its SenderDB's parameters. Without
+        it, a query created for different parameters that happen to agree on the shape of the
+        query would be answered with results that mean nothing to the receiver, which would
+        typically read them as no match.
+
+        The fingerprint identifies the parameters, and with them the mode, but not a SenderDB:
+        SenderDBs with equal parameters have equal fingerprints whatever data and OPRF keys they
+        hold. An application serving several SenderDBs must still send a receiver's OPRF request
+        and query to the same one.
+
+        The encoding does not depend on how PSIParams::save serializes the parameters, so the
+        fingerprint stays the same across versions of FlatBuffers and Microsoft SEAL. It is the
+        ASCII string "apsi.params.fingerprint.v1", without a terminating null, followed by these
+        values as little-endian unsigned integers of the given bit widths:
+
+        - the PSIParams format version (32): 1 without match tags, 2 with them;
+        - felts_per_item, tag_part_count, table_size, max_items_per_bin, hash_func_count, and
+          ps_low_degree (32 each);
+        - the number of query powers (32), then the powers in increasing order (32 each);
+        - the Microsoft SEAL scheme type (8);
+        - poly_modulus_degree and the plain modulus (64 each);
+        - the number of coefficient modulus primes (32), then the primes in order (64 each).
+        */
+        [[nodiscard]]
+        Fingerprint fingerprint() const;
 
         /**
         Reads the PSIParams from a stream.

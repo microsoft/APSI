@@ -510,6 +510,7 @@ namespace apsi {
             sop_query->compr_mode = compr_mode_;
             sop_query->relin_keys = relin_keys_;
             sop_query->data = std::move(encrypted_powers);
+            sop_query->params_fingerprint = params_.fingerprint();
             auto sop = to_request(std::move(sop_query));
 
             APSI_LOG_INFO(

@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -44,13 +45,20 @@ using namespace seal;
 
 namespace APSITests {
     namespace {
-        PSIParams make_test_params()
+        /**
+        Returns parameters with the given hash_func_count, and with match tags if tag_part_count
+        is not zero. The number of hash functions enters only the receiver's cuckoo hashing, so
+        queries for one of these are valid in every respect but the parameter fingerprint for
+        another with the same tag_part_count.
+        */
+        PSIParams make_test_params(uint32_t hash_func_count = 3, uint32_t tag_part_count = 0)
         {
             PSIParams::ItemParams item_params;
             item_params.felts_per_item = 8;
+            item_params.tag_part_count = tag_part_count;
 
             PSIParams::TableParams table_params;
-            table_params.hash_func_count = 3;
+            table_params.hash_func_count = hash_func_count;
             table_params.max_items_per_bin = 16;
             table_params.table_size = 512;
 
@@ -200,9 +208,12 @@ namespace APSITests {
         // A Query checks its data against the SenderDB's parameters when it is built, and
         // RunQuery reads those parameters again. RunQuery indexes the query data by counts taken
         // from its own read and does so without bounds checks, so it must reject a query that the
-        // parameters it reads no longer describe.
+        // parameters it reads no longer describe. A query from an APSI 1.x receiver carries no
+        // parameter fingerprint, so these checks are all that stop it.
         auto sender_db = make_shared<SenderDB>(make_test_params(), 0);
-        Query query(make_honest_query(sender_db->get_params()), sender_db);
+        QueryRequest request = make_honest_query(sender_db->get_params());
+        request->params_fingerprint.reset();
+        Query query(std::move(request), sender_db);
         ASSERT_TRUE(query.is_valid());
 
         // Replace the database with one whose bundle_idx_count differs. The query still holds the
@@ -224,15 +235,41 @@ namespace APSITests {
         // A Query configures its PowersDag from max_items_per_bin, and RunQuery sizes each
         // bundle's power vector from its own read of that value and then indexes it by the DAG's
         // node powers. A database whose bundle count and SEAL parameters are unchanged passes
-        // every check on the query data itself, so the DAG must be checked separately: otherwise
-        // the powers above the new maximum are written past the end of the vector, and after the
-        // QueryResponse has already been sent.
+        // every check on the query data itself, and a query from an APSI 1.x receiver carries no
+        // parameter fingerprint, so the DAG must be checked separately: otherwise the powers above
+        // the new maximum are written past the end of the vector, and after the QueryResponse has
+        // already been sent.
         auto sender_db = make_shared<SenderDB>(make_test_params(), 0);
-        Query query(make_honest_query(sender_db->get_params()), sender_db);
+        QueryRequest request = make_honest_query(sender_db->get_params());
+        request->params_fingerprint.reset();
+        Query query(std::move(request), sender_db);
         ASSERT_TRUE(query.is_valid());
 
         auto replacement = SenderDB(make_shallow_params(), 0);
         replacement.insert_or_assign(Item(3, 3));
+        *sender_db = std::move(replacement);
+
+        stringstream ss;
+        StreamChannel chl(ss);
+        ASSERT_THROW(Sender::RunQuery(query, chl), invalid_argument);
+        ASSERT_TRUE(ss.str().empty());
+    }
+
+    TEST(QueryTests, RunQueryRejectsAQueryWithoutAFingerprintOnceTheSenderDBUsesMatchTags)
+    {
+        // A query from an APSI 1.x receiver carries no parameter fingerprint, which a SenderDB
+        // without match tags accepts. A SenderDB replaced by one with match tags, and the same
+        // table and bins, agrees with the query on every other check RunQuery makes, so only the
+        // missing fingerprint stops the query from being answered.
+        auto sender_db = make_shared<SenderDB>(make_test_params(), 0);
+        QueryRequest request = make_honest_query(sender_db->get_params());
+        request->params_fingerprint.reset();
+        Query query(std::move(request), sender_db);
+        ASSERT_TRUE(query.is_valid());
+
+        auto replacement = SenderDB(make_test_params(3, 1), 0);
+        replacement.insert_or_assign(Item(3, 3));
+        ASSERT_TRUE(replacement.get_params().uses_tags());
         *sender_db = std::move(replacement);
 
         stringstream ss;
@@ -306,6 +343,111 @@ namespace APSITests {
 
         // The parameters give two bundle indices, so without the guard there would be two.
         ASSERT_EQ(size_t(1), chl.attempts());
+    }
+
+    TEST(QueryFingerprintTests, SenderDBWithTagsRequiresAFingerprint)
+    {
+        // A query without a fingerprint comes from a receiver before APSI 2.0, which cannot use
+        // the answer of a SenderDB with match tags: its schema requires a PSI result, so its query
+        // fails at the first result package. The SenderDB refuses the query rather than evaluate
+        // it for nothing.
+        auto sender_db = make_shared<SenderDB>(make_test_params(3, 1));
+        ASSERT_TRUE(sender_db->get_params().uses_tags());
+
+        QueryRequest with_fingerprint = make_honest_query(sender_db->get_params());
+        ASSERT_TRUE(Query(std::move(with_fingerprint), sender_db).is_valid());
+
+        QueryRequest without_fingerprint = make_honest_query(sender_db->get_params());
+        without_fingerprint->params_fingerprint.reset();
+        Query query(std::move(without_fingerprint), sender_db);
+        ASSERT_FALSE(query.is_valid());
+        ASSERT_FALSE(query.check_params_fingerprint(sender_db->get_params()));
+    }
+
+    TEST(QueryFingerprintTests, AcceptsAQueryWithTheMatchingFingerprint)
+    {
+        auto sender_db = make_shared<SenderDB>(make_test_params());
+        QueryRequest request = make_honest_query(sender_db->get_params());
+        ASSERT_EQ(sender_db->get_params().fingerprint(), request->params_fingerprint);
+
+        Query query(std::move(request), sender_db);
+        ASSERT_TRUE(query.is_valid());
+        ASSERT_EQ(sender_db->get_params().fingerprint(), query.params_fingerprint());
+        ASSERT_TRUE(query.check_params_fingerprint(sender_db->get_params()));
+    }
+
+    TEST(QueryFingerprintTests, AcceptsAQueryWithoutAFingerprint)
+    {
+        // A receiver before APSI 2.0 sends no fingerprint. Parameters without match tags are the
+        // only ones it can use, so a SenderDB with such parameters must still answer it.
+        auto sender_db = make_shared<SenderDB>(make_test_params());
+        QueryRequest request = make_honest_query(sender_db->get_params());
+        request->params_fingerprint.reset();
+
+        Query query(std::move(request), sender_db);
+        ASSERT_TRUE(query.is_valid());
+        ASSERT_FALSE(query.params_fingerprint());
+
+        stringstream ss;
+        StreamChannel chl(ss);
+        ASSERT_NO_THROW(Sender::RunQuery(query, chl));
+        ASSERT_FALSE(ss.str().empty());
+    }
+
+    TEST(QueryFingerprintTests, RejectsAQueryWithAnotherFingerprint)
+    {
+        // The query agrees with the SenderDB on everything else, so without the fingerprint it
+        // would be answered
+        auto sender_db = make_shared<SenderDB>(make_test_params(2));
+        QueryRequest request = make_honest_query(make_test_params(3));
+        ASSERT_NE(sender_db->get_params().fingerprint(), request->params_fingerprint);
+
+        QueryRequest request_without_fingerprint = make_honest_query(make_test_params(3));
+        request_without_fingerprint->params_fingerprint.reset();
+        ASSERT_TRUE(Query(std::move(request_without_fingerprint), sender_db).is_valid());
+
+        Query query(std::move(request), sender_db);
+        ASSERT_FALSE(query.is_valid());
+
+        stringstream ss;
+        StreamChannel chl(ss);
+        ASSERT_THROW(Sender::RunQuery(query, chl), invalid_argument);
+        ASSERT_TRUE(ss.str().empty());
+    }
+
+    TEST(QueryFingerprintTests, RejectsAQueryWithAFingerprintDifferingInOneBit)
+    {
+        auto sender_db = make_shared<SenderDB>(make_test_params());
+        for (size_t bit = 0; bit < 8 * PSIParams::fingerprint_byte_count; bit += 37) {
+            QueryRequest request = make_honest_query(sender_db->get_params());
+            ASSERT_TRUE(request->params_fingerprint.has_value());
+            PSIParams::Fingerprint fingerprint =
+                request->params_fingerprint.value_or(PSIParams::Fingerprint{});
+            fingerprint[bit / 8] ^= static_cast<unsigned char>(1 << (bit % 8));
+            request->params_fingerprint = fingerprint;
+            ASSERT_FALSE(Query(std::move(request), sender_db).is_valid());
+        }
+    }
+
+    TEST(QueryFingerprintTests, RunQueryRejectsAQueryWhoseFingerprintNoLongerMatches)
+    {
+        // RunQuery checks the query against the SenderDB again, since the SenderDB may have been
+        // replaced since the Query was created. These parameters pass every other check RunQuery
+        // makes, so only the fingerprint stops the query from being answered.
+        auto sender_db = make_shared<SenderDB>(make_test_params(3), 0);
+        Query query(make_honest_query(sender_db->get_params()), sender_db);
+        ASSERT_TRUE(query.is_valid());
+
+        auto replacement = SenderDB(make_test_params(2), 0);
+        replacement.insert_or_assign(Item(3, 3));
+        *sender_db = std::move(replacement);
+
+        stringstream ss;
+        StreamChannel chl(ss);
+        ASSERT_THROW(Sender::RunQuery(query, chl), invalid_argument);
+
+        // The rejection comes before the QueryResponse is sent
+        ASSERT_TRUE(ss.str().empty());
     }
 
     namespace {

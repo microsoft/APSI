@@ -312,7 +312,9 @@ namespace apsi::receiver {
         sender's item can take, so that an empty entry never selects a value the sender stores.
         Without match tags it is the all-zero item, as in APSI 1.x.
 
-        The query is saved in the compression mode Receiver::get_compr_mode returns.
+        The query is saved in the compression mode Receiver::get_compr_mode returns, and carries
+        the fingerprint of the Receiver's PSIParams (see PSIParams::fingerprint), which the sender
+        checks against its own parameters.
         */
         std::pair<Request, IndexTranslationTable> create_query(
             const std::vector<HashedItem> &items);
