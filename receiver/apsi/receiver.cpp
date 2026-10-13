@@ -170,6 +170,18 @@ namespace apsi {
             }
         }
 
+        void Receiver::set_compr_mode(compr_mode_type compr_mode)
+        {
+            if (!Serialization::IsSupportedComprMode(compr_mode)) {
+                stringstream ss;
+                ss << "compression mode " << static_cast<int>(compr_mode)
+                   << " is not supported by this build of Microsoft SEAL";
+                throw invalid_argument(ss.str());
+            }
+
+            compr_mode_ = compr_mode;
+        }
+
         uint32_t Receiver::reset_powers_dag(const set<uint32_t> &source_powers)
         {
             // First compute the target powers
@@ -495,12 +507,14 @@ namespace apsi {
 
             // Set up the return value
             auto sop_query = make_unique<SenderOperationQuery>();
-            sop_query->compr_mode = Serialization::compr_mode_default;
+            sop_query->compr_mode = compr_mode_;
             sop_query->relin_keys = relin_keys_;
             sop_query->data = std::move(encrypted_powers);
             auto sop = to_request(std::move(sop_query));
 
-            APSI_LOG_INFO("Finished creating encrypted query");
+            APSI_LOG_INFO(
+                "Finished creating encrypted query (compression: " << compr_mode_str(compr_mode_)
+                                                                   << ")");
 
             return { std::move(sop), itt };
         }

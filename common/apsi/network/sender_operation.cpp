@@ -45,6 +45,30 @@ namespace apsi::network {
         }
     }
 
+    const char *compr_mode_str(compr_mode_type compr_mode) noexcept
+    {
+        switch (compr_mode) {
+        case compr_mode_type::none:
+            return "none";
+
+#ifdef SEAL_USE_ZLIB
+        case compr_mode_type::zlib:
+            return "zlib";
+#endif
+
+#ifdef SEAL_USE_ZSTD
+        case compr_mode_type::zstd:
+            return "zstd";
+#endif
+
+        case compr_mode_type::bitpack:
+            return "bitpack";
+
+        default:
+            return "unsupported";
+        }
+    }
+
     size_t SenderOperationHeader::save(ostream &out) const
     {
         flatbuffers::FlatBufferBuilder fbs_builder(128);

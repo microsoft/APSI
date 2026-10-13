@@ -173,6 +173,10 @@ namespace apsi {
                 }
             }
 
+            APSI_LOG_DEBUG(
+                "Query uses compression mode " << compr_mode_str(query.compr_mode())
+                                               << "; result packages will use the same");
+
             // The query response only tells how many ResultPackages to expect; send this first.
             // The reader lock is already held, so the count is read without taking it again.
             uint32_t package_count =

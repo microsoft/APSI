@@ -16,6 +16,7 @@
 #include "apsi/item.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
+#include "apsi/network/sender_operation_response.h"
 #include "apsi/psi_params.h"
 #include "apsi/receiver.h"
 #include "apsi/requests.h"
@@ -85,8 +86,9 @@ namespace APSITests {
         }
 
         /**
-        Keeps every query the receiver sends and answers each with a response announcing no
-        result packages at all, which is what lets request_query complete without a sender.
+        Keeps the relinearization keys and compression mode of every query the receiver sends, and
+        answers each with a response announcing no result packages at all, which is what lets
+        request_query complete without a sender.
         */
         class CapturingChannel final : public NetworkChannel {
         public:
@@ -95,6 +97,7 @@ namespace APSITests {
                 auto query = to_query_request(std::move(sop));
                 if (query) {
                     sent_relin_keys.push_back(save_relin_keys(query->relin_keys));
+                    sent_compr_modes.push_back(query->compr_mode);
                 }
             }
 
@@ -123,6 +126,8 @@ namespace APSITests {
             }
 
             vector<vector<unsigned char>> sent_relin_keys;
+
+            vector<compr_mode_type> sent_compr_modes;
         }; // class CapturingChannel
     } // namespace
 
@@ -318,6 +323,78 @@ namespace APSITests {
         ASSERT_NE(nullptr, second);
 
         ASSERT_EQ(save_relin_keys(first->relin_keys), save_relin_keys(second->relin_keys));
+    }
+
+    namespace {
+        vector<compr_mode_type> supported_compr_modes()
+        {
+            vector<compr_mode_type> compr_modes;
+            for (unsigned value = 0; value <= 0xFF; value++) {
+                if (Serialization::IsSupportedComprMode(static_cast<uint8_t>(value))) {
+                    compr_modes.push_back(static_cast<compr_mode_type>(value));
+                }
+            }
+            return compr_modes;
+        }
+
+        QueryRequest create_query(Receiver &receiver)
+        {
+            vector<HashedItem> items{ HashedItem{ 1, 2 }, HashedItem{ 3, 4 } };
+            return to_query_request(receiver.create_query(items).first);
+        }
+    } // namespace
+
+    TEST(ReceiverComprModeTests, DefaultIsBitpack)
+    {
+        ASSERT_EQ(compr_mode_type::bitpack, Receiver::default_compr_mode);
+
+        Receiver receiver(make_test_params());
+        ASSERT_EQ(compr_mode_type::bitpack, receiver.get_compr_mode());
+        ASSERT_EQ(compr_mode_type::bitpack, create_query(receiver)->compr_mode);
+    }
+
+    TEST(ReceiverComprModeTests, SetComprModeAcceptsEverySupportedMode)
+    {
+        Receiver receiver(make_test_params());
+        for (compr_mode_type compr_mode : supported_compr_modes()) {
+            SCOPED_TRACE(compr_mode_str(compr_mode));
+            receiver.set_compr_mode(compr_mode);
+            ASSERT_EQ(compr_mode, receiver.get_compr_mode());
+            ASSERT_EQ(compr_mode, create_query(receiver)->compr_mode);
+        }
+    }
+
+    TEST(ReceiverComprModeTests, SetComprModeRejectsUnsupportedModes)
+    {
+        Receiver receiver(make_test_params());
+        receiver.set_compr_mode(compr_mode_type::none);
+
+        size_t unsupported_count = 0;
+        for (unsigned value = 0; value <= 0xFF; value++) {
+            if (Serialization::IsSupportedComprMode(static_cast<uint8_t>(value))) {
+                continue;
+            }
+            unsupported_count++;
+            ASSERT_THROW(
+                receiver.set_compr_mode(static_cast<compr_mode_type>(value)), invalid_argument);
+            ASSERT_EQ(compr_mode_type::none, receiver.get_compr_mode());
+        }
+        ASSERT_LT(size_t(0), unsupported_count);
+    }
+
+    TEST(ReceiverComprModeTests, RequestQueryUsesTheComprMode)
+    {
+        Receiver receiver(make_test_params());
+        vector<HashedItem> items{ HashedItem{ 1, 2 } };
+        LabelKeyVector label_keys;
+        CapturingChannel chl;
+
+        static_cast<void>(receiver.request_query(items, label_keys, chl));
+        receiver.set_compr_mode(compr_mode_type::none);
+        static_cast<void>(receiver.request_query(items, label_keys, chl));
+
+        vector<compr_mode_type> expected{ compr_mode_type::bitpack, compr_mode_type::none };
+        ASSERT_EQ(expected, chl.sent_compr_modes);
     }
 
     namespace {

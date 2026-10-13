@@ -301,7 +301,8 @@ namespace apsi {
         computes no matching polynomial. A query is answered with the label results alone, and
         the receiver accepts an item exactly when the sender returns the item's own tag. The
         receiver therefore needs the label keys of its items, which the OPRF provides, whether or
-        not the sender's items have labels. Without match tags, everything is as in APSI 1.x.
+        not the sender's items have labels. Without match tags, everything is as in APSI 1.x, except
+        that queries are bit-packed by default, as are their results.
         */
         [[nodiscard]]
         bool uses_tags() const

@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -13,8 +15,11 @@
 
 // APSI
 #include "apsi/item.h"
+#include "apsi/network/result_package.h"
+#include "apsi/network/result_package_generated.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/stream_channel.h"
+#include "apsi/oprf/oprf_sender.h"
 #include "apsi/psi_params.h"
 #include "apsi/query.h"
 #include "apsi/receiver.h"
@@ -301,5 +306,141 @@ namespace APSITests {
 
         // The parameters give two bundle indices, so without the guard there would be two.
         ASSERT_EQ(size_t(1), chl.attempts());
+    }
+
+    namespace {
+        vector<compr_mode_type> supported_compr_modes()
+        {
+            vector<compr_mode_type> compr_modes;
+            for (unsigned value = 0; value <= 0xFF; value++) {
+                if (Serialization::IsSupportedComprMode(static_cast<uint8_t>(value))) {
+                    compr_modes.push_back(static_cast<compr_mode_type>(value));
+                }
+            }
+            return compr_modes;
+        }
+
+        Label make_label(uint64_t i)
+        {
+            Label label(16);
+            for (size_t j = 0; j < label.size(); j++) {
+                label[j] = static_cast<unsigned char>((i * 31) + j);
+            }
+            return label;
+        }
+    } // namespace
+
+    TEST(ResponseComprModeTests, SenderAnswersInTheComprModeOfTheQuery)
+    {
+        PSIParams params = make_test_params();
+
+        // Labeled, so that the result packages hold label ciphertexts as well
+        constexpr size_t label_byte_count = 16;
+        constexpr size_t nonce_byte_count = 4;
+        auto sender_db = make_shared<SenderDB>(params, label_byte_count, nonce_byte_count);
+        vector<pair<Item, Label>> sender_data;
+        sender_data.reserve(40);
+        for (uint64_t i = 0; i < 40; i++) {
+            sender_data.emplace_back(Item(i, i + 1), make_label(i));
+        }
+        sender_db->set_data(sender_data);
+
+        // Three items in the database and two that are not
+        vector<Item> items{ Item(0, 1), Item(17, 18), Item(39, 40), Item(7, 7), Item(1000, 1) };
+        vector<optional<uint64_t>> expected_index{ 0, 17, 39, nullopt, nullopt };
+        vector<HashedItem> hashed_items;
+        LabelKeyVector label_keys;
+        for (const auto &item : items) {
+            auto hash = oprf::OPRFSender::GetItemHash(item, sender_db->get_oprf_key());
+            hashed_items.push_back(hash.first);
+            label_keys.push_back(hash.second);
+        }
+
+        // The number of label ciphertexts in each result package
+        size_t label_part_count =
+            ((8 * (label_byte_count + nonce_byte_count)) + params.item_bit_count() - 1) /
+            params.item_bit_count();
+
+        for (compr_mode_type compr_mode : supported_compr_modes()) {
+            SCOPED_TRACE(compr_mode_str(compr_mode));
+
+            Receiver receiver(params);
+            receiver.set_compr_mode(compr_mode);
+            auto query_and_itt = receiver.create_query(hashed_items);
+
+            // The query reaches the sender as bytes, as it would over a network
+            stringstream ss;
+            StreamChannel chl(ss);
+            chl.send(std::move(query_and_itt.first));
+            QueryRequest request =
+                to_query_request(chl.receive_operation(sender_db->get_seal_context()));
+            ASSERT_NE(nullptr, request);
+            ASSERT_EQ(compr_mode, request->compr_mode);
+
+            Query query(std::move(request), sender_db);
+            ASSERT_TRUE(query.is_valid());
+            ASSERT_EQ(compr_mode, query.compr_mode());
+
+            // Keep each result package as the bytes that would be sent
+            mutex saved_packages_mtx;
+            vector<string> saved_packages;
+            Sender::RunQuery(
+                query,
+                chl,
+                [](Channel &c, Response response) { c.send(std::move(response)); },
+                [&](Channel &, ResultPart rp) {
+                    stringstream rp_ss;
+                    rp->save(rp_ss);
+                    lock_guard<mutex> lock(saved_packages_mtx);
+                    saved_packages.push_back(rp_ss.str());
+                });
+
+            QueryResponse response = to_query_response(chl.receive_response());
+            ASSERT_NE(nullptr, response);
+            ASSERT_EQ(sender_db->get_bin_bundle_count(), saved_packages.size());
+            ASSERT_EQ(response->package_count, saved_packages.size());
+
+            vector<ResultPart> result_parts;
+            for (const auto &saved : saved_packages) {
+                // Every ciphertext in a result package is saved in the mode of the query. The
+                // result ciphertexts are not in NTT form, so in a mode other than bitpack they
+                // carry format version 4.0, which Microsoft SEAL 4.0 can load.
+                const auto *rp = fbs::GetSizePrefixedResultPackage(saved.data());
+                ASSERT_NE(nullptr, rp->label_result());
+                ASSERT_EQ(label_part_count, rp->label_result()->size());
+                vector<const flatbuffers::Vector<uint8_t> *> cts{ rp->psi_result()->data() };
+                for (const auto *ct : *rp->label_result()) {
+                    cts.push_back(ct->data());
+                }
+                for (const auto *ct : cts) {
+                    Serialization::SEALHeader header;
+                    Serialization::LoadHeader(
+                        reinterpret_cast<const seal_byte *>(ct->data()), ct->size(), header, false);
+                    ASSERT_EQ(compr_mode, header.compr_mode);
+                    ASSERT_EQ(Serialization::format_version_major, header.version_major);
+                    ASSERT_EQ(
+                        compr_mode == compr_mode_type::bitpack
+                            ? Serialization::format_version_minor_bitpack
+                            : Serialization::format_version_minor,
+                        header.version_minor);
+                }
+
+                stringstream rp_ss(saved);
+                auto result_part = make_unique<ResultPackage>();
+                result_part->load(rp_ss, receiver.get_seal_context());
+                result_parts.push_back(std::move(result_part));
+            }
+
+            // And the receiver reads the answer correctly
+            auto results = receiver.process_result(label_keys, query_and_itt.second, result_parts);
+            ASSERT_EQ(items.size(), results.size());
+            for (size_t i = 0; i < items.size(); i++) {
+                const optional<uint64_t> &index = expected_index[i];
+                ASSERT_EQ(index.has_value(), results[i].found);
+                if (index) {
+                    ASSERT_EQ(make_label(*index), results[i].label.value());
+                }
+            }
+        }
     }
 } // namespace APSITests

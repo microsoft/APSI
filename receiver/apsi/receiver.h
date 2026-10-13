@@ -31,6 +31,9 @@
 #include "apsi/responses.h"
 #include "apsi/seal_object.h"
 
+// SEAL
+#include "seal/serialization.h"
+
 namespace apsi::receiver {
     /**
     The Receiver class implements all necessary functions to create and send parameter, OPRF,
@@ -150,6 +153,23 @@ namespace apsi::receiver {
             std::chrono::minutes(30);
 
         /**
+        The compression mode a Receiver uses for its queries unless Receiver::set_compr_mode is
+        called.
+
+        Bit-packing stores each block of coefficients of the relinearization keys and ciphertexts
+        without the high-order and low-order bits that are zero in all of them, such as the
+        low-order bits a sender clears in its results. It saves several times faster than Zstandard,
+        loads about as fast or faster, and makes both queries and result packages smaller. The
+        sender saves its result packages in the mode the query was sent in, so the choice applies to
+        both directions.
+
+        Only Microsoft SEAL 4.6 and later can load bit-packed data, so a receiver querying a
+        sender built with an earlier version, as APSI 1.x senders usually are, must choose another
+        mode, normally seal::compr_mode_type::zstd.
+        */
+        static constexpr seal::compr_mode_type default_compr_mode = seal::compr_mode_type::bitpack;
+
+        /**
         Creates a new receiver with parameters specified. In this case the receiver has
         specified the parameters and expects the sender to use the same set.
         */
@@ -188,6 +208,25 @@ namespace apsi::receiver {
         {
             return crypto_context_.seal_context();
         }
+
+        /**
+        Returns the compression mode for the relinearization keys and ciphertexts in the queries
+        this Receiver creates.
+        */
+        [[nodiscard]] seal::compr_mode_type get_compr_mode() const noexcept
+        {
+            return compr_mode_;
+        }
+
+        /**
+        Sets the compression mode for the relinearization keys and ciphertexts in the queries this
+        Receiver creates from now on. Any mode this build of Microsoft SEAL supports can be used;
+        see Receiver::default_compr_mode for the default and for when to choose another. The sender
+        answers each query in the mode it was sent in.
+
+        Throws std::invalid_argument if this build of Microsoft SEAL does not support compr_mode.
+        */
+        void set_compr_mode(seal::compr_mode_type compr_mode);
 
         /**
         Performs a parameter request and returns the received PSIParams object.
@@ -272,6 +311,8 @@ namespace apsi::receiver {
         value 2^item_bit_count_per_felt in each of its slots, which no field element of a
         sender's item can take, so that an empty entry never selects a value the sender stores.
         Without match tags it is the all-zero item, as in APSI 1.x.
+
+        The query is saved in the compression mode Receiver::get_compr_mode returns.
         */
         std::pair<Request, IndexTranslationTable> create_query(
             const std::vector<HashedItem> &items);
@@ -443,5 +484,7 @@ namespace apsi::receiver {
         PowersDag pd_;
 
         SEALObject<seal::RelinKeys> relin_keys_;
+
+        seal::compr_mode_type compr_mode_ = default_compr_mode;
     }; // class Receiver
 } // namespace apsi::receiver

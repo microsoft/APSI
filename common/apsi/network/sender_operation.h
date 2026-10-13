@@ -20,6 +20,7 @@
 // SEAL
 #include "seal/ciphertext.h"
 #include "seal/relinkeys.h"
+#include "seal/serialization.h"
 #include "seal/util/common.h"
 
 namespace apsi::network {
@@ -34,6 +35,13 @@ namespace apsi::network {
     };
 
     const char *sender_operation_type_str(SenderOperationType sop_type);
+
+    /**
+    Returns the name of a Microsoft SEAL compression mode: "none", "zlib", "zstd", or "bitpack". A
+    value that is not a compression mode this build of Microsoft SEAL supports is reported as
+    "unsupported".
+    */
+    const char *compr_mode_str(seal::compr_mode_type compr_mode) noexcept;
 
     /**
     A class describing the type of a SenderOperation object and an optional member to identify
@@ -130,6 +138,10 @@ namespace apsi::network {
             return SenderOperationType::sop_query;
         }
 
+        /**
+        The compression mode for the relinearization keys and the ciphertexts in the query. The
+        sender saves the result packages for the query in the same mode.
+        */
         seal::compr_mode_type compr_mode = seal::Serialization::compr_mode_default;
 
         SEALObject<seal::RelinKeys> relin_keys;

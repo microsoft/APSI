@@ -71,11 +71,11 @@ namespace apsi {
             //
             // What the number bounds is the serialized payload ZeroMQ holds for a peer that has
             // stopped reading, since it keeps a queued message until that peer reads it rather
-            // than until the query ends, and keeps a queue per peer. A result package measures
-            // 443 KB at the largest shipped parameter set and 97 KB at a typical one, which puts
-            // one stalled peer on the order of a hundred megabytes where a high water mark of
-            // 70000 allowed tens of gigabytes. It does not bound what the sender itself holds:
-            // a result computed but not yet handed over is the sender's own memory.
+            // than until the query ends, and keeps a queue per peer. Bit-packed, a result package
+            // of the shipped parameter sets comes to up to about 0.8 MB, which puts one stalled
+            // peer at up to about 200 MB, where a high water mark of 70000 allowed tens of
+            // gigabytes. It does not bound what the sender itself holds: a result computed but not
+            // yet handed over is the sender's own memory.
             //
             // The value is a conservative operating choice rather than one the protocol dictates.
             // A peer that stalls long enough to fill the queue and keep it full for

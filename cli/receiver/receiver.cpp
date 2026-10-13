@@ -146,6 +146,7 @@ int remote_query(const CLP &cmd)
     APSI_LOG_INFO("Setting thread count to " << ThreadPoolMgr::GetThreadCount());
 
     Receiver receiver(*params);
+    receiver.set_compr_mode(cmd.compr_mode());
 
     auto [query_data, orig_items] = load_db(cmd.query_file());
     if (!query_data || !holds_alternative<CSVReader::UnlabeledData>(*query_data)) {
