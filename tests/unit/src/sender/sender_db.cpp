@@ -2,22 +2,39 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <memory>
 #include <numeric>
 #include <set>
 #include <sstream>
+#include <string>
 #include <thread>
 
 // APSI
 #include "apsi/log.h"
+#include "apsi/network/stream_channel.h"
 #include "apsi/oprf/oprf_common.h"
+#include "apsi/oprf/oprf_sender.h"
 #include "apsi/psi_params.h"
+#include "apsi/query.h"
+#include "apsi/receiver.h"
+#include "apsi/sender.h"
 #include "apsi/sender_db.h"
 #include "apsi/sender_db_generated.h"
+#include "apsi/util/db_encoding.h"
+#include "apsi/util/label_encryptor.h"
+
+// Kuku
+#include "kuku/locfunc.h"
+
+// SEAL
+#include "seal/util/uintarithsmallmod.h"
 
 // Google Test
 #include "gtest/gtest.h"
@@ -127,8 +144,8 @@ namespace APSITests {
             PSIParams::TableParams table_params = params.table_params();
             table_params.max_items_per_bin = max_items_per_bin;
 
-            // No query is run here, but the parameters still have to be consistent: a query power
-            // may not exceed max_items_per_bin, so drop the ones that no longer fit.
+            // The parameters must stay consistent for the queries that some tests run: a query
+            // power may not exceed max_items_per_bin, so drop the ones that no longer fit.
             PSIParams::QueryParams query_params = params.query_params();
             set<uint32_t> query_powers;
             for (uint32_t power : query_params.query_powers) {
@@ -672,6 +689,187 @@ namespace APSITests {
 
         test_fun(get_params1());
         test_fun(get_params2());
+    }
+
+    TEST(SenderDBTests, OverwriteChangesTheItemWhereItIsStored)
+    {
+        // An item being given a new label need not be in the newest bin bundle at its bundle
+        // index, and a newer bin bundle may well have room for it. The update must change the
+        // item where it is stored and nowhere else. Storing a second copy with the new label
+        // instead leaves the old copy answering queries with the old label, makes get_label --
+        // which reads the first bin bundle holding the item -- return the old label, and leaves a
+        // copy behind when the item is removed.
+        auto test_fun = [](const shared_ptr<PSIParams> &base_params) {
+            // Shallow bins and a known key, so that a few hundred items spill into further bin
+            // bundles at every bundle index, the same way on every run
+            PSIParams params = with_shallow_bins(*base_params, 3);
+            SenderDB sender_db(params, fixed_oprf_key(), 20, 16, true);
+
+            vector<pair<Item, Label>> data;
+            for (uint64_t i = 0; i < 300; i++) {
+                data.emplace_back(Item(i, ~i), create_label(static_cast<unsigned char>(i), 20));
+            }
+            sender_db.set_data(data);
+
+            // Make sure the case this test is about exists: more than one bin bundle at a bundle
+            // index, so that items in the older ones can be updated while the newer ones have
+            // room
+            size_t max_bundles = 0;
+            for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+                max_bundles = max(max_bundles, sender_db.get_bin_bundle_count(b));
+            }
+            ASSERT_LE(size_t(3), max_bundles);
+            size_t bin_bundle_count = sender_db.get_bin_bundle_count();
+
+            // Give every item a new label, all in one batch, and then a few one at a time
+            for (auto &item_label : data) {
+                item_label.second =
+                    create_label(static_cast<unsigned char>(item_label.second[0] + 100), 20);
+            }
+            sender_db.insert_or_assign(data);
+            for (size_t i = 0; i < data.size(); i += 29) {
+                data[i].second =
+                    create_label(static_cast<unsigned char>(data[i].second[0] + 50), 20);
+                sender_db.insert_or_assign(data[i]);
+            }
+
+            ASSERT_EQ(data.size(), sender_db.get_item_count());
+            ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+            for (const auto &item_label : data) {
+                ASSERT_EQ(item_label.second, sender_db.get_label(item_label.first));
+            }
+
+            // Removing every item leaves nothing behind
+            vector<Item> items;
+            for (const auto &item_label : data) {
+                items.push_back(item_label.first);
+            }
+            sender_db.remove(items);
+            ASSERT_EQ(0, sender_db.get_item_count());
+            ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+        };
+
+        test_fun(get_params1());
+        test_fun(get_params2());
+    }
+
+    TEST(SenderDBTests, FailedRemovalChangesNothing)
+    {
+        // A removal that cannot be completed must leave the database as it was: the item set and
+        // the bin bundles describing the same items, and the bin bundles ready to answer a query.
+        // The only way to reach the failure is a database whose item set names an item its bin
+        // bundles do not hold, so one is spliced together here from the item set of one database
+        // and the bin bundles of another built with the same key.
+        auto params = get_params1();
+        oprf::OPRFKey key = fixed_oprf_key();
+
+        SenderDB fewer(*params, key, 0, 0, true);
+        fewer.set_data(vector<Item>{ Item(1, 1), Item(2, 2) });
+        SenderDB more(*params, key, 0, 0, true);
+        more.set_data(vector<Item>{ Item(1, 1), Item(2, 2), Item(3, 3) });
+        ASSERT_EQ(fewer.get_bin_bundle_count(), more.get_bin_bundle_count());
+
+        // A saved SenderDB is a size-prefixed header followed by the bin bundles
+        auto header_size = [](const string &bytes) {
+            uint32_t size = 0;
+            memcpy(&size, bytes.data(), sizeof(size));
+            return sizeof(size) + size;
+        };
+        stringstream fewer_ss;
+        fewer.save(fewer_ss);
+        string fewer_bytes = fewer_ss.str();
+        stringstream more_ss;
+        more.save(more_ss);
+        string more_bytes = more_ss.str();
+
+        stringstream spliced_ss;
+        spliced_ss << more_bytes.substr(0, header_size(more_bytes))
+                   << fewer_bytes.substr(header_size(fewer_bytes));
+        SenderDB sender_db = SenderDB::Load(spliced_ss).first;
+        ASSERT_EQ(3, sender_db.get_item_count());
+        ASSERT_TRUE(sender_db.has_item(Item(3, 3)));
+
+        // Item 3 is in the item set but in no bin bundle, so this removal cannot be completed
+        ASSERT_THROW(sender_db.remove(vector<Item>{ Item(1, 1), Item(3, 3) }), logic_error);
+
+        // Nothing changed
+        ASSERT_EQ(3, sender_db.get_item_count());
+        ASSERT_EQ(3, sender_db.get_hashed_items().size());
+        ASSERT_TRUE(sender_db.has_item(Item(1, 1)));
+        ASSERT_TRUE(sender_db.has_item(Item(3, 3)));
+        ASSERT_EQ(fewer.get_bin_bundle_count(), sender_db.get_bin_bundle_count());
+        for (uint32_t b = 0; b < params->bundle_idx_count(); b++) {
+            ASSERT_NO_THROW(static_cast<void>(sender_db.get_cache_at(b)));
+        }
+        stringstream after_ss;
+        sender_db.save(after_ss);
+        ASSERT_EQ(
+            fewer_bytes.substr(header_size(fewer_bytes)),
+            after_ss.str().substr(header_size(after_ss.str())));
+
+        // The items that are there can still be removed
+        sender_db.remove(vector<Item>{ Item(1, 1), Item(2, 2) });
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+    }
+
+    TEST(SenderDBTests, RemovalOfAMissingItemChangesNothing)
+    {
+        auto test_fun = [](size_t label_byte_count) {
+            auto params = get_params1();
+            SenderDB sender_db(*params, label_byte_count);
+            Item stored(1, 1);
+            if (label_byte_count) {
+                sender_db.insert_or_assign({ stored, create_label(1, label_byte_count) });
+            } else {
+                sender_db.insert_or_assign(stored);
+            }
+            ASSERT_EQ(size_t(1), sender_db.get_item_count());
+
+            // A batch naming an item that is not in the database is refused before any of its
+            // items is removed
+            Item missing(2, 2);
+            ASSERT_THROW(sender_db.remove(vector<Item>{ stored, missing }), logic_error);
+            ASSERT_EQ(size_t(1), sender_db.get_item_count());
+            ASSERT_TRUE(sender_db.has_item(stored));
+            for (uint32_t b = 0; b < params->bundle_idx_count(); b++) {
+                ASSERT_NO_THROW(static_cast<void>(sender_db.get_cache_at(b)));
+            }
+        };
+
+        test_fun(0);
+        test_fun(8);
+    }
+
+    TEST(SenderDBTests, RepeatedItemInOneRemovalIsCollapsed)
+    {
+        auto test_fun = [](size_t label_byte_count) {
+            auto params = get_params1();
+            SenderDB sender_db(*params, label_byte_count);
+            Item a(1, 1);
+            Item b(2, 2);
+            Item c(3, 3);
+            if (label_byte_count) {
+                vector<pair<Item, Label>> data;
+                data.emplace_back(a, create_label(1, label_byte_count));
+                data.emplace_back(b, create_label(2, label_byte_count));
+                data.emplace_back(c, create_label(3, label_byte_count));
+                sender_db.insert_or_assign(data);
+            } else {
+                sender_db.insert_or_assign(vector<Item>{ a, b, c });
+            }
+            ASSERT_EQ(size_t(3), sender_db.get_item_count());
+
+            // Removing an item twice in one batch is the same as removing it once
+            ASSERT_NO_THROW(sender_db.remove(vector<Item>{ a, a, b }));
+            ASSERT_EQ(size_t(1), sender_db.get_item_count());
+            ASSERT_FALSE(sender_db.has_item(a));
+            ASSERT_FALSE(sender_db.has_item(b));
+            ASSERT_TRUE(sender_db.has_item(c));
+        };
+
+        test_fun(0);
+        test_fun(8);
     }
 
     TEST(SenderDBTests, LoadRejectsABufferMissingRequiredFields)
@@ -1232,5 +1430,384 @@ namespace APSITests {
 
         // Never optimistic: the database figure is at least the single-bundle one.
         ASSERT_LE(params.log2_fpp_per_bin_bundle(), sender_db.log2_fpp(1));
+    }
+
+    namespace {
+        apsi::util::felt_t evaluate_polyn(
+            const FEltPolyn &polyn, apsi::util::felt_t x, const Modulus &mod)
+        {
+            apsi::util::felt_t result = 0;
+            for (size_t i = polyn.size(); i-- > 0;) {
+                result = seal::util::multiply_uint_mod(result, x, mod);
+                result = seal::util::add_uint_mod(result, polyn[i], mod);
+            }
+            return result;
+        }
+
+        /**
+        Computes the locations of a HashedItem as a SenderDB with the given parameters does, as
+        pairs of a bundle index and the first bin of the location in that bundle.
+        */
+        vector<pair<uint32_t, size_t>> places_of(
+            const HashedItem &hashed_item, const PSIParams &params)
+        {
+            kuku::item_type kuku_item;
+            memcpy(&kuku_item, hashed_item.value().data(), sizeof(kuku_item));
+
+            set<uint32_t> locations;
+            for (uint32_t i = 0; i < params.table_params().hash_func_count; i++) {
+                kuku::LocFunc hash_func(params.table_params().table_size, kuku::make_item(i, 0));
+                locations.insert(hash_func(kuku_item));
+            }
+
+            vector<pair<uint32_t, size_t>> places;
+            for (uint32_t location : locations) {
+                places.emplace_back(
+                    location / params.items_per_bundle(),
+                    (location % params.items_per_bundle()) * params.item_params().felts_per_item);
+            }
+            return places;
+        }
+
+        /**
+        Returns the SenderDB that sender_db would be if it also held the bin bundles of others,
+        after its own: what an older version of APSI could leave behind when it stored an item a
+        second time on updating the item's label. The others must have been built with the same
+        parameters and OPRF key, and hold only items sender_db holds.
+        */
+        SenderDB with_extra_bin_bundles(
+            const SenderDB &sender_db, const vector<const SenderDB *> &others)
+        {
+            // A saved SenderDB is a size-prefixed header followed by the bin bundles
+            auto saved = [](const SenderDB &db) {
+                stringstream ss;
+                db.save(ss);
+                return ss.str();
+            };
+            auto header_size = [](const string &bytes) {
+                uint32_t size = 0;
+                memcpy(&size, bytes.data(), sizeof(size));
+                return sizeof(size) + size;
+            };
+
+            string bytes = saved(sender_db);
+            const auto *header = fbs::GetSizePrefixedSenderDB(bytes.data());
+            uint32_t bin_bundle_count = header->bin_bundle_count();
+            string bin_bundles = bytes.substr(header_size(bytes));
+            for (const SenderDB *other : others) {
+                string other_bytes = saved(*other);
+                bin_bundle_count +=
+                    fbs::GetSizePrefixedSenderDB(other_bytes.data())->bin_bundle_count();
+                bin_bundles += other_bytes.substr(header_size(other_bytes));
+            }
+
+            // The same header, counting the bin bundles appended
+            flatbuffers::FlatBufferBuilder builder(1024);
+            auto params = builder.CreateVector(header->params()->data(), header->params()->size());
+            auto oprf_key =
+                builder.CreateVector(header->oprf_key()->data(), header->oprf_key()->size());
+            vector<fbs::HashedItem> hashed_items;
+            for (const auto *hashed_item : *header->hashed_items()) {
+                hashed_items.push_back(*hashed_item);
+            }
+            auto hashed_items_vec = builder.CreateVectorOfStructs(hashed_items);
+            fbs::SenderDBBuilder sender_db_builder(builder);
+            sender_db_builder.add_params(params);
+            sender_db_builder.add_info(header->info());
+            sender_db_builder.add_oprf_key(oprf_key);
+            sender_db_builder.add_hashed_items(hashed_items_vec);
+            sender_db_builder.add_bin_bundle_count(bin_bundle_count);
+            builder.FinishSizePrefixed(sender_db_builder.Finish());
+
+            stringstream ss;
+            ss.write(
+                reinterpret_cast<const char *>(builder.GetBufferPointer()),
+                static_cast<streamsize>(builder.GetSize()));
+            ss << bin_bundles;
+            return SenderDB::Load(ss).first;
+        }
+
+        /**
+        Returns, for each location of the item, the label of every copy of it the SenderDB stores
+        there, in sorted order: the label decrypted from the label polynomials of each bin bundle
+        that holds the item, as a query matching that bin bundle would give it. Unlike get_label,
+        which reads one copy, this sees every copy.
+        */
+        vector<vector<Label>> stored_labels(
+            SenderDB &sender_db, const Item &item, const oprf::OPRFKey &key)
+        {
+            const PSIParams &params = sender_db.get_params();
+            const Modulus &mod = params.seal_params().plain_modulus();
+            size_t felts_per_item = params.item_params().felts_per_item;
+
+            auto [hashed_item, label_key] = oprf::OPRFSender::GetItemHash(item, key);
+            vector<apsi::util::felt_t> felts =
+                apsi::util::algebraize_item(hashed_item, params.item_bit_count(), mod);
+
+            vector<vector<Label>> labels;
+            for (const auto &place : places_of(hashed_item, params)) {
+                labels.emplace_back();
+                for (const BinBundleCache &cache : sender_db.get_cache_at(place.first)) {
+                    // Whether this bin bundle holds the item: its matching polynomials vanish at
+                    // the item's field elements
+                    bool holds = true;
+                    for (size_t s = 0; holds && (s < felts_per_item); s++) {
+                        size_t bin = place.second + s;
+                        holds = evaluate_polyn(cache.felt_matching_polyns[bin], felts[s], mod) == 0;
+                    }
+                    if (!holds) {
+                        continue;
+                    }
+
+                    // The label parts in the item's slots, part by part, as a receiver collects
+                    // them
+                    apsi::util::AlgLabel alg_label;
+                    size_t part_count = cache.felt_interp_polyns.size();
+                    for (size_t p = 0; p < part_count; p++) {
+                        for (size_t s = 0; s < felts_per_item; s++) {
+                            alg_label.push_back(evaluate_polyn(
+                                cache.felt_interp_polyns[p][place.second + s], felts[s], mod));
+                        }
+                    }
+                    EncryptedLabel encrypted_label = apsi::util::dealgebraize_label(
+                        alg_label, part_count * params.item_bit_count(), mod);
+                    encrypted_label.resize(
+                        sender_db.get_nonce_byte_count() + sender_db.get_label_byte_count());
+                    labels.back().push_back(
+                        apsi::util::decrypt_label(
+                            encrypted_label, label_key, sender_db.get_nonce_byte_count()));
+                }
+                sort(labels.back().begin(), labels.back().end());
+            }
+            return labels;
+        }
+
+        /**
+        Queries the SenderDB for the given items through the whole protocol, and returns for each
+        item, in sorted order, the label of every match a result package gives it. The packages
+        are processed one by one, so this sees every copy of an item the query reaches, where
+        process_result would keep only the first match.
+        */
+        vector<vector<Label>> query_labels(
+            const shared_ptr<SenderDB> &sender_db,
+            const oprf::OPRFKey &key,
+            const vector<Item> &items)
+        {
+            vector<HashedItem> hashed_items;
+            LabelKeyVector label_keys;
+            for (const auto &item : items) {
+                auto [hashed_item, label_key] = oprf::OPRFSender::GetItemHash(item, key);
+                hashed_items.push_back(hashed_item);
+                label_keys.push_back(label_key);
+            }
+
+            apsi::receiver::Receiver recv(sender_db->get_params());
+            auto [request, itt] = recv.create_query(hashed_items);
+
+            stringstream ss;
+            network::StreamChannel chl(ss);
+            chl.send(std::move(request));
+            Query query(
+                to_query_request(chl.receive_operation(sender_db->get_seal_context())), sender_db);
+            Sender::RunQuery(query, chl);
+
+            QueryResponse query_response = to_query_response(chl.receive_response());
+            vector<vector<Label>> labels(items.size());
+            for (uint32_t i = 0; i < query_response->package_count; i++) {
+                ResultPart result_part = chl.receive_result(recv.get_seal_context());
+                vector<apsi::receiver::MatchRecord> mrs =
+                    recv.process_result_part(label_keys, itt, result_part);
+                for (size_t j = 0; j < mrs.size(); j++) {
+                    if (mrs[j].found) {
+                        labels[j].push_back(mrs[j].label.value());
+                    }
+                }
+            }
+            for (auto &item_labels : labels) {
+                sort(item_labels.begin(), item_labels.end());
+            }
+            return labels;
+        }
+
+        /**
+        Collects the warnings logged while it exists, and restores the global logger and log
+        level when it is destroyed.
+        */
+        class WarningCapture {
+        public:
+            WarningCapture() : saved_level_(GetLogLevel())
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::warning)] = [this](const string &msg) {
+                    warnings_.push_back(msg);
+                };
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+                SetLogLevel(LogLevel::warning);
+            }
+
+            ~WarningCapture()
+            {
+                CloseLogger();
+                SetLogLevel(saved_level_);
+            }
+
+            WarningCapture(const WarningCapture &) = delete;
+
+            WarningCapture &operator=(const WarningCapture &) = delete;
+
+            /**
+            Returns how many of the warnings contain the given text.
+            */
+            size_t count(const string &text) const
+            {
+                return static_cast<size_t>(
+                    count_if(warnings_.begin(), warnings_.end(), [&](const string &warning) {
+                        return warning.find(text) != string::npos;
+                    }));
+            }
+
+        private:
+            LogLevel saved_level_;
+
+            vector<string> warnings_;
+        };
+    } // namespace
+
+    TEST(SenderDBTests, OverwriteChangesEveryCopyOfAnItemStoredMoreThanOnce)
+    {
+        // An older version of APSI could store an item a second time when it updated the item's
+        // label (see OverwriteChangesTheItemWhereItIsStored), leaving the copy with the old label
+        // in an older bin bundle to answer queries. Such a database is put together here: the bin
+        // bundles of two more databases, built with the same key and holding some of the same
+        // items with other labels, are appended to those of a first one. Updating one of these
+        // items must change every copy, so that every copy a query can match gives the new label,
+        // and must warn, naming how many copies there are. Removing the item drops every copy.
+        auto test_fun = [](const PSIParams &params) {
+            oprf::OPRFKey key = fixed_oprf_key();
+            constexpr size_t label_byte_count = 20;
+            unsigned char next_label = 0;
+            auto make_data = [&](uint64_t count) {
+                vector<pair<Item, Label>> data;
+                for (uint64_t i = 0; i < count; i++) {
+                    data.emplace_back(Item(i, ~i), create_label(next_label++, label_byte_count));
+                }
+                return data;
+            };
+
+            // Items 0 to 4 end up stored three times, items 5 to 9 twice, and the rest once
+            vector<pair<Item, Label>> first = make_data(100);
+            vector<pair<Item, Label>> second = make_data(10);
+            vector<pair<Item, Label>> third = make_data(5);
+            SenderDB first_db(params, key, label_byte_count, 16, true);
+            first_db.set_data(first);
+            SenderDB second_db(params, key, label_byte_count, 16, true);
+            second_db.set_data(second);
+            SenderDB third_db(params, key, label_byte_count, 16, true);
+            third_db.set_data(third);
+            auto sender_db =
+                make_shared<SenderDB>(with_extra_bin_bundles(first_db, { &second_db, &third_db }));
+            size_t bin_bundle_count = sender_db->get_bin_bundle_count();
+            ASSERT_EQ(
+                first_db.get_bin_bundle_count() + second_db.get_bin_bundle_count() +
+                    third_db.get_bin_bundle_count(),
+                bin_bundle_count);
+            ASSERT_EQ(first.size(), sender_db->get_item_count());
+
+            // The labels of the copies of an item, as they were stored
+            auto labels_of = [&](size_t i) {
+                vector<Label> labels{ first[i].second };
+                if (i < second.size()) {
+                    labels.push_back(second[i].second);
+                }
+                if (i < third.size()) {
+                    labels.push_back(third[i].second);
+                }
+                sort(labels.begin(), labels.end());
+                return labels;
+            };
+
+            // Every location of each of the first 15 items holds its copies, each with its own
+            // label, and a query matches every one of them
+            constexpr size_t checked = 15;
+            vector<Item> items;
+            array<size_t, 4> locations_by_copy_count{};
+            for (size_t i = 0; i < checked; i++) {
+                items.push_back(first[i].first);
+                vector<vector<Label>> stored = stored_labels(*sender_db, items[i], key);
+                ASSERT_FALSE(stored.empty());
+                for (const auto &at_location : stored) {
+                    ASSERT_EQ(labels_of(i), at_location) << "item " << i;
+                }
+                locations_by_copy_count[labels_of(i).size()] += stored.size();
+            }
+            vector<vector<Label>> queried = query_labels(sender_db, key, items);
+            for (size_t i = 0; i < checked; i++) {
+                ASSERT_EQ(labels_of(i), queried[i]) << "item " << i;
+            }
+
+            // Updating them overwrites every copy, and warns once for each location of an item
+            // stored more than once
+            vector<pair<Item, Label>> update = make_data(checked);
+            {
+                WarningCapture capture;
+                ASSERT_NO_THROW(sender_db->insert_or_assign(update));
+                ASSERT_EQ(locations_by_copy_count[3], capture.count("overwriting all 3 copies"));
+                ASSERT_EQ(locations_by_copy_count[2], capture.count("overwriting all 2 copies"));
+                ASSERT_EQ(
+                    locations_by_copy_count[2] + locations_by_copy_count[3],
+                    capture.count(
+                        "Removing the item and inserting it again drops the extra copies"));
+            }
+            ASSERT_EQ(first.size(), sender_db->get_item_count());
+            ASSERT_EQ(bin_bundle_count, sender_db->get_bin_bundle_count());
+
+            for (size_t i = 0; i < checked; i++) {
+                vector<Label> expected(labels_of(i).size(), update[i].second);
+                for (const auto &at_location : stored_labels(*sender_db, items[i], key)) {
+                    ASSERT_EQ(expected, at_location) << "item " << i;
+                }
+                ASSERT_EQ(update[i].second, sender_db->get_label(items[i])) << "item " << i;
+            }
+
+            queried = query_labels(sender_db, key, items);
+            for (size_t i = 0; i < checked; i++) {
+                ASSERT_EQ(vector<Label>(labels_of(i).size(), update[i].second), queried[i])
+                    << "item " << i;
+            }
+
+            for (size_t i = checked; i < first.size(); i += 7) {
+                ASSERT_EQ(first[i].second, sender_db->get_label(first[i].first)) << "item " << i;
+            }
+
+            // Removing the items stored more than once drops every copy, and inserting them again
+            // stores one, which a later update finds without a warning
+            vector<Item> removed(
+                items.begin(), items.begin() + static_cast<ptrdiff_t>(second.size()));
+            sender_db->remove(removed);
+            ASSERT_GE(first_db.get_bin_bundle_count(), sender_db->get_bin_bundle_count());
+            for (const auto &item : removed) {
+                ASSERT_FALSE(sender_db->has_item(item));
+                for (const auto &at_location : stored_labels(*sender_db, item, key)) {
+                    ASSERT_TRUE(at_location.empty());
+                }
+            }
+            vector<pair<Item, Label>> reinserted = make_data(second.size());
+            sender_db->insert_or_assign(reinserted);
+            ASSERT_EQ(first.size(), sender_db->get_item_count());
+            vector<pair<Item, Label>> last_update = make_data(checked);
+            {
+                WarningCapture capture;
+                sender_db->insert_or_assign(last_update);
+                ASSERT_EQ(0, capture.count("copies of an item"));
+            }
+            for (size_t i = 0; i < checked; i++) {
+                for (const auto &at_location : stored_labels(*sender_db, items[i], key)) {
+                    ASSERT_EQ(vector<Label>{ last_update[i].second }, at_location) << "item " << i;
+                }
+                ASSERT_EQ(last_update[i].second, sender_db->get_label(items[i]));
+            }
+        };
+
+        test_fun(with_shallow_bins(*get_params1(), 3));
     }
 } // namespace APSITests

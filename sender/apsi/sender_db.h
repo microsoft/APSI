@@ -36,7 +36,10 @@ namespace apsi::sender {
     number of new items into a SenderDB can take time, it is not recommended to recreate the
     SenderDB when the database changes a little bit. Instead, the class supports fast update and
     deletion operations that should be preferred: SenderDB::insert_or_assign and
-    SenderDB::remove.
+    SenderDB::remove. SenderDB::insert_or_assign inserts the items that are not yet in the database
+    and, in a labeled SenderDB, replaces the labels of the others in place, never storing an item
+    twice. SenderDB::remove removes all of a batch or nothing: if any item is not in the database,
+    it throws std::logic_error before changing anything.
 
     The SenderDB constructor allows the label byte count to be specified; unlabeled mode is
     activated by setting the label byte count to zero. It is possible to optionally specify the
@@ -156,7 +159,9 @@ namespace apsi::sender {
         /**
         Inserts the given data into the database. This function can be used only on a labeled
         SenderDB instance. If an item already exists in the database, its label is overwritten
-        with the new label.
+        with the new label in every bin bundle that holds it. APSI 1.x could store an item more
+        than once when it updated the item's label; every copy is then overwritten, and a warning
+        is logged. Removing such an item and inserting it again drops the extra copies.
         */
         void insert_or_assign(const std::vector<std::pair<Item, Label>> &data);
 
@@ -208,12 +213,14 @@ namespace apsi::sender {
         }
 
         /**
-        Removes the given data from the database, using at most thread_count threads.
+        Removes the given data from the database. An item given more than once is removed once.
+        Throws std::logic_error if an item is not in the database, in which case nothing is removed.
         */
         void remove(const std::vector<Item> &data);
 
         /**
-        Removes the given (hashed) item from the database.
+        Removes the given (hashed) item from the database. Throws std::logic_error if the item is
+        not in the database.
         */
         void remove(const Item &data)
         {

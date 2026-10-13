@@ -325,6 +325,15 @@ namespace apsi::sender {
         bool try_multi_overwrite(const std::vector<T> &item_labels, std::size_t start_bin_idx);
 
         /**
+        Returns whether the given items are stored in sequential bins, beginning at
+        start_bin_idx, found exactly as try_multi_overwrite and try_multi_remove find them. Any
+        labels given are ignored. Unlike those functions, this never changes the BinBundle, so it
+        can be used to find out where an item is stored before deciding what to change.
+        */
+        template <typename T>
+        bool multi_contains(const std::vector<T> &item_labels, std::size_t start_bin_idx) const;
+
+        /**
         Attempts to remove the stored items and labels. Returns true iff it found a contiguous
         sequence of given items and the data was successfully removed. If no such sequence was
         found, this BinBundle is not mutated.

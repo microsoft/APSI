@@ -754,6 +754,52 @@ namespace apsi {
             return true;
         }
 
+        template <>
+        // Unlabeled overload names its argument 'items' rather than the generic 'item_labels'.
+        // NOLINTNEXTLINE(readability-inconsistent-declaration-parameter-name)
+        bool BinBundle::multi_contains(const vector<felt_t> &items, size_t start_bin_idx) const
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot search for data in a stripped BinBundle");
+                throw logic_error("failed to search for data");
+            }
+            if (items.empty()) {
+                APSI_LOG_ERROR("No item data to search for");
+                return false;
+            }
+
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx) {
+                return false;
+            }
+
+            // Every item component must appear in its bin, as try_multi_overwrite and
+            // try_multi_remove require
+            size_t curr_bin_idx = start_bin_idx;
+            for (felt_t curr_item : items) {
+                if (!is_present(item_bins_[curr_bin_idx], filters_[curr_bin_idx], curr_item)) {
+                    return false;
+                }
+
+                curr_bin_idx++;
+            }
+
+            return true;
+        }
+
+        template <>
+        bool BinBundle::multi_contains(
+            const vector<pair<felt_t, vector<felt_t>>> &item_labels, size_t start_bin_idx) const
+        {
+            vector<felt_t> items;
+            items.reserve(item_labels.size());
+            for (const auto &curr_item_label : item_labels) {
+                items.push_back(curr_item_label.first);
+            }
+
+            return multi_contains(items, start_bin_idx);
+        }
+
         bool BinBundle::try_multi_remove(const vector<felt_t> &items, size_t start_bin_idx)
         {
             if (stripped_) {

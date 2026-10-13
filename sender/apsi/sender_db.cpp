@@ -212,11 +212,11 @@ namespace apsi {
 
             /**
             Inserts the given items and corresponding labels into bin_bundles at their respective
-            cuckoo indices. It will only insert the data with bundle index in the half-open range
-            range indicated by work_range. If inserting into a BinBundle would make the number of
-            items in a bin larger than max_bin_size, this function will create and insert a new
-            BinBundle. If overwrite is set, this will overwrite the labels if it finds an
-            AlgItemLabel that matches the input perfectly.
+            cuckoo indices, for the items whose bundle index is bundle_index. An item goes into the
+            newest BinBundle that accepts it, or into a new BinBundle if none does. A bin holds at
+            most max_bin_size - 1 items. If overwrite is set, every item must already be stored in
+            the BinBundles at its bundle index; its labels are overwritten in every one of them that
+            holds it, and nothing is inserted.
             */
             template <typename T>
             void insert_or_assign_worker(
@@ -256,21 +256,56 @@ namespace apsi {
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
-                    // Try to insert or overwrite these field elements in an existing BinBundle at
-                    // this bundle index. Keep track of whether or not we succeed.
-                    bool written = false;
-                    for (auto bundle_it = bundle_set.rbegin(); bundle_it != bundle_set.rend();
-                         bundle_it++) {
-                        // If we're supposed to overwrite, try to overwrite. One of these BinBundles
-                        // has to have the data we're trying to overwrite.
-                        if (overwrite) {
-                            // If we successfully overwrote, we're done with this bundle
-                            written = bundle_it->try_multi_overwrite(data, bin_idx);
-                            if (written) {
-                                break;
+                    // Overwrite the item in every BinBundle that holds it, all found before any is
+                    // changed, and in no other. Trying them one at a time, as APSI 1.x did, can
+                    // store a second copy with the new label and leave the old one to answer
+                    // queries, so an item can be stored more than once; every copy is overwritten,
+                    // so that whichever one a query matches gives the new label.
+                    if (overwrite) {
+                        vector<BinBundle *> holders;
+                        for (auto &bundle : bundle_set) {
+                            if (bundle.multi_contains(data, bin_idx)) {
+                                holders.push_back(&bundle);
                             }
                         }
 
+                        // The item is in the database, so this should never happen
+                        if (holders.empty()) {
+                            APSI_LOG_ERROR(
+                                "Insert-or-Assign worker: "
+                                "failed to overwrite item at bundle index "
+                                << bundle_idx << " because no BinBundle there holds it");
+                            throw logic_error("tried to overwrite non-existent item");
+                        }
+
+                        if (holders.size() > 1) {
+                            APSI_LOG_WARNING(
+                                "Insert-or-Assign worker: overwriting all "
+                                << holders.size() << " copies of an item at bundle index "
+                                << bundle_idx
+                                << "; an older version of APSI stored the item more than once "
+                                   "when it updated its label. Removing the item and inserting it "
+                                   "again drops the extra copies.");
+                        }
+
+                        for (BinBundle *holder : holders) {
+                            if (!holder->try_multi_overwrite(data, bin_idx)) {
+                                APSI_LOG_ERROR(
+                                    "Insert-or-Assign worker: "
+                                    "failed to overwrite item at bundle index "
+                                    << bundle_idx << " although it was found there");
+                                throw logic_error("failed to overwrite item");
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    // Try to insert these field elements in an existing BinBundle at this bundle
+                    // index. Keep track of whether or not we succeed.
+                    bool written = false;
+                    for (auto bundle_it = bundle_set.rbegin(); bundle_it != bundle_set.rend();
+                         bundle_it++) {
                         // Do a dry-run insertion and see if the new largest bin size in the range
                         // exceeds the limit
                         int32_t new_largest_bin_size =
@@ -284,17 +319,6 @@ namespace apsi {
                             written = true;
                             break;
                         }
-                    }
-
-                    // We tried to overwrite an item that doesn't exist. This should never happen
-                    if (overwrite && !written) {
-                        APSI_LOG_ERROR(
-                            "Insert-or-Assign worker: "
-                            "failed to overwrite item at bundle index "
-                            << bundle_idx
-                            << " "
-                               "because the item was not found");
-                        throw logic_error("tried to overwrite non-existent item");
                     }
 
                     // If we had conflicts everywhere when trying to insert, then we need to make a
@@ -398,8 +422,55 @@ namespace apsi {
             }
 
             /**
+            Checks, without changing anything, that each of the given items is stored at its
+            respective cuckoo index in at least one of bin_bundles. Only the data with bundle index
+            bundle_index is checked. Throws std::logic_error if an item is missing.
+            */
+            void remove_check_worker(
+                const vector<pair<AlgItem, size_t>> &data_with_indices,
+                const vector<vector<BinBundle>> &bin_bundles,
+                uint32_t bundle_index,
+                uint32_t bins_per_bundle)
+            {
+                STOPWATCH(sender_stopwatch, "remove_check_worker");
+
+                for (const auto &data_with_idx : data_with_indices) {
+                    // Get the bundle index
+                    size_t cuckoo_idx = data_with_idx.second;
+
+                    auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    // If the bundle_idx isn't in the prescribed range, don't check this data
+                    if (bundle_idx != bundle_index) {
+                        // Dealing with this bundle index is not our job
+                        continue;
+                    }
+
+                    const vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
+                    bool found = false;
+                    for (const BinBundle &bundle : bundle_set) {
+                        if (bundle.multi_contains(data_with_idx.first, bin_idx)) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    // SenderDB::remove has checked that the item is in the SenderDB, so this means
+                    // the item set and the bin bundles disagree. Nothing has been removed yet.
+                    if (!found) {
+                        APSI_LOG_ERROR(
+                            "Remove worker: the item to remove at bundle index "
+                            << bundle_idx << " was not found; nothing has been removed");
+                        throw logic_error("failed to remove item");
+                    }
+                }
+            }
+
+            /**
             Removes the given items and corresponding labels from bin_bundles at their respective
-            cuckoo indices.
+            cuckoo indices. An item found in more than one BinBundle at its bundle index, as
+            APSI 1.x could leave one behind when it updated a label, is removed from every one of
+            them.
             */
             void remove_worker(
                 const vector<pair<AlgItem, size_t>> &data_with_indices,
@@ -427,15 +498,20 @@ namespace apsi {
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
-                    // Try to remove these field elements from an existing BinBundle at this bundle
-                    // index. Keep track of whether or not we succeed.
-                    bool removed = false;
+                    // Remove these field elements from every BinBundle at this bundle index that
+                    // holds them, and count the BinBundles that did
+                    size_t removed_count = 0;
                     for (BinBundle &bundle : bundle_set) {
-                        // If we successfully removed, we're done with this bundle
-                        removed = bundle.try_multi_remove(data_with_idx.first, bin_idx);
-                        if (removed) {
-                            break;
+                        if (bundle.try_multi_remove(data_with_idx.first, bin_idx)) {
+                            removed_count++;
                         }
+                    }
+
+                    if (removed_count > 1) {
+                        APSI_LOG_WARNING(
+                            "Remove worker: removed an item stored in "
+                            << removed_count << " BinBundles at bundle index " << bundle_idx
+                            << " instead of one");
                     }
 
                     // We may have produced some empty BinBundles so just remove them all
@@ -444,8 +520,9 @@ namespace apsi {
                     });
                     bundle_set.erase(rem_it, bundle_set.end());
 
-                    // We tried to remove an item that doesn't exist. This should never happen
-                    if (!removed) {
+                    // We tried to remove an item that doesn't exist. The check that runs before
+                    // any removal makes this impossible.
+                    if (!removed_count) {
                         APSI_LOG_ERROR(
                             "Remove worker: "
                             "failed to remove item at bundle index "
@@ -460,8 +537,10 @@ namespace apsi {
             }
 
             /**
-            Takes algebraized data to be removed, splits it up, and distributes it so that
-            thread_count many threads can all remove in parallel.
+            Takes algebraized data to be removed, splits it up, and distributes it so that worker
+            threads can all remove in parallel. Every item is first checked to be present, and
+            nothing is removed unless all of them are: a removal cannot be undone partway, so a
+            batch that cannot be removed in full has to be refused before it has had any effect.
             */
             void dispatch_remove(
                 const vector<pair<AlgItem, size_t>> &data_with_indices,
@@ -491,6 +570,24 @@ namespace apsi {
                     bundle_indices_set.end(),
                     back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
+
+                // Check that everything to remove is present before removing anything
+                {
+                    TaskGroup check_tasks(tpm.thread_pool());
+                    check_tasks.reserve(bundle_indices.size());
+                    for (auto &bundle_idx : bundle_indices) {
+                        check_tasks.add([&, bundle_idx] {
+                            remove_check_worker(
+                                data_with_indices,
+                                bin_bundles,
+                                static_cast<uint32_t>(bundle_idx),
+                                bins_per_bundle);
+                        });
+                    }
+
+                    // Wait for the tasks to finish
+                    check_tasks.join();
+                }
 
                 // Run the threads on the partitions
                 TaskGroup tasks(tpm.thread_pool());
@@ -1056,27 +1153,31 @@ namespace apsi {
             // Compute the hashes for the input data
             auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
 
-            // Remove items that do not exist in the database.
-            auto existing_data_end =
-                remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
-                    bool found = hashed_items_.find(item) != hashed_items_.end();
-                    if (found) {
-                        // Remove from hashed_items_ already at this point!
-                        hashed_items_.erase(item);
-                        item_count_--;
-                    }
+            // Removing an item twice in one batch is the same as removing it once, so repeats are
+            // collapsed. remove_if applies its predicate exactly once per element, which is what
+            // makes using it to deduplicate sound.
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(hashed_data.size());
+            hashed_data.erase(
+                remove_if(
+                    hashed_data.begin(),
+                    hashed_data.end(),
+                    [&](const auto &item) { return !batch_items.insert(item).second; }),
+                hashed_data.end());
 
-                    // Remove those that were not found
-                    return !found;
+            // An item that is not in the database cannot be removed. Removal fans out across
+            // worker threads and cannot be unwound partway, so the batch is refused before it has
+            // had any effect, and nothing is recorded until the removal below has succeeded: the
+            // item set must keep describing the bin bundles if it fails.
+            auto missing_item_count =
+                count_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
+                    return hashed_items_.find(item) == hashed_items_.end();
                 });
-
-            // This distance is always non-negative
-            size_t existing_item_count =
-                static_cast<size_t>(distance(existing_data_end, hashed_data.end()));
-            if (existing_item_count) {
-                APSI_LOG_WARNING(
-                    "Ignoring " << existing_item_count
-                                << " items that are not present in the SenderDB");
+            if (missing_item_count) {
+                APSI_LOG_ERROR(
+                    "Cannot remove " << missing_item_count
+                                     << " items that are not present in the SenderDB");
+                throw logic_error("failed to remove item");
             }
 
             // Break the data down into its field element representation. Also compute the items'
@@ -1084,9 +1185,16 @@ namespace apsi {
             vector<pair<AlgItem, size_t>> data_with_indices =
                 preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
 
-            // Dispatch the removal
+            // Dispatch the removal. This changes nothing unless every item can be removed.
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+
+            // The items are gone from the bin bundles, so they can now be removed from the item
+            // set as well
+            for (const auto &item : hashed_data) {
+                hashed_items_.erase(item);
+                item_count_--;
+            }
 
             // Generate the BinBundle caches
             generate_caches();
