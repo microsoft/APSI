@@ -75,6 +75,8 @@ namespace apsi::sender {
     constructor of the Query class verifies that the QueryRequest is valid for the given
     SenderDB, and if it is not the constructor still returns successfully but the Query is
     marked as invalid (Query::is_valid() returns false) and cannot be used in the next step.
+    Among other things, the constructor checks the query's parameter fingerprint, and loads and
+    checks its ciphertexts, which network::SenderOperationQuery::load leaves in serialized form.
     Once a valid Query object is created, the RunQuery function can be used to perform the query
     and respond on the given channel. Optionally, two lambda functions can be given to RunQuery
     to provide custom logic for sending the QueryResponse and the ResultPart objects on the

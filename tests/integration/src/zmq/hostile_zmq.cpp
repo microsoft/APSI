@@ -21,12 +21,17 @@
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/receiver.h"
+#include "apsi/requests.h"
+#include "apsi/seal_object.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
 #include "support/zmq_test_utils.h"
 #include "test_utils.h"
+
+// SEAL
+#include "seal/ciphertext.h"
 
 // ZeroMQ
 #include "zmq.hpp"
@@ -346,6 +351,93 @@ namespace APSITests {
             vector<string> errors_;
         };
     } // namespace
+
+    TEST(HostileZMQTests, DispatcherSurvivesQueriesItCannotLoad)
+    {
+        // The ciphertexts of a query are loaded only once the dispatcher has checked that the query
+        // holds as many as the parameters call for, which is after the channel has received it. A
+        // query whose ciphertexts are not valid is therefore refused when the dispatcher handles
+        // it rather than when the channel receives it, and that too must cost the peer its own
+        // exchange and nothing more.
+        SetUpTestLoggingAndThreads();
+        ErrorLog errors;
+
+        PSIParams params = create_params1();
+
+        vector<Item> sender_items;
+        sender_items.reserve(100);
+        for (size_t i = 0; i < 100; i++) {
+            sender_items.emplace_back(i + 1, i + 1);
+        }
+
+        atomic<bool> stop_sender{ false };
+        auto sender_db = CreateSenderDB(params, sender_items);
+
+        promise<int> listening_on;
+        future<int> listening_on_f = listening_on.get_future();
+
+        future<void> sender_f = async(launch::async, [&] {
+            try {
+                ZMQSenderDispatcher dispatcher(sender_db);
+                dispatcher.run(
+                    stop_sender, 0, [&listening_on](int port) { listening_on.set_value(port); });
+            } catch (...) {
+                try {
+                    listening_on.set_exception(current_exception());
+                } catch (const future_error &) { // NOLINT(bugprone-empty-catch): see below
+                    // The port was already announced, so the bind succeeded and the failure came
+                    // later. Nothing is waiting on the promise any more.
+                }
+                throw;
+            }
+        });
+        DispatcherStopper stopper(stop_sender, sender_f);
+
+        string address = connect_address(listening_on_f.get());
+
+        // Two queries no receiver sends, each holding bytes that are not a ciphertext at all, too
+        // many of them for the size bound to refuse them unloaded: one with ten times as many
+        // ciphertexts as the parameters call for, all but the first four for each power such
+        // bytes, and one with the right number, one of which is. Nothing answers them, so they go
+        // out on a channel of their own.
+        SEALObject<Ciphertext> not_a_ciphertext;
+        not_a_ciphertext.set_serialized(vector<unsigned char>(16 * 1024, 0x5A));
+        vector<HashedItem> hostile_items{ HashedItem(1, 1), HashedItem(2, 2) };
+        Receiver hostile(params);
+
+        QueryRequest too_many = to_query_request(hostile.create_query(hostile_items).first);
+        for (auto &q : too_many->data) {
+            q.second.resize(10 * q.second.size(), not_a_ciphertext);
+        }
+        QueryRequest one_invalid = to_query_request(hostile.create_query(hostile_items).first);
+        one_invalid->data.begin()->second.back() = not_a_ciphertext;
+
+        ZMQReceiverChannel hostile_chl;
+        hostile_chl.connect(address);
+        hostile_chl.send(to_request(std::move(too_many)));
+        hostile_chl.send(to_request(std::move(one_invalid)));
+
+        // Both are received, and refused when they are handled
+        ASSERT_TRUE(errors.wait_for("which does not match with bundle_idx_count", 30s));
+        ASSERT_TRUE(errors.wait_for(": incompatible version", 30s));
+
+        // The dispatcher goes on serving
+        ZMQReceiverChannel recv_chl;
+        recv_chl.connect(address);
+
+        Receiver receiver(params);
+        vector<Item> recv_items = { sender_items[0], sender_items[1] };
+        constexpr uint64_t absent_item_word = numeric_limits<uint64_t>::max();
+        recv_items.emplace_back(absent_item_word, absent_item_word);
+
+        auto [hashed_recv_items, label_keys] = Receiver::RequestOPRF(recv_items, recv_chl, 30s);
+        auto query_result = receiver.request_query(hashed_recv_items, label_keys, recv_chl, 30s);
+
+        ASSERT_EQ(size_t(3), query_result.size());
+        ASSERT_TRUE(query_result[0].found);
+        ASSERT_TRUE(query_result[1].found);
+        ASSERT_FALSE(query_result[2].found);
+    }
 
     // The deadline is checked between receive calls, so it protects a receiver only as far as
     // the channel hands control back. Every other test of it runs against a fake that returns

@@ -361,16 +361,19 @@ namespace APSITests {
         // Are we able to extract the relinearization keys?
         ASSERT_NO_THROW(auto rlk = sop_query->relin_keys.extract_if_local());
 
-        // Check for query ciphertexts
+        // Check for query ciphertexts. They are received in serialized form, and loaded only when
+        // they are extracted.
         ASSERT_EQ(2, sop_query->data.size());
 
         ASSERT_FALSE(sop_query->data.at(0).empty());
         ASSERT_EQ(1, sop_query->data[0].size());
-        auto query_ct0 = sop_query->data[0][0].extract_if_local();
+        ASSERT_TRUE(sop_query->data[0][0].is_serialized());
+        auto query_ct0 = sop_query->data[0][0].extract(get_context()->seal_context());
 
         ASSERT_FALSE(sop_query->data.at(123).empty());
         ASSERT_EQ(1, sop_query->data[123].size());
-        auto query_ct123 = sop_query->data[123][0].extract_if_local();
+        ASSERT_TRUE(sop_query->data[123][0].is_serialized());
+        auto query_ct123 = sop_query->data[123][0].extract(get_context()->seal_context());
 
         // Create a query response
         auto rsop_query = make_unique<SenderOperationResponseQuery>();

@@ -2,9 +2,13 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -16,6 +20,7 @@
 
 // APSI
 #include "apsi/item.h"
+#include "apsi/log.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/result_package_generated.h"
 #include "apsi/network/sender_operation.h"
@@ -25,13 +30,18 @@
 #include "apsi/query.h"
 #include "apsi/receiver.h"
 #include "apsi/requests.h"
+#include "apsi/responses.h"
+#include "apsi/seal_object.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
+#include "apsi/util/utils.h"
 
 // SEAL
+#include "seal/ciphertext.h"
 #include "seal/context.h"
 #include "seal/evaluator.h"
 #include "seal/modulus.h"
+#include "seal/serialization.h"
 
 // Google Test
 #include "gtest/gtest.h"
@@ -142,6 +152,155 @@ namespace APSITests {
             tamper(ct);
             cts[0].set(std::move(ct));
         }
+
+        /**
+        Returns the query request as a sender receives it: saved, and read back with
+        SenderOperationQuery::load, which holds the ciphertexts in serialized form.
+        */
+        QueryRequest receive(const QueryRequest &request, const shared_ptr<SEALContext> &context)
+        {
+            stringstream ss;
+            request->save(ss);
+            auto received = make_unique<SenderOperationQuery>();
+            received->load(ss, context);
+            return received;
+        }
+
+        /**
+        Returns the bytes Microsoft SEAL saves the ciphertext as.
+        */
+        vector<unsigned char> save_ciphertext(const Ciphertext &ct, compr_mode_type compr_mode)
+        {
+            vector<unsigned char> bytes(static_cast<size_t>(ct.save_size(compr_mode)));
+            auto size =
+                ct.save(reinterpret_cast<seal_byte *>(bytes.data()), bytes.size(), compr_mode);
+            bytes.resize(static_cast<size_t>(size));
+            return bytes;
+        }
+
+        /**
+        Returns a ciphertext held as bytes that are not a ciphertext at all, so that it fails if it
+        is ever loaded. They are 4 KiB, more than the 1/64 of what a ciphertext loads to that a
+        Query requires a ciphertext held in serialized form to take, so that loading it is tried.
+        */
+        SEALObject<Ciphertext> not_a_ciphertext()
+        {
+            SEALObject<Ciphertext> ct;
+            ct.set_serialized(vector<unsigned char>(4096, 0x5A));
+            return ct;
+        }
+
+        /**
+        Returns the ciphertexts of the query, as saved without compression, by exponent.
+        */
+        map<uint32_t, vector<vector<unsigned char>>> saved_ciphertexts(const Query &query)
+        {
+            map<uint32_t, vector<vector<unsigned char>>> result;
+            for (const auto &q : query.data()) {
+                for (const auto &ct : q.second) {
+                    result[q.first].push_back(save_ciphertext(ct, compr_mode_type::none));
+                }
+            }
+            return result;
+        }
+
+        /**
+        Returns the relinearization keys of the query, as saved without compression.
+        */
+        string saved_relin_keys(const Query &query)
+        {
+            stringstream ss;
+            query.relin_keys().save(ss, compr_mode_type::none);
+            return ss.str();
+        }
+
+        /**
+        Runs the query and returns the result packages it is answered with, as the sender writes
+        them. They are sorted, since the order they are sent in depends on scheduling.
+        */
+        vector<vector<unsigned char>> answer(const Query &query)
+        {
+            stringstream ss;
+            StreamChannel chl(ss);
+            Sender::RunQuery(query, chl);
+
+            QueryResponse response =
+                to_query_response(chl.receive_response(SenderOperationType::sop_query));
+            vector<vector<unsigned char>> packages;
+            packages.reserve(response->package_count);
+            for (uint32_t i = 0; i < response->package_count; i++) {
+                packages.push_back(apsi::util::read_from_stream(ss));
+            }
+            sort(packages.begin(), packages.end());
+            return packages;
+        }
+
+        /**
+        Collects the errors logged while it exists, and restores the global logger and log level
+        when it is destroyed.
+        */
+        class ErrorCapture {
+        public:
+            ErrorCapture() : saved_level_(GetLogLevel())
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::error)] = [this](const string &msg) {
+                    errors_.push_back(msg);
+                };
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+                SetLogLevel(LogLevel::error);
+            }
+
+            ~ErrorCapture()
+            {
+                CloseLogger();
+                SetLogLevel(saved_level_);
+            }
+
+            ErrorCapture(const ErrorCapture &) = delete;
+
+            ErrorCapture &operator=(const ErrorCapture &) = delete;
+
+            /**
+            Succeeds if exactly one error has been logged, and it contains the given text.
+            */
+            [[nodiscard]] testing::AssertionResult logged_only(const string &text) const
+            {
+                return logged_one(
+                    text,
+                    errors_.size() == 1 && errors_[0].find(text) != string::npos,
+                    "containing");
+            }
+
+            /**
+            Succeeds if exactly one error has been logged, and it is the given text.
+            */
+            [[nodiscard]] testing::AssertionResult logged_exactly(const string &text) const
+            {
+                return logged_one(text, errors_.size() == 1 && errors_[0] == text, "equal to");
+            }
+
+        private:
+            [[nodiscard]] testing::AssertionResult logged_one(
+                const string &text, bool success, const string &relation) const
+            {
+                if (success) {
+                    return testing::AssertionSuccess();
+                }
+
+                testing::AssertionResult result = testing::AssertionFailure();
+                result << "expected exactly one error, " << relation << " \"" << text << "\"; got "
+                       << errors_.size();
+                for (const auto &error : errors_) {
+                    result << "\n  " << error;
+                }
+                return result;
+            }
+
+            LogLevel saved_level_;
+
+            vector<string> errors_;
+        };
     } // namespace
 
     TEST(QueryTests, AcceptsHonestQuery)
@@ -201,6 +360,262 @@ namespace APSITests {
 
         Query query(std::move(request), sender_db);
         ASSERT_FALSE(query.is_valid());
+    }
+
+    TEST(QueryTests, AcceptsHonestQueryAsReceived)
+    {
+        auto sender_db = make_shared<SenderDB>(make_test_params());
+        QueryRequest request =
+            receive(make_honest_query(sender_db->get_params()), sender_db->get_seal_context());
+        for (const auto &q : request->data) {
+            for (const auto &ct : q.second) {
+                ASSERT_TRUE(ct.is_serialized());
+            }
+        }
+
+        Query query(std::move(request), sender_db);
+        ASSERT_TRUE(query.is_valid());
+    }
+
+    TEST(QueryTests, AnswersAQueryAsReceivedAsItAnswersTheQuerySent)
+    {
+        // The ciphertexts of a received query are loaded only when the Query is created. That
+        // must give the Query the very ciphertexts the receiver sent, as loading them on receipt
+        // would, and so the very same answer.
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        for (uint64_t i = 0; i < 20; i++) {
+            sender_db->insert_or_assign(HashedItem(i, i));
+        }
+        auto context = sender_db->get_seal_context();
+
+        QueryRequest sent = make_honest_query(sender_db->get_params());
+        QueryRequest received = receive(sent, context);
+
+        // The same query with each ciphertext loaded as it is read, rather than held in
+        // serialized form
+        auto loaded = make_unique<SenderOperationQuery>();
+        loaded->compr_mode = received->compr_mode;
+        loaded->relin_keys = received->relin_keys;
+        loaded->params_fingerprint = received->params_fingerprint;
+        for (const auto &q : received->data) {
+            for (const auto &ct : q.second) {
+                vector<unsigned char> bytes(ct.save_size(compr_mode_type::none));
+                bytes.resize(ct.save(bytes, compr_mode_type::none));
+                loaded->data[q.first].emplace_back();
+                loaded->data[q.first].back().load(context, bytes);
+            }
+        }
+
+        Query from_sent(std::move(sent), sender_db);
+        Query from_received(std::move(received), sender_db);
+        Query from_loaded(std::move(loaded), sender_db);
+        ASSERT_TRUE(from_sent.is_valid());
+        ASSERT_TRUE(from_received.is_valid());
+        ASSERT_TRUE(from_loaded.is_valid());
+
+        ASSERT_EQ(saved_ciphertexts(from_sent), saved_ciphertexts(from_received));
+        ASSERT_EQ(saved_ciphertexts(from_loaded), saved_ciphertexts(from_received));
+
+        vector<vector<unsigned char>> packages = answer(from_loaded);
+        ASSERT_FALSE(packages.empty());
+        ASSERT_EQ(packages, answer(from_received));
+        ASSERT_EQ(packages, answer(from_sent));
+    }
+
+    // SEAL compresses what it saves, and a ciphertext whose data is zero compresses so well that a
+    // query of a few kilobytes can hold gigabytes of ciphertexts. The ciphertexts of a received
+    // query are therefore loaded only once their number is known to be what the parameters call
+    // for. In the tests below, the ciphertexts that should never be loaded are bytes that fail to
+    // load, so that an error about them would show that they were loaded after all.
+
+    TEST(QueryTests, RefusesTooManyCiphertextsWithoutLoadingThem)
+    {
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        size_t bundle_idx_count = sender_db->get_params().bundle_idx_count();
+        ASSERT_EQ(size_t(2), bundle_idx_count);
+
+        // Ten times as many ciphertexts for each power as the parameters call for
+        QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+        for (auto &q : request->data) {
+            q.second.resize(10 * bundle_idx_count, not_a_ciphertext());
+        }
+
+        ErrorCapture errors;
+        Query query(std::move(request), sender_db);
+        ASSERT_FALSE(query.is_valid());
+        ASSERT_TRUE(errors.logged_only(
+            "contains 20 ciphertexts which does not match with bundle_idx_count (2)"));
+    }
+
+    TEST(QueryTests, RefusesOtherPowersWithoutLoadingThem)
+    {
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        vector<SEALObject<Ciphertext>> cts(
+            sender_db->get_params().bundle_idx_count(), not_a_ciphertext());
+
+        // A power the parameters do not call for, as well as those they do
+        {
+            QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+            ASSERT_EQ(size_t(0), request->data.count(2));
+            request->data[2] = cts;
+
+            ErrorCapture errors;
+            ASSERT_FALSE(Query(std::move(request), sender_db).is_valid());
+            ASSERT_TRUE(errors.logged_only(
+                "contains 4 ciphertext powers which does not match with the size of "
+                "query_powers (3)"));
+        }
+
+        // A power the parameters do not call for, in place of one they do
+        {
+            QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+            request->data.erase(5);
+            request->data[2] = cts;
+
+            ErrorCapture errors;
+            ASSERT_FALSE(Query(std::move(request), sender_db).is_valid());
+            ASSERT_TRUE(errors.logged_only("query power 2 does not match with a source node"));
+        }
+
+        // Fewer powers than the parameters call for
+        {
+            QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+            request->data.erase(5);
+            for (auto &q : request->data) {
+                q.second = cts;
+            }
+
+            ErrorCapture errors;
+            ASSERT_FALSE(Query(std::move(request), sender_db).is_valid());
+            ASSERT_TRUE(errors.logged_only(
+                "contains 2 ciphertext powers which does not match with the size of "
+                "query_powers (3)"));
+        }
+    }
+
+    TEST(QueryTests, RefusesBytesThatAreNotACiphertext)
+    {
+        // With the right number of ciphertexts, the ciphertexts are loaded, and one that cannot be
+        // makes the query invalid rather than throwing
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+        request->data.at(3).back() = not_a_ciphertext();
+
+        ErrorCapture errors;
+        Query query(std::move(request), sender_db);
+        ASSERT_FALSE(query.is_valid());
+
+        // Microsoft SEAL reads the bytes as the header of a version it does not know, which shows
+        // that loading them was tried rather than refused for their size
+        ASSERT_TRUE(errors.logged_exactly(
+            "Failed to extract a ciphertext for exponent 3: incompatible version"));
+    }
+
+    TEST(QueryTests, LoadsNoCiphertextAfterAnInvalidOne)
+    {
+        // Each ciphertext is checked as soon as it is loaded, so that an invalid query costs the
+        // sender at most one invalid ciphertext. The first ciphertext loaded here is valid for
+        // SEAL but has the largest size SEAL allows. Its data is zero, and it is saved without
+        // compression, as compressed it would take too few bytes to be loaded at all. Every other
+        // is not a ciphertext at all.
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+
+        Ciphertext zero(*context);
+        zero.resize(SEAL_CIPHERTEXT_SIZE_MAX);
+        vector<unsigned char> zero_bytes = save_ciphertext(zero, compr_mode_type::none);
+
+        // Query loads the ciphertexts in the order the query data is iterated in
+        bool first = true;
+        for (auto &q : request->data) {
+            for (auto &ct : q.second) {
+                if (first) {
+                    ct.set_serialized(zero_bytes);
+                    first = false;
+                } else {
+                    ct = not_a_ciphertext();
+                }
+            }
+        }
+
+        ErrorCapture errors;
+        Query query(std::move(request), sender_db);
+        ASSERT_FALSE(query.is_valid());
+        ASSERT_TRUE(errors.logged_exactly(
+            "Extracted ciphertext has size 16; expected a fresh encryption of size 2"));
+    }
+
+    TEST(QueryTests, RefusesACiphertextThatTakesTooFewBytes)
+    {
+        // A ciphertext whose data is zero is valid for SEAL, and compressed it takes almost
+        // nothing, so a query of such ciphertexts would load to thousands of times its size. A
+        // ciphertext held in serialized form must take at least 1/64 of the bytes it would load
+        // to, a fresh encryption of size 2 at the first level of the modulus chain: here 2 * 4096
+        // coefficients of two primes, of 8 bytes each. One of zeros is refused before it is
+        // loaded, and accepted if saved without compression.
+        if (Serialization::compr_mode_default == compr_mode_type::none) {
+            GTEST_SKIP() << "Microsoft SEAL is built without compression";
+        }
+
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        Ciphertext zero(*context);
+        zero.resize(2);
+
+        auto query_holding = [&](const vector<unsigned char> &bytes) {
+            QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+            request->data.at(3).back().set_serialized(bytes);
+            return Query(std::move(request), sender_db);
+        };
+
+        ASSERT_TRUE(query_holding(save_ciphertext(zero, compr_mode_type::none)).is_valid());
+
+        vector<unsigned char> compressed = save_ciphertext(zero, Serialization::compr_mode_default);
+        ErrorCapture errors;
+        ASSERT_FALSE(query_holding(compressed).is_valid());
+        ASSERT_TRUE(errors.logged_exactly(
+            "Failed to extract a ciphertext for exponent 3: it takes " +
+            to_string(compressed.size()) + " bytes, less than 1/64 of the " +
+            to_string(2 * 4096 * 2 * 8) + " bytes it would load to"));
+    }
+
+    TEST(QueryTests, RejectsTamperedCiphertextsAsReceived)
+    {
+        // The checks on a ciphertext apply alike to one that is loaded only when the Query is
+        // created
+        auto sender_db = make_shared<SenderDB>(make_test_params());
+        auto context = sender_db->get_seal_context();
+        Evaluator evaluator(*context);
+
+        vector<pair<function<void(Ciphertext &)>, string>> tamperings{
+            { [&evaluator](Ciphertext &ct) { evaluator.mod_switch_to_next_inplace(ct); },
+              "is not at the highest level of the modulus chain" },
+            { [&evaluator](Ciphertext &ct) { evaluator.transform_to_ntt_inplace(ct); },
+              "is in NTT form" },
+            { [&evaluator](Ciphertext &ct) {
+                 Ciphertext squared;
+                 evaluator.square(ct, squared);
+                 ct = std::move(squared);
+             },
+              "has size 3;" },
+        };
+        for (const auto &[tamper, error] : tamperings) {
+            SCOPED_TRACE(error);
+
+            QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+            auto &ct = request->data.begin()->second[0];
+            Ciphertext tampered = ct.extract(context);
+            tamper(tampered);
+            ct.set_serialized(save_ciphertext(tampered, Serialization::compr_mode_default));
+
+            ErrorCapture errors;
+            ASSERT_FALSE(Query(std::move(request), sender_db).is_valid());
+            ASSERT_TRUE(errors.logged_only(error));
+        }
     }
 
     TEST(QueryTests, RunQueryRejectsAQueryThatNoLongerMatchesTheSenderDB)

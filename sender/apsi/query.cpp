@@ -3,6 +3,7 @@
 
 // STD
 #include <array>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 
@@ -10,6 +11,9 @@
 #include "apsi/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/query.h"
+
+// SEAL
+#include "seal/util/common.h"
 
 using namespace std;
 using namespace seal;
@@ -20,6 +24,10 @@ namespace apsi {
 
     namespace sender {
         namespace {
+            // A query ciphertext held in serialized form must take at least 1/max_query_expansion
+            // of the bytes it would load to; see Query::Query
+            constexpr size_t max_query_expansion = 64;
+
             /**
             Returns true if a SenderDB with the given parameters must refuse a query that carries
             no parameter fingerprint. Receivers before APSI 2.0 send none, and cannot use the
@@ -116,13 +124,103 @@ namespace apsi {
                 }
             }
 
-            // Extract and validate query ciphertexts
+            // Get the PSIParams
+            PSIParams params(sender_db_->get_params());
+
+            uint32_t bundle_idx_count = params.bundle_idx_count();
+            uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
+            uint32_t ps_low_degree = params.query_params().ps_low_degree;
+            const set<uint32_t> &query_powers = params.query_params().query_powers;
+            set<uint32_t> target_powers = create_powers_set(ps_low_degree, max_items_per_bin);
+
+            // Check that the query data matches the PSIParams before extracting any ciphertext.
+            // SEAL compresses what it saves, so a query that arrived over the network can hold far
+            // more ciphertext data than its size suggests, and extracting a ciphertext loads it in
+            // full. Checking the counts first means that an invalid query can make the sender
+            // load no more ciphertexts than a valid one holds.
+            if (query_request->data.size() != query_powers.size()) {
+                APSI_LOG_ERROR(
+                    "Query data is incompatible with PSI parameters: "
+                    "query contains "
+                    << query_request->data.size()
+                    << " ciphertext powers which does not match with "
+                       "the size of query_powers ("
+                    << query_powers.size() << ")");
+                return;
+            }
+
+            for (const auto &q : query_request->data) {
+                // Check that each power has one ciphertext per bundle index and is a source node in
+                // the PowersDag
+                if (q.second.size() != bundle_idx_count) {
+                    APSI_LOG_ERROR(
+                        "Query data is incompatible with PSI parameters: "
+                        "query power "
+                        << q.first << " contains " << q.second.size()
+                        << " ciphertexts which does not "
+                           "match with bundle_idx_count ("
+                        << bundle_idx_count << ")");
+                    return;
+                }
+
+                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) {
+                    return n == q.first;
+                });
+                if (where == query_powers.cend()) {
+                    APSI_LOG_ERROR(
+                        "Query data is incompatible with PowersDag: "
+                        "query power "
+                        << q.first << " does not match with a source node in PowersDag");
+                    return;
+                }
+            }
+
+            // Extract and validate query ciphertexts. Each is checked as soon as it is extracted,
+            // so that an invalid query costs the sender at most one invalid ciphertext.
+            //
+            // As defense in depth, one held in serialized form, as one that arrived over the
+            // network is, must also take at least 1/max_query_expansion of the bytes it would load
+            // to, a fresh encryption of size 2 at the first level of the modulus chain, before it
+            // is extracted. SEAL compresses what it saves, so a ciphertext whose data is zero would
+            // otherwise load to hundreds or thousands of times its size, while a fresh encryption
+            // looks uniformly random and stays far above the bound even when saved with a seed.
+            // SEAL itself bounds what the relinearization keys load to.
+            const auto &first_parms = seal_context->first_context_data()->parms();
+            size_t loaded_ct_byte_count = seal::util::mul_safe(
+                static_cast<size_t>(2),
+                first_parms.poly_modulus_degree(),
+                first_parms.coeff_modulus().size(),
+                sizeof(uint64_t));
+
             for (auto &q : query_request->data) {
                 APSI_LOG_DEBUG(
                     "Extracting " << q.second.size() << " ciphertexts for exponent " << q.first);
                 vector<Ciphertext> cts;
                 for (auto &ct : q.second) {
-                    cts.push_back(ct.extract(seal_context));
+                    if (ct.is_serialized()) {
+                        // For an object held in serialized form, this is the number of bytes it
+                        // is held as, whatever the compression mode
+                        size_t ct_byte_count = ct.save_size(compr_mode_type::none);
+                        if (ct_byte_count < loaded_ct_byte_count / max_query_expansion) {
+                            APSI_LOG_ERROR(
+                                "Failed to extract a ciphertext for exponent "
+                                << q.first << ": it takes " << ct_byte_count
+                                << " bytes, less than 1/" << max_query_expansion << " of the "
+                                << loaded_ct_byte_count << " bytes it would load to");
+                            return;
+                        }
+                    }
+
+                    // A ciphertext that arrived over the network is loaded only here, and its
+                    // data may not be a valid ciphertext at all
+                    try {
+                        cts.push_back(ct.extract(seal_context));
+                    } catch (const exception &ex) {
+                        APSI_LOG_ERROR(
+                            "Failed to extract a ciphertext for exponent " << q.first << ": "
+                                                                           << ex.what());
+                        return;
+                    }
                     if (!is_valid_for(cts.back(), *seal_context)) {
                         APSI_LOG_ERROR("Extracted ciphertext is invalid for SEALContext");
                         return;
@@ -157,15 +255,6 @@ namespace apsi {
                 data_[q.first] = std::move(cts);
             }
 
-            // Get the PSIParams
-            PSIParams params(sender_db_->get_params());
-
-            uint32_t bundle_idx_count = params.bundle_idx_count();
-            uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
-            uint32_t ps_low_degree = params.query_params().ps_low_degree;
-            const set<uint32_t> &query_powers = params.query_params().query_powers;
-            set<uint32_t> target_powers = create_powers_set(ps_low_degree, max_items_per_bin);
-
             // Create the PowersDag
             pd_.configure(query_powers, target_powers);
 
@@ -178,42 +267,6 @@ namespace apsi {
                 return;
             }
             APSI_LOG_DEBUG("Configured PowersDag with depth " << pd_.depth());
-
-            // Check that the query data size matches the PSIParams
-            if (data_.size() != query_powers.size()) {
-                APSI_LOG_ERROR(
-                    "Extracted query data is incompatible with PSI parameters: "
-                    "query contains "
-                    << data_.size()
-                    << " ciphertext powers which does not match with "
-                       "the size of query_powers ("
-                    << query_powers.size() << ")");
-                return;
-            }
-
-            for (auto &q : data_) {
-                // Check that powers in the query data match source nodes in the PowersDag
-                if (q.second.size() != bundle_idx_count) {
-                    APSI_LOG_ERROR(
-                        "Extracted query data is incompatible with PSI parameters: "
-                        "query power "
-                        << q.first << " contains " << q.second.size()
-                        << " ciphertexts which does not "
-                           "match with bundle_idx_count ("
-                        << bundle_idx_count << ")");
-                    return;
-                }
-                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) {
-                    return n == q.first;
-                });
-                if (where == query_powers.cend()) {
-                    APSI_LOG_ERROR(
-                        "Extracted query data is incompatible with PowersDag: "
-                        "query power "
-                        << q.first << " does not match with a source node in PowersDag");
-                    return;
-                }
-            }
 
             // The query is valid
             valid_ = true;

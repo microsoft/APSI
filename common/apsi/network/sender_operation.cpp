@@ -48,6 +48,78 @@ namespace apsi::network {
 
             return fingerprint;
         }
+
+        /**
+        The dimensions that serialized KSwitchKeys, such as relinearization keys, declare: how many
+        key sets they hold, and how many keys the first key set holds, or zero if there is none.
+        */
+        struct KSwitchKeysDimensions {
+            uint64_t key_set_count = 0;
+
+            uint64_t first_key_count = 0;
+        };
+
+        /**
+        Reads the dimensions of serialized KSwitchKeys without loading any key.
+
+        Serialization::Load decompresses the data only as its load_members function reads it, so
+        a function that stops as soon as it has read the dimensions makes Load decompress no more
+        than the first block of the data, and allocate no key. The members are read as
+        KSwitchKeys::load_members reads them: the parms_id, the number of key sets, and for each
+        key set the number of keys in it followed by the keys. Whatever Serialization::Load throws
+        for data that cannot be read that far is thrown on.
+        */
+        KSwitchKeysDimensions read_kswitch_keys_dimensions(const seal_byte *in, size_t size)
+        {
+            // Thrown to stop Serialization::Load once the dimensions have been read. Load passes
+            // on an exception it does not handle itself, after restoring its stream's exception
+            // mask.
+            struct DimensionsRead : exception {};
+
+            KSwitchKeysDimensions dims;
+            try {
+                Serialization::Load(
+                    [&dims](istream &stream, SEALVersion) {
+                        parms_id_type parms_id{};
+                        stream.read(reinterpret_cast<char *>(&parms_id), sizeof(parms_id_type));
+                        stream.read(
+                            reinterpret_cast<char *>(&dims.key_set_count), sizeof(uint64_t));
+                        if (dims.key_set_count) {
+                            stream.read(
+                                reinterpret_cast<char *>(&dims.first_key_count), sizeof(uint64_t));
+                        }
+                        throw DimensionsRead{};
+                    },
+                    in,
+                    size,
+                    false);
+            } catch (const DimensionsRead &) {
+                return dims;
+            }
+
+            // The function passed to Serialization::Load ends by throwing, so Load cannot return
+            throw logic_error("the dimensions of the keys could not be read");
+        }
+
+        /**
+        Throws std::runtime_error unless serialized relinearization keys declare exactly one key
+        set of key_count keys, without loading any key; see read_kswitch_keys_dimensions.
+        */
+        void check_relin_keys_dimensions(const seal_byte *in, size_t size, size_t key_count)
+        {
+            KSwitchKeysDimensions dims = read_kswitch_keys_dimensions(in, size);
+            if (dims.key_set_count != 1) {
+                stringstream ss;
+                ss << "they declare a key set count of " << dims.key_set_count << ", not 1";
+                throw runtime_error(ss.str());
+            }
+            if (dims.first_key_count != key_count) {
+                stringstream ss;
+                ss << "their key set declares a key count of " << dims.first_key_count << ", not "
+                   << key_count;
+                throw runtime_error(ss.str());
+            }
+        }
     } // namespace
 
     const char *sender_operation_type_str(SenderOperationType sop_type)
@@ -363,11 +435,21 @@ namespace apsi::network {
             }
 
             const auto &relin_keys_data = *req.relin_keys();
-            gsl::span<const unsigned char> relin_keys_data_span(
-                reinterpret_cast<const unsigned char *>(relin_keys_data.data()),
-                relin_keys_data.size());
+            const auto *relin_keys_bytes =
+                reinterpret_cast<const seal_byte *>(relin_keys_data.data());
+            size_t relin_keys_size = relin_keys_data.size();
+
+            // A receiver creates its keys with KeyGenerator::create_relin_keys, which makes exactly
+            // one key set: the one for the square of the secret key, which is all a query needs,
+            // with a key for each prime of the first data level. SEAL accepts up to
+            // poly_modulus_degree key sets, and keys that are almost all zero compress so well that
+            // a few hundred bytes can declare gigabytes of them, so the dimensions are checked
+            // before any key is loaded.
+            size_t key_count = context->first_context_data()->parms().coeff_modulus().size();
+            RelinKeys loaded_relin_keys;
             try {
-                relin_keys.load(context, relin_keys_data_span);
+                check_relin_keys_dimensions(relin_keys_bytes, relin_keys_size, key_count);
+                loaded_relin_keys.load(*context, relin_keys_bytes, relin_keys_size);
             } catch (const logic_error &ex) {
                 stringstream ss;
                 ss << "failed to load relinearization keys: ";
@@ -379,41 +461,52 @@ namespace apsi::network {
                 ss << ex.what();
                 throw runtime_error(ss.str());
             }
+
+            // The keys loaded have the dimensions checked above, unless a version of SEAL saves
+            // keys differently from how check_relin_keys_dimensions reads them
+            if (loaded_relin_keys.data().size() != 1 || loaded_relin_keys.size() != 1) {
+                throw runtime_error(
+                    "failed to load relinearization keys: expected exactly one key set");
+            }
+            relin_keys.set(std::move(loaded_relin_keys));
         }
 
-        // Load the query data; this is a required field so we can always dereference
+        // Read the query data; this is a required field so we can always dereference. The
+        // ciphertexts are kept in serialized form rather than loaded: SEAL compresses what it
+        // saves, so a few bytes can load as a large ciphertext, and how many ciphertexts there
+        // should be depends on the parameters, which sender::Query checks before loading any.
+        //
+        // Holding a ciphertext copies its bytes, so the bytes copied are counted. FlatBuffers lets
+        // many offsets point at one object, as its builder does to share strings, and the verifier
+        // allows it, so the entries of a short query could otherwise all point at one large
+        // ciphertext and have it copied once each. A receiver saves every ciphertext to bytes of
+        // its own, so those of an honest query never add up to more than the buffer.
         const auto &query = *req.query();
+        size_t ct_byte_count = 0;
         for (const auto *query_part : query) {
             uint32_t exponent = query_part->exponent();
             if (data.count(exponent)) {
                 throw runtime_error("invalid query data");
             }
 
-            // Load the ciphertext data; this is a required field so we can always dereference.
-            // We deliberately do not reserve() cts.size(): the count comes from the wire, so
+            // The ciphertext data is a required field so we can always dereference. We
+            // deliberately do not reserve() cts.size(): the count comes from the wire, so
             // reserving it up front would let a malformed buffer force a large allocation. The
-            // vector instead grows as each ciphertext is loaded and validated, bounded by the
-            // actual (verifier-checked) buffer contents.
+            // vector instead grows as each ciphertext is copied, bounded by the actual
+            // (verifier-checked) buffer contents.
             const auto &cts = *query_part->cts();
             vector<SEALObject<Ciphertext>> cts_vec;
             for (const auto *const ct : cts) {
-                gsl::span<const unsigned char> ct_span(
-                    reinterpret_cast<const unsigned char *>(ct->data()->data()),
-                    ct->data()->size());
-                SEALObject<Ciphertext> temp;
-                try {
-                    temp.load(context, ct_span);
-                } catch (const logic_error &ex) {
-                    stringstream ss;
-                    ss << "failed to load query ciphertext: ";
-                    ss << ex.what();
-                    throw runtime_error(ss.str());
-                } catch (const runtime_error &ex) {
-                    stringstream ss;
-                    ss << "failed to load query ciphertext: ";
-                    ss << ex.what();
-                    throw runtime_error(ss.str());
+                size_t ct_size = ct->data()->size();
+                if (ct_size > in_data.size() - ct_byte_count) {
+                    throw runtime_error("invalid query data: ciphertexts share bytes");
                 }
+                ct_byte_count += ct_size;
+
+                gsl::span<const unsigned char> ct_span(
+                    reinterpret_cast<const unsigned char *>(ct->data()->data()), ct_size);
+                SEALObject<Ciphertext> temp;
+                temp.set_serialized(ct_span);
                 cts_vec.emplace_back(std::move(temp));
             }
 
