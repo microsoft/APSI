@@ -120,7 +120,8 @@ namespace APSITests {
 
         ASSERT_EQ(expected, make_params(ParamsValues{}).fingerprint());
 
-        // parameters/16M-4096.json: Paterson-Stockmeyer, four primes, and a 23-bit plain modulus
+        // APSI 1.x's parameters/16M-4096.json: Paterson-Stockmeyer, four primes, and a 23-bit plain
+        // modulus
         ParamsValues values;
         values.felts_per_item = 5;
         values.table_size = 6552;

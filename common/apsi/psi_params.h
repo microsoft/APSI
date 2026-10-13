@@ -81,8 +81,9 @@ namespace apsi {
         to grow with |coeff_modulus| alone; only the total size is a meaningful measure. Raising
         poly_modulus_degree, by contrast, enlarges every ciphertext while proportionally reducing
         bundle_idx_count(), leaving the total unchanged, so it is not an inflation this bound need
-        reject. The most demanding parameter set in parameters/ is charged 30 MiB, leaving this
-        bound roughly a factor of 17 of headroom.
+        reject. The most demanding parameter set in parameters/, 256M-4096.json, is charged
+        18.75 MiB, leaving this bound a factor of more than 27 of headroom. The most demanding set
+        APSI 1.x shipped, its 16M-11041.json, is charged 33 MiB, a factor of more than 15.
         */
         constexpr static std::uint64_t query_byte_count_max = static_cast<std::uint64_t>(512) << 20;
 
@@ -156,7 +157,7 @@ namespace apsi {
             An upper bound on table_size. The receiver's cuckoo table and the vectors indexed by it
             grow with table_size independently of the encryption parameters, so this bound is needed
             in addition to PSIParams::query_byte_count_max. The largest table_size in parameters/ is
-            16384, so this leaves a factor of 64 of headroom.
+            24576, in a set with match tags, so this leaves a factor of more than 42 of headroom.
             */
             constexpr static std::uint32_t table_size_max = static_cast<std::uint32_t>(1) << 20;
 
@@ -170,8 +171,10 @@ namespace apsi {
             this one value: measured, 8100 target powers configure in 0.46 s, 32768 in 9.1 s, and
             65536 in 43 s. Nothing else in the parameter set restrains it.
 
-            The largest max_items_per_bin in parameters/ is 8100, so this leaves a factor of four
-            of headroom. A parameter set at this bound still costs several seconds of the
+            The largest max_items_per_bin in parameters/ is 2939, in the 256M sets, which this
+            admits with a factor of more than 11 to spare. Those sets use Paterson-Stockmeyer and
+            configure at most 134 target powers; without it, the largest is 530, in 1M-256-288.json.
+            A parameter set at this bound with ps_low_degree zero still costs several seconds of the
             receiver's own CPU before a query is sent; the bound makes that finite, not free.
             */
             constexpr static std::uint32_t max_items_per_bin_max = static_cast<std::uint32_t>(1)

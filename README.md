@@ -881,7 +881,7 @@ The format of the JSON string is as in the following example:
     }
 }
 ```
-This is [parameters/256K-4096-cmp.json](parameters/256K-4096-cmp.json) verbatim.
+This is the set APSI 1.x shipped as `256K-4096-cmp.json`, which uses matching polynomials.
 `PSIParams::Load` adds the power 1 to `query_powers` if the file leaves it out, which the `PSIParams` constructor does not do &ndash; it rejects a `query_powers` without it.
 Write it out, as every file in [parameters/](parameters/) does, and the file means the same thing through either route.
 The Microsoft SEAL `plain_modulus` parameter can be set to a specific prime, like in the example above in the `seal_params` section, or can be expressed as a desired number of bits for the prime, in which case the library will sample a prime of appropriate form. In such a case, the `seal_params` section would appear as follows:

@@ -3,15 +3,23 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <numeric>
 #include <random>
+#include <set>
+#include <sstream>
+#include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 // APSI
 #include "apsi/config.h"
+#include "apsi/psi_params.h"
 #include "apsi/util/interpolate.h"
 
 // SEAL
@@ -255,16 +263,68 @@ namespace APSITests {
             }
             return values;
         }
+
+        /**
+        What the parameter sets in the parameters directory ask of interpolation: their plain
+        moduli, and for the sets without match tags and those with them, in that order, the most
+        items a bin holds and the largest plain modulus among the sets whose bins hold that many. A
+        bin holds max_items_per_bin items with match tags and one fewer without them.
+        */
+        struct ShippedBins {
+            size_t set_count = 0;
+
+            set<uint64_t> moduli;
+
+            array<pair<size_t, uint64_t>, 2> largest{};
+        };
+
+        ShippedBins read_shipped_bins()
+        {
+            namespace fs = std::filesystem;
+
+            ShippedBins shipped;
+            for (const auto &entry : fs::directory_iterator(fs::path(APSI_PARAMETERS_DIR))) {
+                if (entry.path().extension() != ".json") {
+                    continue;
+                }
+                ifstream file(entry.path());
+                stringstream json;
+                json << file.rdbuf();
+                apsi::PSIParams params = apsi::PSIParams::Load(json.str());
+
+                uint64_t modulus = params.seal_params().plain_modulus().value();
+                size_t bin_size = params.table_params().max_items_per_bin;
+                if (!params.uses_tags()) {
+                    bin_size--;
+                }
+
+                shipped.set_count++;
+                shipped.moduli.insert(modulus);
+                auto &largest = shipped.largest[params.uses_tags() ? 1 : 0];
+                if (bin_size > largest.first ||
+                    (bin_size == largest.first && modulus > largest.second)) {
+                    largest = { bin_size, modulus };
+                }
+            }
+
+            return shipped;
+        }
     } // namespace
 
     TEST(InterpolateTests, NewtonInterpolatePolynMatchesDividedDifferences)
     {
-        // The plain moduli of the parameter sets in the parameters directory other than the 256M
-        // ones, and small ones
+        ShippedBins shipped = read_shipped_bins();
+        ASSERT_LE(size_t(36), shipped.set_count) << "expected to find the shipped parameter sets";
+
+        // The plain moduli of the parameter sets in the parameters directory, and small ones. The
+        // reference takes a modular inversion for every divided difference, so it is compared
+        // with at small sizes only; larger ones are checked below.
+        set<uint64_t> moduli = shipped.moduli;
+        moduli.insert({ 7, 101 });
         mt19937_64 rng(1);
-        for (uint64_t p : { 7, 101, 40961, 65537, 147457, 270337, 2277377, 4423681 }) {
+        for (uint64_t p : moduli) {
             Modulus mod(p);
-            for (size_t size : { 1, 2, 3, 5, 42, 228, 512 }) {
+            for (size_t size : { 1U, 2U, 3U, 5U, 42U, 228U }) {
                 if (size > p) {
                     continue;
                 }
@@ -272,18 +332,51 @@ namespace APSITests {
                 auto values = random_values(size, mod, rng);
                 ASSERT_EQ(
                     divided_differences_interpolate(points, values, mod),
-                    newton_interpolate_polyn(points, values, mod));
+                    newton_interpolate_polyn(points, values, mod))
+                    << "modulus " << p << ", " << size << " points";
             }
         }
 
-        // The largest bins of the parameter sets other than the 256M ones
-        Modulus mod(4423681);
-        auto points = random_points(1304, mod, rng);
-        auto values = random_values(1304, mod, rng);
-        auto polyn = newton_interpolate_polyn(points, values, mod);
-        ASSERT_EQ(divided_differences_interpolate(points, values, mod), polyn);
-        for (size_t i = 0; i < points.size(); i++) {
-            ASSERT_EQ(values[i], uint64_t_poly_eval(polyn, points[i], mod));
+        // BinBundle interpolates every bin with newton_interpolate_polyns: the tag and label parts,
+        // and without match tags the matching polynomial as well, whose roots are the points. The
+        // largest bins of the parameter sets hold over a thousand items, and nearly 3000 with
+        // match tags, but nothing in the interpolation depends on how many there are, so 2048 of
+        // them, or as many as the bins hold if that is fewer, cover it. They are interpolated with
+        // the plain modulus of the set with the largest bins, without match tags and with them.
+        //
+        // The result is checked at every point instead of against the reference: a polynomial of
+        // degree below the number of distinct points that takes the given values at all of them is
+        // the interpolating one, so with as many coefficients as there are points it is what the
+        // reference gives, and a monic polynomial whose degree is the number of points and that
+        // vanishes at all of them is the one with those roots.
+        for (bool tags : { false, true }) {
+            auto [bin_size, p] = shipped.largest[tags ? 1 : 0];
+            ASSERT_LT(size_t(0), bin_size);
+            SCOPED_TRACE(string(tags ? "with" : "without") + " match tags");
+
+            Modulus mod(p);
+            auto points = random_points(min<size_t>(bin_size, 2048), mod, rng);
+            vector<vector<uint64_t>> values{ random_values(points.size(), mod, rng),
+                                             random_values(points.size(), mod, rng) };
+            vector<uint64_t> roots;
+            auto polyns = newton_interpolate_polyns(
+                points, { values[0], values[1] }, mod, tags ? nullptr : &roots);
+
+            ASSERT_EQ(values.size(), polyns.size());
+            for (size_t j = 0; j < values.size(); j++) {
+                ASSERT_EQ(points.size(), polyns[j].size());
+                for (size_t i = 0; i < points.size(); i++) {
+                    ASSERT_EQ(values[j][i], uint64_t_poly_eval(polyns[j], points[i], mod));
+                }
+            }
+
+            if (!tags) {
+                ASSERT_EQ(points.size() + 1, roots.size());
+                ASSERT_EQ(1, roots.back());
+                for (uint64_t point : points) {
+                    ASSERT_EQ(0, uint64_t_poly_eval(roots, point, mod));
+                }
+            }
         }
     }
 

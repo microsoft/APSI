@@ -7,5 +7,6 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/query.cpp
         ${CMAKE_CURRENT_LIST_DIR}/save_size.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender_db.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/shipped_parameters.cpp
         ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )

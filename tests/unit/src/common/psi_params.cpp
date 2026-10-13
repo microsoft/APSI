@@ -244,28 +244,63 @@ namespace APSITests {
 
     TEST(PSIParamsTest, MostDemandingShippedParamsAreAccepted)
     {
-        // parameters/16M-11041.json builds the largest query of any parameter set in parameters/
+        // parameters/256M-4096.json builds the largest query of any parameter set in parameters/:
+        // two bundle indices of fifteen query powers each, at four data primes and a special
+        // prime, which PSIParams charges 18.75 MiB. That is under a twenty-seventh of
+        // query_byte_count_max.
         string json = "{"
+                      "    \"version\": 2,"
                       "    \"table_params\": {"
                       "        \"hash_func_count\": 3,"
-                      "        \"table_size\": 16380,"
-                      "        \"max_items_per_bin\": 1304"
+                      "        \"table_size\": 8192,"
+                      "        \"max_items_per_bin\": 2939"
                       "    },"
-                      "    \"item_params\": { \"felts_per_item\": 5 },"
+                      "    \"item_params\": {"
+                      "        \"felts_per_item\": 2,"
+                      "        \"tag_part_count\": 1"
+                      "    },"
                       "    \"query_params\": {"
-                      "        \"ps_low_degree\": 44,"
-                      "        \"query_powers\": [ 1, 3, 11, 18, 45, 225 ]"
+                      "        \"ps_low_degree\": 46,"
+                      "        \"query_powers\": [ 1, 2, 3, 7, 11, 15, 19, 21, 22, 24, 47, 141,"
+                      "            517, 705, 1504 ]"
                       "    },"
                       "    \"seal_params\": {"
-                      "        \"plain_modulus_bits\": 22,"
+                      "        \"plain_modulus\": 17179967489,"
                       "        \"poly_modulus_degree\": 8192,"
-                      "        \"coeff_modulus_bits\": [ 56, 56, 56, 50 ]"
+                      "        \"coeff_modulus_bits\": [ 55, 43, 43, 43, 20 ]"
                       "    }"
                       "}";
 
         PSIParams params = PSIParams::Load(json);
-        ASSERT_EQ(16380, params.table_params().table_size);
-        ASSERT_EQ(10, params.bundle_idx_count());
+        ASSERT_EQ(8192, params.table_params().table_size);
+        ASSERT_EQ(2, params.bundle_idx_count());
+
+        // The charge PSIParams validates against query_byte_count_max: every query power of every
+        // bundle index, each a ciphertext of 2 * poly_modulus_degree * |coeff_modulus| words
+        auto charge = [](const PSIParams &p) {
+            return static_cast<uint64_t>(p.bundle_idx_count()) *
+                   p.query_params().query_powers.size() * 2 *
+                   p.seal_params().poly_modulus_degree() * p.seal_params().coeff_modulus().size() *
+                   sizeof(uint64_t);
+        };
+        ASSERT_EQ(static_cast<uint64_t>(19660800), charge(params));
+        ASSERT_LT(charge(params) * 27, PSIParams::query_byte_count_max);
+
+        // And no shipped set is charged more
+        namespace fs = std::filesystem;
+        size_t checked = 0;
+        for (const auto &entry : fs::directory_iterator(fs::path(APSI_PARAMETERS_DIR))) {
+            if (entry.path().extension() != ".json") {
+                continue;
+            }
+            ifstream file(entry.path());
+            ASSERT_TRUE(file.is_open()) << entry.path();
+            stringstream shipped;
+            shipped << file.rdbuf();
+            ASSERT_LE(charge(PSIParams::Load(shipped.str())), charge(params)) << entry.path();
+            checked++;
+        }
+        ASSERT_LE(size_t(36), checked) << "expected to find the shipped parameter sets";
     }
 
     TEST(PSIParamsTest, Constructor2)
@@ -431,8 +466,8 @@ namespace APSITests {
 
     TEST(PSIParamsTest, LoadAcceptsAFrozenBufferFromAnEarlierVersion)
     {
-        // A serialized PSIParams captured from parameters/1M-1-32.json, held here as bytes so it
-        // cannot drift with the code that produced it.
+        // A serialized PSIParams captured from APSI 1.x's parameters/1M-1-32.json, held here as
+        // bytes so it cannot drift with the code that produced it.
         //
         // Marking fields required in psi_params.fbs changes what the verifier rejects, not what
         // the writer emits: a buffer built with and without those attributes is byte-identical,
@@ -1037,17 +1072,43 @@ namespace APSITests {
         ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
     namespace {
-        // Smallest load that a bin should not exceed: the smallest k for which the chance that
-        // any of the m bins holds k or more is below delta. A mean-plus-one-deviation estimate
-        // is not enough here, because it describes a typical maximum rather than bounding one,
-        // and under-predicts often enough to matter -- one bundle either way decides whether a
+        // APSI 1.x's parameters/100K-1.json, verbatim. Like every set APSI 1.x shipped, it predates
+        // the version key, and every version of APSI must keep loading it. The tests below load it
+        // and edit it.
+        string apsi1_100k_1_json()
+        {
+            return R"json({
+    "table_params": {
+        "hash_func_count": 1,
+        "table_size": 409,
+        "max_items_per_bin": 20
+    },
+    "item_params": {
+        "felts_per_item": 5
+    },
+    "query_params": {
+        "ps_low_degree": 0,
+        "query_powers": [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+    },
+    "seal_params": {
+        "plain_modulus": 65537,
+        "poly_modulus_degree": 2048,
+        "coeff_modulus_bits": [ 48 ]
+    }
+}
+)json";
+        }
+
+        // Smallest load that a bin should not reach: the smallest k for which the chance that any
+        // of the bins holds k or more is at most delta. A mean-plus-one-deviation estimate is not
+        // enough here, because it describes a typical maximum rather than bounding one, and
+        // under-predicts often enough to matter -- one bundle either way decides whether a
         // parameter set meets the bound.
-        double load_bound(double mean, double bins)
+        double load_bound(double mean, double bins, double delta)
         {
             if (mean <= 0.0) {
                 return 1.0;
             }
-            const double delta = 1e-3;
             double target = delta / bins;
             double log_p = -mean; // log P(X = 0)
             double tail = 1.0;    // P(X >= k)
@@ -1060,71 +1121,133 @@ namespace APSITests {
             return k;
         }
 
-        // How many bin bundles a bundle index may hold. Two things open a new one: a location
-        // filling its bin, and -- in labeled mode, and always with match tags -- two items whose
-        // field elements collide, since interpolation needs distinct points and
-        // BinBundle::multi_insert refuses the repeat. The second dominates when max_items_per_bin
-        // approaches the square root of the field element space, which is where a capacity-only
-        // estimate silently under-predicts.
+        // P(X >= k) for X ~ Poisson(mean), summed upward from k. The tails the multiplicity bound
+        // needs lie far below the rounding error of one minus the terms below k.
+        double poisson_tail(double mean, double k)
+        {
+            double log_term = -mean + k * log(mean) - lgamma(k + 1.0);
+            double tail = 0.0;
+            for (double j = k; j < k + 1000.0; j += 1.0) {
+                double term = exp(log_term);
+                tail += term;
+                if (j > mean && term <= tail * 1e-17) {
+                    break;
+                }
+                log_term += log(mean) - log(j + 1.0);
+            }
+            return tail;
+        }
+
+        // How many items at one location may share a field element: the smallest r for which the
+        // chance that more than r do is at most delta. An item has felts_per_item field elements,
+        // each in a bin of its own and uniform over its 2^b values, b = item_bit_count_per_felt,
+        // so the items at a location that share a value in one bin are Poisson(mean / 2^b), and
+        // the union runs over every location, bin and value. A bin holds a field element once,
+        // so each of those items needs a bin bundle of its own.
+        double multiplicity_bound(
+            double mean,
+            double item_bit_count_per_felt,
+            double felts_per_item,
+            double locations,
+            double delta)
+        {
+            double values = pow(2.0, item_bit_count_per_felt);
+            double cells = locations * felts_per_item * values;
+            double r = 1.0;
+            while (cells * poisson_tail(mean / values, r + 1.0) > delta) {
+                r += 1.0;
+            }
+            return r;
+        }
+
+        // How many bin bundles a bundle index is charged for: the design count that chose the sets
+        // in parameters/.
+        //
+        // A bin holds max_items_per_bin items with match tags and one fewer without, as SenderDB
+        // fills it. Without match tags or labels nothing else limits a bin bundle and the bundles
+        // fill one after another, so the capacity count, bounded with probability 1e-3, is exact.
+        // Otherwise a bin bundle also refuses an item whose field element it holds at the
+        // location already -- the tag parts are label parts whether or not the items have labels
+        // -- so the count is the larger of the capacity count and the multiplicity bound, each
+        // bounded with probability 5e-4, plus two for placement: in simulations that reproduce
+        // SenderDB's placement exactly, built in bulk or grown one item at a time, no bundle index
+        // of a set in parameters/ needed more.
         double bundle_bound(
             double sender_size,
             double hash_func_count,
             double table_size,
-            double max_items_per_bin,
+            double bin_capacity,
             double item_bit_count_per_felt,
-            double label_byte_count,
-            bool uses_tags)
+            double felts_per_item,
+            bool collisions)
         {
             double mean = hash_func_count * sender_size / table_size;
-            double per_bin = load_bound(mean, table_size);
-            double bundles = max(1.0, ceil(per_bin / max_items_per_bin));
-
-            if (label_byte_count > 0.0 || uses_tags) {
-                double in_bin = min(per_bin, max_items_per_bin);
-                double space = pow(2.0, item_bit_count_per_felt);
-                double colliding_pairs = in_bin * in_bin / (2.0 * space);
-                bundles = max(bundles, 1.0 + load_bound(colliding_pairs, table_size));
+            if (!collisions) {
+                return max(1.0, ceil(load_bound(mean, table_size, 1e-3) / bin_capacity));
             }
-            return bundles;
+            double bundles = max(1.0, ceil(load_bound(mean, table_size, 5e-4) / bin_capacity));
+            bundles =
+                max(bundles,
+                    multiplicity_bound(
+                        mean, item_bit_count_per_felt, felts_per_item, table_size, 5e-4));
+            return bundles + 2.0;
+        }
+
+        // The number of item-sized parts a nonce and label take together, as SenderDB counts
+        // them: zero without a label, and otherwise ceil(8 * (nonce + label) / item_bit_count),
+        // with the nonce the default 16 bytes. With match tags an item is one or two field
+        // elements in the shipped sets, and three to seven without them, so the same label takes
+        // more parts with match tags.
+        double label_part_count(double label_byte_count, double item_bit_count)
+        {
+            if (label_byte_count <= 0.0) {
+                return 0.0;
+            }
+            return ceil(8.0 * (label_byte_count + 16.0) / item_bit_count);
         }
 
         // Sender and receiver set sizes, and any label byte count, are encoded in the file name as
-        // the README describes: <sender>-<receiver>[-<label byte count>][-com|-cmp].
+        // the README describes: <sender>-<receiver>[-<label byte count>][-com|-cmp]. A name of any
+        // other form is not one this can check.
         bool parse_name(const string &stem, double &sender, double &receiver, double &label_bytes)
         {
-            size_t dash = stem.find('-');
-            if (dash == string::npos) {
+            vector<string> fields;
+            size_t start = 0;
+            for (size_t dash = stem.find('-'); dash != string::npos; dash = stem.find('-', start)) {
+                fields.push_back(stem.substr(start, dash - start));
+                start = dash + 1;
+            }
+            fields.push_back(stem.substr(start));
+            if (fields.size() < 2 || fields.size() > 4) {
                 return false;
             }
-            string s = stem.substr(0, dash);
+
+            auto is_number = [](const string &s) {
+                return !s.empty() && s.find_first_not_of("0123456789") == string::npos;
+            };
+
+            string s = fields[0];
             size_t mult = 1;
             if (!s.empty() && (s.back() == 'K' || s.back() == 'M')) {
                 mult = (s.back() == 'K') ? 1000 : 1000000;
                 s.pop_back();
             }
-            string rest = stem.substr(dash + 1);
-            string r = rest;
-            string tail;
-            size_t dash2 = rest.find('-');
-            if (dash2 != string::npos) {
-                r = rest.substr(0, dash2);
-                tail = rest.substr(dash2 + 1);
-            }
-            if (s.empty() || r.empty() || s.find_first_not_of("0123456789") != string::npos ||
-                r.find_first_not_of("0123456789") != string::npos) {
+            if (!is_number(s) || !is_number(fields[1])) {
                 return false;
             }
             sender = static_cast<double>(stoull(s)) * static_cast<double>(mult);
-            receiver = static_cast<double>(stoull(r));
+            receiver = static_cast<double>(stoull(fields[1]));
 
             label_bytes = 0.0;
-            if (!tail.empty()) {
-                string first = tail.substr(0, tail.find('-'));
-                if (first.find_first_not_of("0123456789") == string::npos) {
-                    label_bytes = static_cast<double>(stoull(first));
-                }
+            size_t next = 2;
+            if (next < fields.size() && is_number(fields[next])) {
+                label_bytes = static_cast<double>(stoull(fields[next]));
+                next++;
             }
-            return true;
+            if (next < fields.size() && (fields[next] == "com" || fields[next] == "cmp")) {
+                next++;
+            }
+            return next == fields.size();
         }
     } // namespace
 
@@ -1132,13 +1255,9 @@ namespace APSITests {
     {
         // A file may name the serialization version it was written for, so that one written for
         // a version this build does not implement is refused while loading rather than at the
-        // first exchange with a peer. The key is optional: files written before it existed, and
-        // the sets in parameters/, carry no version and must still load.
-        stringstream ss;
-        ifstream file(string(APSI_PARAMETERS_DIR) + "/100K-1.json");
-        ASSERT_TRUE(file.is_open());
-        ss << file.rdbuf();
-        string base = ss.str();
+        // first exchange with a peer. The key is optional: files written before it existed, such
+        // as the APSI 1.x sets, carry no version and must still load.
+        string base = apsi1_100k_1_json();
 
         ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(base)));
 
@@ -1172,11 +1291,7 @@ namespace APSITests {
         // offending value by streaming it, which every Json::Value supports; reading it as a
         // string instead would hold only for a string, and jsoncpp answers the rest by throwing
         // a logic error or, when built without exceptions, by aborting.
-        stringstream ss;
-        ifstream file(string(APSI_PARAMETERS_DIR) + "/100K-1.json");
-        ASSERT_TRUE(file.is_open());
-        ss << file.rdbuf();
-        string base = ss.str();
+        string base = apsi1_100k_1_json();
 
         ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(base)));
 
@@ -1221,21 +1336,24 @@ namespace APSITests {
         // handle, and a receiver that visibly retries has told an observer something.
         //
         // Three-way cuckoo hashing carries a threshold near 91.8% occupancy, and insertion
-        // starts failing measurably well before it. The shipped sets hold to at least 1.6 times
-        // the receiver's item count, which is about 62% occupancy; this checks that a retune has
-        // not quietly taken one below that.
-        constexpr double min_ratio = 1.5996; // 1638/1024, the ratio the shipped sets realize
+        // starts failing measurably well before it. The shipped sets hold to at least 1.99 times
+        // the receiver's item count, about 50% occupancy, and APSI 1.x's to 1.6 times, about 62%;
+        // this checks that a retune has not quietly taken one below the latter.
+        constexpr double min_ratio = 1.5996; // 1638/1024, the ratio APSI 1.x's sets realize
 
         namespace fs = std::filesystem;
         fs::path dir(APSI_PARAMETERS_DIR);
         ASSERT_TRUE(fs::is_directory(dir)) << "cannot find " << dir;
 
+        size_t json_files = 0;
         size_t checked = 0;
         for (const auto &entry : fs::directory_iterator(dir)) {
             if (entry.path().extension() != ".json") {
                 continue;
             }
+            json_files++;
 
+            // The set sizes are in the name
             string stem = entry.path().stem().string();
             double sender = 0.0;
             double receiver = 0.0;
@@ -1264,7 +1382,9 @@ namespace APSITests {
             checked++;
         }
 
-        ASSERT_LE(size_t(20), checked) << "far fewer parameter sets checked than expected";
+        // 28 of the 36 shipped sets carry more than one query item
+        ASSERT_LE(size_t(36), json_files) << "expected to find the shipped parameter sets";
+        ASSERT_LE(size_t(28), checked) << "far fewer parameter sets checked than expected";
     }
 
     TEST(PSIParamsTests, ShippedParameterSetsHoldTheDocumentedFalsePositiveBound)
@@ -1273,11 +1393,18 @@ namespace APSITests {
         // returning at least one false positive below 2^-40, at the set sizes its file name
         // gives. That figure is not PSIParams::log2_fpp_per_bin_bundle, which describes one
         // bin bundle: it must also count the bundles a location spills into and the items in
-        // a query. Retuning a
-        // parameter file without carrying both terms is what this guards against.
+        // a query. Retuning a parameter file without carrying both terms is what this guards
+        // against.
+        //
+        // There is one file per set, <name>.json, with match tags or without them. Each must load
+        // and hold the bound with the bundle count of its kind. With match tags one bundle
+        // contributes -min(tag_bit_count, 128), and without them felts_per_item times
+        // (log2(max_items_per_bin) - item_bit_count_per_felt); log2_fpp_per_bin_bundle returns
+        // either.
         //
         // The bundle count is bounded rather than estimated, so the guard errs towards reporting
-        // a set as failing rather than passing.
+        // a set as failing rather than passing. The tightest set, 256M-1, comes to -41.4 with 24
+        // bundles; it would take 64 to reach -40.
         namespace fs = std::filesystem;
         fs::path dir(APSI_PARAMETERS_DIR);
         ASSERT_TRUE(fs::is_directory(dir)) << "cannot find " << dir;
@@ -1306,27 +1433,38 @@ namespace APSITests {
             json << file.rdbuf();
 
             PSIParams params = PSIParams::Load(json.str());
+
+            double h = static_cast<double>(params.table_params().hash_func_count);
+            double table_size = static_cast<double>(params.table_params().table_size);
+            double max_items_per_bin = static_cast<double>(params.table_params().max_items_per_bin);
             double bundles = bundle_bound(
                 sender,
-                static_cast<double>(params.table_params().hash_func_count),
-                static_cast<double>(params.table_params().table_size),
-                static_cast<double>(params.table_params().max_items_per_bin),
+                h,
+                table_size,
+                params.uses_tags() ? max_items_per_bin : max_items_per_bin - 1.0,
                 static_cast<double>(params.item_bit_count_per_felt()),
-                label_bytes,
-                params.uses_tags());
+                static_cast<double>(params.item_params().felts_per_item),
+                params.uses_tags() || label_bytes > 0.0);
 
             double fpp = params.log2_fpp_per_bin_bundle() + log2(bundles) + log2(receiver);
+
+            // For the message: the ciphertexts every bin bundle answers with
+            double parts = params.uses_tags()
+                               ? params.tag_part_count() +
+                                     label_part_count(label_bytes, params.item_bit_count())
+                               : 1.0 + label_part_count(label_bytes, params.item_bit_count());
 
             ASSERT_LT(fpp, -40.0) << stem << ": per-execution log2(fpp) is " << fpp
                                   << ", which is not below -40. "
                                   << "One bundle gives " << params.log2_fpp_per_bin_bundle()
                                   << ", a location may fill " << bundles
-                                  << " bin bundles, and a query carries " << receiver << " items.";
+                                  << " bin bundles, each answering with " << parts
+                                  << " ciphertexts, and a query carries " << receiver << " items.";
             checked++;
         }
 
         ASSERT_EQ(json_files, checked) << "every parameter set must be checked";
-        ASSERT_LE(size_t(30), checked) << "expected to find the shipped parameter sets";
+        ASSERT_LE(size_t(36), checked) << "expected to find the 36 shipped parameter sets";
     }
 
     namespace {
