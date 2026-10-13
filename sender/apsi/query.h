@@ -34,15 +34,22 @@ namespace apsi::sender {
         returns false, and Sender::RunQuery refuses it. The checks come in this order: the
         parameter fingerprint (see check_params_fingerprint); the relinearization keys; that the
         query holds exactly the source powers the parameters call for, each with one ciphertext per
-        bundle index; and then, one ciphertext at a time, that the ciphertext is a fresh encryption
-        valid for the SenderDB's SEALContext.
+        bundle index; and then that each ciphertext is a fresh encryption valid for the SenderDB's
+        SEALContext.
 
         A query request that SenderOperationQuery::load read holds its ciphertexts in serialized
         form. Each is loaded only in the last step, once the number of ciphertexts is known to be
-        right, so an invalid query can make the sender load no more ciphertexts than a valid one
-        holds, and at most one invalid one. A ciphertext held in serialized form that takes less
-        than 1/64 of the bytes a fresh encryption loads to, or whose data is not a ciphertext at
-        all, leaves the query invalid like any other failed check.
+        right, and checked as soon as it is loaded. The ciphertexts are loaded on the calling
+        thread if ThreadPoolMgr::GetThreadCount() is one, as it is under a ScopedParallelismLimit
+        of one, or if the calling thread is a task of the thread pool, and otherwise by up to that
+        many tasks on the thread pool, one for each ciphertext at most, which take them in the
+        order of the query data and take no other once one has failed. An invalid query can
+        therefore make the sender load no more ciphertexts than a valid one holds, and at most one
+        invalid one for each task. The failure logged is that of the first ciphertext to fail in
+        the order of the query data, as when they are loaded one at a time. A ciphertext held in
+        serialized form that takes less than 1/64 of the bytes a fresh encryption loads to, or
+        whose data is not a ciphertext at all, leaves the query invalid like any other failed
+        check.
 
         Throws std::invalid_argument if query_request or sender_db is null.
         */

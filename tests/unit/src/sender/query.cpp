@@ -35,6 +35,7 @@
 #include "apsi/seal_object.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
+#include "apsi/thread_pool_mgr.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -237,8 +238,8 @@ namespace APSITests {
         }
 
         /**
-        Collects the errors logged while it exists, and restores the global logger and log level
-        when it is destroyed.
+        Collects the errors and the debug messages logged while it exists, and restores the global
+        logger and log level when it is destroyed.
         */
         class ErrorCapture {
         public:
@@ -248,8 +249,11 @@ namespace APSITests {
                 log_handlers[static_cast<size_t>(LogLevel::error)] = [this](const string &msg) {
                     errors_.push_back(msg);
                 };
+                log_handlers[static_cast<size_t>(LogLevel::debug)] = [this](const string &msg) {
+                    debug_messages_.push_back(msg);
+                };
                 SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
-                SetLogLevel(LogLevel::error);
+                SetLogLevel(LogLevel::debug);
             }
 
             ~ErrorCapture()
@@ -281,6 +285,30 @@ namespace APSITests {
                 return logged_one(text, errors_.size() == 1 && errors_[0] == text, "equal to");
             }
 
+            /**
+            Returns how many ciphertexts the last Query created while this exists extracted, by
+            what it logs at debug level, or SIZE_MAX if no Query has logged it.
+            */
+            [[nodiscard]] size_t extracted_count() const
+            {
+                const string *message = last_extraction_message();
+                return message
+                           ? static_cast<size_t>(stoull(message->substr(extracted_prefix.size())))
+                           : SIZE_MAX;
+            }
+
+            /**
+            Returns how many tasks the last Query created while this exists extracted its
+            ciphertexts with, by what it logs at debug level, or SIZE_MAX if no Query has logged it.
+            */
+            [[nodiscard]] size_t extraction_task_count() const
+            {
+                const string *message = last_extraction_message();
+                return message ? static_cast<size_t>(stoull(message->substr(
+                                     message->find(tasks_infix) + tasks_infix.size())))
+                               : SIZE_MAX;
+            }
+
         private:
             [[nodiscard]] testing::AssertionResult logged_one(
                 const string &text, bool success, const string &relation) const
@@ -301,6 +329,47 @@ namespace APSITests {
             LogLevel saved_level_;
 
             vector<string> errors_;
+
+            vector<string> debug_messages_;
+
+            inline static const string extracted_prefix = "Extracted ";
+
+            inline static const string tasks_infix = " query ciphertexts with ";
+
+            /**
+            Returns the last message in which a Query tells how many ciphertexts it extracted, or
+            nullptr if there is none.
+            */
+            [[nodiscard]] const string *last_extraction_message() const
+            {
+                for (auto it = debug_messages_.rbegin(); it != debug_messages_.rend(); it++) {
+                    if ((it->rfind(extracted_prefix, 0) == 0) &&
+                        (it->find(tasks_infix) != string::npos)) {
+                        return &*it;
+                    }
+                }
+                return nullptr;
+            }
+        };
+
+        /**
+        Sets the thread count while it exists, and restores the default when it is destroyed.
+        */
+        class ThreadCountScope {
+        public:
+            explicit ThreadCountScope(size_t thread_count)
+            {
+                ThreadPoolMgr::SetThreadCount(thread_count);
+            }
+
+            ~ThreadCountScope()
+            {
+                ThreadPoolMgr::SetThreadCount(0);
+            }
+
+            ThreadCountScope(const ThreadCountScope &) = delete;
+
+            ThreadCountScope &operator=(const ThreadCountScope &) = delete;
         };
     } // namespace
 
@@ -561,11 +630,12 @@ namespace APSITests {
 
     TEST(QueryTests, LoadsNoCiphertextAfterAnInvalidOne)
     {
-        // Each ciphertext is checked as soon as it is loaded, so that an invalid query costs the
-        // sender at most one invalid ciphertext. The first ciphertext loaded here is valid for
-        // SEAL but has the largest size SEAL allows. Its data is zero, and it is saved without
-        // compression, as compressed it would take too few bytes to be loaded at all. Every other
-        // is not a ciphertext at all.
+        // Each ciphertext is checked as soon as it is loaded, so that, loaded one at a time, as
+        // they are under a parallelism limit of one, an invalid query costs the sender at most one
+        // invalid ciphertext. The first ciphertext loaded here is valid for SEAL but has the
+        // largest size SEAL allows. Its data is zero, and it is saved without compression, as
+        // compressed it would take too few bytes to be loaded at all. Every other is not a
+        // ciphertext at all.
         auto sender_db = make_shared<SenderDB>(make_wider_params());
         auto context = sender_db->get_seal_context();
         QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
@@ -587,11 +657,135 @@ namespace APSITests {
             }
         }
 
+        ThreadCountScope threads(4);
+        ScopedParallelismLimit limit(1);
         ErrorCapture errors;
         Query query(std::move(request), sender_db);
         ASSERT_FALSE(query.is_valid());
         ASSERT_TRUE(errors.logged_exactly(
             "Extracted ciphertext has size 16; expected a fresh encryption of size 2"));
+        ASSERT_EQ(size_t(1), errors.extracted_count());
+    }
+
+    TEST(QueryTests, LoadsAtMostOneInvalidCiphertextPerTask)
+    {
+        // Loaded by several tasks, the ciphertexts are taken in order, each is checked as soon as
+        // it is loaded, and none is taken once one has failed, so an invalid query costs the
+        // sender at most one invalid ciphertext for each task. Here none of the six is a
+        // ciphertext. The failure logged is that of the first, whichever task fails first.
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        ThreadCountScope threads(4);
+        for (size_t limit_count : { 1U, 2U, 3U, 0U }) {
+            SCOPED_TRACE("parallelism limit " + to_string(limit_count));
+            size_t task_count = limit_count ? limit_count : 4;
+            for (int run = 0; run < 20; run++) {
+                QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+                uint32_t first_exponent = request->data.begin()->first;
+                for (auto &q : request->data) {
+                    for (auto &ct : q.second) {
+                        ct = not_a_ciphertext();
+                    }
+                }
+
+                ScopedParallelismLimit limit(limit_count);
+                ErrorCapture errors;
+                Query query(std::move(request), sender_db);
+                ASSERT_FALSE(query.is_valid());
+                ASSERT_TRUE(errors.logged_exactly(
+                    "Failed to extract a ciphertext for exponent " + to_string(first_exponent) +
+                    ": incompatible version"));
+                ASSERT_LE(size_t(1), errors.extracted_count());
+                ASSERT_GE(task_count, errors.extracted_count());
+            }
+        }
+    }
+
+    TEST(QueryTests, ReportsTheFirstInvalidCiphertextWhateverTheParallelism)
+    {
+        // With several invalid ciphertexts loaded by several tasks, the failure logged is that of
+        // the first invalid one in the order of the query data, as when they are loaded one at a
+        // time, however the tasks are scheduled. Here the third of six is not a ciphertext at
+        // all, and the fifth has size 16.
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        Ciphertext zero(*context);
+        zero.resize(SEAL_CIPHERTEXT_SIZE_MAX);
+        vector<unsigned char> zero_bytes = save_ciphertext(zero, compr_mode_type::none);
+
+        ThreadCountScope threads(4);
+        for (size_t limit_count : { 1U, 2U, 0U }) {
+            SCOPED_TRACE("parallelism limit " + to_string(limit_count));
+            for (int run = 0; run < 20; run++) {
+                QueryRequest request = receive(make_honest_query(sender_db->get_params()), context);
+                size_t position = 0;
+                uint32_t third_exponent = 0;
+                for (auto &q : request->data) {
+                    for (auto &ct : q.second) {
+                        if (position == 2) {
+                            ct = not_a_ciphertext();
+                            third_exponent = q.first;
+                        } else if (position == 4) {
+                            ct.set_serialized(zero_bytes);
+                        }
+                        position++;
+                    }
+                }
+                ASSERT_EQ(size_t(6), position);
+
+                ScopedParallelismLimit limit(limit_count);
+                ErrorCapture errors;
+                Query query(std::move(request), sender_db);
+                ASSERT_FALSE(query.is_valid());
+                ASSERT_TRUE(errors.logged_exactly(
+                    "Failed to extract a ciphertext for exponent " + to_string(third_exponent) +
+                    ": incompatible version"));
+            }
+        }
+    }
+
+    TEST(QueryTests, LoadsTheSameCiphertextsWhateverTheParallelism)
+    {
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        QueryRequest sent = make_honest_query(sender_db->get_params());
+
+        ThreadCountScope threads(4);
+        map<uint32_t, vector<vector<unsigned char>>> expected;
+        for (size_t limit_count : { 1U, 2U, 0U }) {
+            SCOPED_TRACE("parallelism limit " + to_string(limit_count));
+            ScopedParallelismLimit limit(limit_count);
+            ErrorCapture errors;
+            Query query(receive(sent, context), sender_db);
+            ASSERT_TRUE(query.is_valid());
+            ASSERT_EQ(size_t(6), errors.extracted_count());
+            ASSERT_EQ(limit_count ? limit_count : 4, errors.extraction_task_count());
+            if (limit_count == 1) {
+                expected = saved_ciphertexts(query);
+            } else {
+                ASSERT_TRUE(expected == saved_ciphertexts(query));
+            }
+        }
+    }
+
+    TEST(QueryTests, LoadsTheCiphertextsItselfOnATaskOfTheThreadPool)
+    {
+        // A task of the thread pool cannot wait for other tasks on it, so a Query created on one
+        // loads the ciphertexts on that thread, as with a single thread, rather than throwing
+        auto sender_db = make_shared<SenderDB>(make_wider_params());
+        auto context = sender_db->get_seal_context();
+        QueryRequest sent = make_honest_query(sender_db->get_params());
+
+        ThreadCountScope threads(4);
+        ThreadPoolMgr tpm;
+        ErrorCapture errors;
+        auto valid = tpm.thread_pool().enqueue([&]() {
+            Query query(receive(sent, context), sender_db);
+            return query.is_valid();
+        });
+        ASSERT_TRUE(valid.get());
+        ASSERT_EQ(size_t(6), errors.extracted_count());
+        ASSERT_EQ(size_t(1), errors.extraction_task_count());
     }
 
     TEST(QueryTests, RefusesACiphertextThatTakesTooFewBytes)

@@ -109,9 +109,11 @@ namespace apsi {
     within one: when one of its tasks finishes, a fan-out's next task queues behind whatever other
     operations have queued on the pool meanwhile, but a task that has started runs to completion.
     ThreadPoolMgr::GetThreadCount reports at most max_tasks on this thread, so the fan-outs it
-    sizes, the OPRF computations and PowersDag::parallel_apply, have at most max_tasks tasks, and
+    sizes, the OPRF computations, PowersDag::parallel_apply and the loading of a query's
+    ciphertexts in the sender::Query constructor, have at most max_tasks tasks, and
     receiver::Receiver::request_query starts at most max_tasks result threads, which are not on the
-    pool. The pool is neither resized nor reserved, so a limit above its worker count has no further
+    pool. With a limit of one, a sender::Query loads the ciphertexts on the thread that creates it.
+    The pool is neither resized nor reserved, so a limit above its worker count has no further
     effect. Operations begun on other threads are unaffected: concurrent operations with different
     limits share the pool without coordinating or serializing.
 

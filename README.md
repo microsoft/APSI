@@ -876,7 +876,7 @@ Once the request has been obtained, the `RunOPRF` function can be called with th
 This function will return `nullptr` if the received request was not of the right type.
 Once the request has been obtained, a `Query` object must be created from it.
 The constructor of the `Query` class verifies that the `QueryRequest` is valid for the given `SenderDB`, and if it is not the constructor still returns successfully but the `Query` is marked as invalid (`Query::is_valid()` returns `false`) and cannot be used in the next step.
-Among other things, the constructor checks the query's [parameter fingerprint](#parameter-fingerprints), and loads and checks its ciphertexts, which `network::SenderOperationQuery::load` leaves in serialized form.
+Among other things, the constructor checks the query's [parameter fingerprint](#parameter-fingerprints), and loads and checks its ciphertexts, which `network::SenderOperationQuery::load` leaves in serialized form, with up to as many tasks on the thread pool as `ThreadPoolMgr::GetThreadCount` gives.
 Once a valid `Query` object is created, the `RunQuery` function can be used to perform the query and respond on the given channel.
 Optionally, two lambda functions can be given to `RunQuery` to provide custom logic for sending the `QueryResponse` and the `ResultPart` objects on the channel.
 
@@ -1365,7 +1365,7 @@ Instances are cheap and scope-bound, and cannot be copied or moved.
 
 An `apsi::ScopedParallelismLimit` limits the parallelism of the APSI operations that the thread creating it begins while it exists.
 Each fan-out of such an operation runs at most the given number of tasks at once on the shared pool, and `ThreadPoolMgr::GetThreadCount` reports at most that number on the thread.
-The fan-outs that split their work by `ThreadPoolMgr::GetThreadCount`, the OPRF computations and `PowersDag::parallel_apply`, therefore have at most that many tasks.
+The fan-outs that split their work by `ThreadPoolMgr::GetThreadCount`, the OPRF computations, `PowersDag::parallel_apply` and the loading of a query's ciphertexts in the `sender::Query` constructor, therefore have at most that many tasks; with a limit of one, a `sender::Query` loads the ciphertexts on the thread that creates it.
 Operations take turns on the workers between tasks, never within one: a task that has started runs to completion.
 The pool is neither resized nor reserved, and operations begun on other threads are unaffected, so concurrent operations with different limits share the pool without coordinating or serializing.
 For example, a server that answers each query on a thread of its own can keep every query to two tasks at a time:
