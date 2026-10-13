@@ -59,6 +59,14 @@ namespace apsi::network {
         Reads the ResultPackage from a stream. A package without a PSI result loads with an empty
         psi_result; whether one is expected depends on the parameters, which this overload does not
         know. Use the overload with parameters to have the structure checked.
+
+        Before any ciphertext is loaded, a package is refused with std::runtime_error if it has more
+        label parts than any parameters allow for its label and nonce byte counts, if its
+        ciphertexts share bytes, which FlatBuffers allows but no sender writes, or if together they
+        take less than 1/64 of what they load to, counting each as a ciphertext of size 2 at the
+        last level of the modulus chain. Every ciphertext must then have the shape a sender gives
+        its results: coefficient form, the last level of the modulus chain, and size 2 or 3.
+        Loading throws std::runtime_error at the first that does not, before the next is loaded.
         */
         std::size_t load(std::istream &in, const std::shared_ptr<seal::SEALContext> &context);
 
@@ -68,8 +76,10 @@ namespace apsi::network {
         verified on the serialized package before any ciphertext in it is loaded, and a package
         without it is refused with std::runtime_error, so that one which cannot be a result for
         these parameters costs no work beyond reading it. For parameters without match tags, a
-        package without a PSI result is refused with std::runtime_error in the same way, as the
-        schema refused it before match tags made the PSI result optional.
+        package is refused with std::runtime_error in the same way if it has no PSI result, as the
+        APSI 1.x schema refused it, if it is for a bundle index the parameters do not have, or if
+        it has more label parts than its label and nonce take. Otherwise this checks and loads the
+        package as the other overload does.
         */
         std::size_t load(
             std::istream &in,
@@ -82,8 +92,10 @@ namespace apsi::network {
         psi_result, a label_byte_count and nonce_byte_count within their bounds, no nonce without
         a label, and exactly params.tag_part_count() + P ciphertexts in label_result, where P is
         the number of item-sized parts the nonce and label take together, or zero without a
-        label. For parameters without match tags this checks nothing; a receiver then deals with
-        malformed packages as in APSI 1.x.
+        label. For parameters without match tags this checks nothing. The overload of load that
+        takes the parameters refuses a package for a bundle index the parameters do not have, or
+        with more label parts than its label and nonce take; the receiver ignores a package loaded
+        otherwise for a bundle index the parameters do not have, as in APSI 1.x.
         */
         void check_tag_structure(const PSIParams &params) const;
 

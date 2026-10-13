@@ -467,12 +467,14 @@ namespace APSITests {
 
             // Receive two packages
             auto rp = clt.receive_result(get_context()->seal_context());
+            ASSERT_NE(nullptr, rp);
             ASSERT_EQ(0, rp->bundle_idx);
             ASSERT_EQ(0, rp->label_byte_count);
             ASSERT_EQ(0, rp->nonce_byte_count);
             ASSERT_TRUE(rp->label_result.empty());
 
             rp = clt.receive_result(get_context()->seal_context());
+            ASSERT_NE(nullptr, rp);
             ASSERT_EQ(123, rp->bundle_idx);
             ASSERT_EQ(80, rp->label_byte_count);
             ASSERT_EQ(4, rp->nonce_byte_count);
@@ -561,7 +563,11 @@ namespace APSITests {
         nrsop->sop_response = std::move(rsop_query);
         svr.send(std::move(nrsop));
 
-        // Finally send two ZMQResultPackages
+        // Finally send two ZMQResultPackages. The query ciphertexts stand in for results, so they
+        // are taken to the last level of the modulus chain, where a sender's results are.
+        auto last_parms_id = get_context()->seal_context()->last_parms_id();
+        get_context()->evaluator()->mod_switch_to_inplace(query_ct0, last_parms_id);
+        get_context()->evaluator()->mod_switch_to_inplace(query_ct123, last_parms_id);
         auto rp = make_unique<ResultPackage>();
         rp->bundle_idx = 0;
         rp->label_byte_count = 0;
@@ -641,7 +647,8 @@ namespace APSITests {
             auto client_id = nsop->client_id;
 
             Ciphertext ct;
-            get_context()->encryptor()->encrypt_zero_symmetric(ct);
+            get_context()->encryptor()->encrypt_zero_symmetric(
+                get_context()->seal_context()->last_parms_id(), ct);
             for (bool with_psi_result : { false, true }) {
                 auto rp = make_unique<ResultPackage>();
                 if (with_psi_result) {

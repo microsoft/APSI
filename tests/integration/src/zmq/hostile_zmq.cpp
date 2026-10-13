@@ -2,12 +2,15 @@
 // Licensed under the MIT license.
 
 // STD
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <future>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
@@ -123,18 +126,17 @@ namespace APSITests {
         }
 
         /**
-        Serves parameter and OPRF requests honestly, then answers a query by announcing result
-        packages it never sends.
-
-        The announcement is what commits the receiver: each of its result workers claims one of
-        the announced packages and then waits for it. Reaching that state over a real socket is
-        the point of the fake, because it is where a blocking receive would otherwise park a
-        worker in the kernel, holding the channel's receive mutex, with its siblings and the
-        join that waits for them stuck behind it.
+        Answers a query from the given client on the given channel.
         */
-        void RunSilentSender(
+        using QueryAnswerer = function<void(
+            ZMQSenderChannel &, const vector<unsigned char> &, unique_ptr<SenderOperation>)>;
+
+        /**
+        Serves parameter and OPRF requests honestly, and leaves every query to answer_query.
+        */
+        void RunFakeSender(
             const shared_ptr<SenderDB> &sender_db,
-            uint32_t announced_package_count,
+            const QueryAnswerer &answer_query,
             atomic<bool> &stop,
             ZMQSenderChannel &chl)
         {
@@ -172,17 +174,44 @@ namespace APSITests {
                         });
                     break;
 
-                case SenderOperationType::sop_query: {
-                    auto response = make_unique<SenderOperationResponseQuery>();
-                    response->package_count = announced_package_count;
-                    SendResponseTo(chl, client_id, std::move(response));
+                case SenderOperationType::sop_query:
+                    answer_query(chl, client_id, std::move(sop->sop));
                     break;
-                }
 
                 default:
                     break;
                 }
             }
+        }
+
+        /**
+        Serves parameter and OPRF requests honestly, then answers a query by announcing result
+        packages it never sends.
+
+        The announcement is what commits the receiver: each of its result workers claims one of
+        the announced packages and then waits for it. Reaching that state over a real socket is
+        the point of the fake, because it is where a blocking receive would otherwise park a
+        worker in the kernel, holding the channel's receive mutex, with its siblings and the
+        join that waits for them stuck behind it.
+        */
+        void RunSilentSender(
+            const shared_ptr<SenderDB> &sender_db,
+            uint32_t announced_package_count,
+            atomic<bool> &stop,
+            ZMQSenderChannel &chl)
+        {
+            RunFakeSender(
+                sender_db,
+                [announced_package_count](
+                    ZMQSenderChannel &c,
+                    const vector<unsigned char> &client_id,
+                    unique_ptr<SenderOperation>) {
+                    auto response = make_unique<SenderOperationResponseQuery>();
+                    response->package_count = announced_package_count;
+                    SendResponseTo(c, client_id, std::move(response));
+                },
+                stop,
+                chl);
         }
     } // namespace
 
@@ -261,6 +290,62 @@ namespace APSITests {
         ASSERT_TRUE(query_result[1].found);
         ASSERT_FALSE(query_result[2].found);
     }
+
+    namespace {
+        /**
+        Collects the errors logged while it exists, from any thread, and silences logging again
+        when it is destroyed.
+        */
+        class ErrorLog {
+        public:
+            ErrorLog()
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::error)] = [this](const string &msg) {
+                    lock_guard<mutex> lock(mtx_);
+                    errors_.push_back(msg);
+                };
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+            }
+
+            ~ErrorLog()
+            {
+                // Replacing the logger closes this one, which waits for a handler that is still
+                // running, so nothing refers to this object once it is gone.
+                SetLogger(Logger::Create({}, {}, {}));
+            }
+
+            ErrorLog(const ErrorLog &) = delete;
+
+            ErrorLog &operator=(const ErrorLog &) = delete;
+
+            /**
+            Waits until an error containing the given text has been logged, and returns false if
+            none has been within the given time.
+            */
+            bool wait_for(const string &text, chrono::milliseconds timeout) const
+            {
+                auto deadline = chrono::steady_clock::now() + timeout;
+                while (chrono::steady_clock::now() < deadline) {
+                    {
+                        lock_guard<mutex> lock(mtx_);
+                        for (const auto &error : errors_) {
+                            if (error.find(text) != string::npos) {
+                                return true;
+                            }
+                        }
+                    }
+                    this_thread::sleep_for(50ms);
+                }
+                return false;
+            }
+
+        private:
+            mutable mutex mtx_;
+
+            vector<string> errors_;
+        };
+    } // namespace
 
     // The deadline is checked between receive calls, so it protects a receiver only as far as
     // the channel hands control back. Every other test of it runs against a fake that returns
@@ -350,5 +435,183 @@ namespace APSITests {
         // Reaching this line at all is most of the assertion: an unbounded wait on the queued
         // request would never return. The bound catches it turning into something merely slow.
         ASSERT_LT(elapsed, 60s);
+    }
+
+    namespace {
+        /**
+        Answers a query as an honest sender does, and then sends one result package more: a copy
+        of the first, as misreport leaves it. The response announces it, so that the receiver
+        waits for every package, the honest ones and the copy.
+        */
+        void AnswerWithOneMorePackage(
+            const shared_ptr<SenderDB> &sender_db,
+            const function<void(ResultPackage &)> &misreport,
+            ZMQSenderChannel &chl,
+            const vector<unsigned char> &client_id,
+            unique_ptr<SenderOperation> sop)
+        {
+            // Sender::RunQuery hands over the packages from several tasks at once, so they are
+            // collected under a lock and sent once all of them are there
+            mutex packages_mtx;
+            vector<unique_ptr<ResultPackage>> packages;
+            Query query(to_query_request(std::move(sop)), sender_db);
+            Sender::RunQuery(
+                query,
+                chl,
+                [](Channel &, Response) {},
+                [&](Channel &, ResultPart rp) {
+                    lock_guard<mutex> lock(packages_mtx);
+                    packages.push_back(std::move(rp));
+                });
+
+            auto copy = make_unique<ResultPackage>(*packages.front());
+            misreport(*copy);
+            packages.push_back(std::move(copy));
+
+            auto response = make_unique<SenderOperationResponseQuery>();
+            response->package_count = static_cast<uint32_t>(packages.size());
+            SendResponseTo(chl, client_id, std::move(response));
+
+            for (auto &rp : packages) {
+                auto network_rp = make_unique<ZMQResultPackage>();
+                network_rp->rp = std::move(rp);
+                network_rp->client_id = client_id;
+                chl.send(std::move(network_rp));
+            }
+        }
+
+        /**
+        Queries, over a real socket, a sender that answers with one result package more than an
+        honest sender, a copy of the first. As it is, the copy is ignored, so a first query gets
+        the honest answer. As misreport changes it, the receiver's channel refuses it with the
+        given error, and a second query fails, although every honest package arrives as well.
+        */
+        void ExpectMisreportedPackageFailsTheQuery(
+            const shared_ptr<SenderDB> &sender_db,
+            const function<void(ResultPackage &)> &misreport,
+            const string &refusal)
+        {
+            ErrorLog errors;
+            atomic<bool> stop_sender{ false };
+            atomic<bool> misreporting{ false };
+
+            ZMQSenderChannel sender_chl;
+            sender_chl.bind(any_port_bind_address());
+            string address = connect_address(sender_chl);
+
+            future<void> sender_f = async(launch::async, [&] {
+                RunFakeSender(
+                    sender_db,
+                    [&](ZMQSenderChannel &chl,
+                        const vector<unsigned char> &client_id,
+                        unique_ptr<SenderOperation> sop) {
+                        AnswerWithOneMorePackage(
+                            sender_db,
+                            [&](ResultPackage &rp) {
+                                if (misreporting) {
+                                    misreport(rp);
+                                }
+                            },
+                            chl,
+                            client_id,
+                            std::move(sop));
+                    },
+                    stop_sender,
+                    sender_chl);
+            });
+            DispatcherStopper stopper(stop_sender, sender_f);
+
+            ZMQReceiverChannel recv_chl;
+            recv_chl.connect(address);
+
+            // Two items the sender has, and one it does not
+            vector<Item> recv_items = { Item(1, 1), Item(2, 2) };
+            constexpr uint64_t absent_item_word = numeric_limits<uint64_t>::max();
+            recv_items.emplace_back(absent_item_word, absent_item_word);
+
+            Receiver receiver(sender_db->get_params());
+            auto [hashed_recv_items, label_keys] = Receiver::RequestOPRF(recv_items, recv_chl, 30s);
+
+            // The copy as it is, which is ignored
+            vector<MatchRecord> query_result =
+                receiver.request_query(hashed_recv_items, label_keys, recv_chl, 30s);
+            ASSERT_EQ(size_t(3), query_result.size());
+            for (size_t i = 0; i < 2; i++) {
+                ASSERT_TRUE(query_result[i].found);
+                if (sender_db->is_labeled()) {
+                    ASSERT_EQ(sender_db->get_label(recv_items[i]), query_result[i].label.value());
+                }
+            }
+            ASSERT_FALSE(query_result[2].found);
+            ASSERT_FALSE(recv_chl.receive_failed());
+
+            // The copy as misreport changes it, which is refused
+            misreporting = true;
+            try {
+                (void)receiver.request_query(hashed_recv_items, label_keys, recv_chl, 30s);
+                FAIL() << "the query was expected to fail on the misreported package";
+            } catch (const runtime_error &ex) {
+                ASSERT_STREQ("failed to receive the result package", ex.what());
+            }
+            ASSERT_TRUE(recv_chl.receive_failed());
+            ASSERT_TRUE(errors.wait_for(refusal, 5s));
+        }
+    } // namespace
+
+    // Without match tags, the shipped channels refuse a result package for a bundle index the
+    // parameters do not have, or with more label parts than its label and nonce take, as
+    // ResultPackage::load does with the parameters, and the failed receive fails the whole query.
+    // A channel that inherits Channel::receive_result_for checks less; see
+    // HostileSenderTests.OutOfRangeBundleIdxIsIgnored.
+
+    TEST(HostileZMQTests, OutOfRangeBundleIdxFailsTheQueryOverZMQ)
+    {
+        SetUpTestLoggingAndThreads();
+
+        PSIParams params = create_params1();
+        ASSERT_FALSE(params.uses_tags());
+        ASSERT_EQ(uint32_t(4), params.bundle_idx_count());
+
+        vector<Item> sender_items;
+        sender_items.reserve(100);
+        for (size_t i = 0; i < 100; i++) {
+            sender_items.emplace_back(i + 1, i + 1);
+        }
+        auto sender_db = CreateSenderDB(params, sender_items);
+
+        // The first bundle index the parameters do not have
+        ASSERT_NO_FATAL_FAILURE(ExpectMisreportedPackageFailsTheQuery(
+            sender_db,
+            [](ResultPackage &rp) { rp.bundle_idx = 4; },
+            "failed to load ResultPackage: result package is for bundle index 4 but the "
+            "parameters have only 4"));
+    }
+
+    TEST(HostileZMQTests, ExtraLabelPartFailsTheQueryOverZMQ)
+    {
+        SetUpTestLoggingAndThreads();
+
+        // A 10-byte label and a 4-byte nonce take one label part of 128 bits
+        PSIParams params = create_params1();
+        ASSERT_FALSE(params.uses_tags());
+        ASSERT_EQ(uint32_t(128), params.item_bit_count());
+
+        vector<pair<Item, Label>> sender_items;
+        sender_items.reserve(100);
+        for (size_t i = 0; i < 100; i++) {
+            sender_items.emplace_back(
+                Item(i + 1, i + 1), create_label(static_cast<unsigned char>(i + 1), 10));
+        }
+        auto sender_db = make_shared<SenderDB>(params, 10, 4, true);
+        sender_db->set_data(sender_items);
+
+        ASSERT_NO_FATAL_FAILURE(ExpectMisreportedPackageFailsTheQuery(
+            sender_db,
+            [](ResultPackage &rp) {
+                SEALObject<Ciphertext> extra_part = rp.label_result.back();
+                rp.label_result.push_back(std::move(extra_part));
+            },
+            "failed to load ResultPackage: result package has 2 label parts but at most 1 are "
+            "expected"));
     }
 } // namespace APSITests

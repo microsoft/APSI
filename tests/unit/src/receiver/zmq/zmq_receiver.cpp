@@ -192,6 +192,10 @@ namespace APSITests {
 
             // Query will send result to client in a stream of ResultPackages
             auto send_nrp = [&](Ciphertext ct, uint32_t bundle_idx) {
+                // A sender's results are at the last level of the modulus chain
+                Evaluator(*get_context()->seal_context())
+                    .mod_switch_to_inplace(ct, get_context()->seal_context()->last_parms_id());
+
                 auto rp = make_unique<ResultPackage>();
                 rp->bundle_idx = bundle_idx;
 

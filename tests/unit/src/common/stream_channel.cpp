@@ -168,12 +168,24 @@ namespace APSITests {
         ASSERT_EQ(nullptr, clt.receive_result_for(get_context()->seal_context(), tag_params));
         ASSERT_TRUE(clt.receive_failed());
 
-        // Without match tags, a package is received if it has a PSI result
+        // Without match tags, a package is received if it has a PSI result and no more label parts
+        // than its label takes: three of 128 bits for a label of 33 bytes, but only two for 32
         StreamChannel clt2(/* istream */ stream2, /* ostream */ stream1);
-        svr.send(make_package(true, 3));
+        auto package_with_label = [](uint32_t label_byte_count) {
+            auto package = make_package(true, 3);
+            package->label_byte_count = label_byte_count;
+            return package;
+        };
+
+        svr.send(package_with_label(33));
         rp = clt2.receive_result_for(get_context()->seal_context(), *get_params());
         ASSERT_NE(nullptr, rp);
+        ASSERT_EQ(3, rp->label_result.size());
         ASSERT_FALSE(clt2.receive_failed());
+
+        svr.send(package_with_label(32));
+        ASSERT_EQ(nullptr, clt2.receive_result_for(get_context()->seal_context(), *get_params()));
+        ASSERT_TRUE(clt2.receive_failed());
     }
 
     TEST_F(StreamChannelTests, ReceiveResultForRequiresPSIResultWithoutTags)

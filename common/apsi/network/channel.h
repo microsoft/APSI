@@ -117,9 +117,10 @@ namespace apsi::network {
         a package is never processed.
 
         The channels shipped with APSI check the structure on the serialized package, before any
-        ciphertext in it is loaded; see ResultPackage::load. The default implementation, which a
-        channel written elsewhere inherits, receives the package with receive_result and checks
-        the loaded package instead.
+        ciphertext in it is loaded, and without match tags also refuse a package for a bundle index
+        the parameters do not have or with more label parts than its label takes; see
+        ResultPackage::load. The default implementation, which a channel written elsewhere
+        inherits, receives the package with receive_result and checks the loaded package instead.
         */
         virtual std::unique_ptr<ResultPackage> receive_result_for(
             std::shared_ptr<seal::SEALContext> context, const PSIParams &params)

@@ -64,8 +64,9 @@ namespace apsi {
         and replayed packages are therefore handled where they actually conflict, by the
         keep-first merge under the merge lock.
 
-        An out-of-range index is hostile input rather than an internal error, so it must not
-        abort the query.
+        An out-of-range index is hostile input rather than an internal error. ResultPackage::load
+        refuses a package carrying one when given the parameters, so the channels shipped with APSI
+        fail the receive, and with it the query; a package that arrives otherwise is ignored here.
         */
         bool bundle_idx_in_range(uint32_t bundle_idx, uint32_t bundle_idx_count)
         {

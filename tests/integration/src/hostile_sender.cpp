@@ -925,12 +925,14 @@ namespace APSITests {
         Receiver receiver(params);
         HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10);
 
-        // A package claiming a bundle_idx far outside the parameter set. This is a behaviour
-        // contract rather than a crash guard: the index arithmetic runs in size_t with
-        // mul_safe so it cannot wrap, and an unknown table index misses the translation table
-        // anyway, so such a package is harmless on its own. The receiver rejects it up front
-        // to avoid the wasted decryption, and either way the requirement is the same -- a
-        // garbage bundle_idx is ignored, never fatal, and the rest of the answer still lands.
+        // A package claiming a bundle_idx far outside the parameter set. What becomes of it
+        // depends on the channel: StreamChannel and ZMQChannel refuse it, as ResultPackage::load
+        // does with the parameters, which fails the query (see
+        // HostileZMQTests.OutOfRangeBundleIdxFailsTheQueryOverZMQ). This test pins the path of a
+        // channel that inherits Channel::receive_result_for, as ReplayChannel does: the receiver
+        // gets the package and ignores it, as APSI 1.x did, and the rest of the answer still
+        // lands. That is safe, as the index arithmetic runs in size_t with mul_safe so it cannot
+        // wrap, and the receiver skips the package before decrypting it.
         ReplayChannel chl(honest.sender_db, AppendOutOfRangeBundleIdx);
         vector<MatchRecord> query_result;
         ASSERT_NO_THROW(
@@ -975,10 +977,11 @@ namespace APSITests {
     // With match tags the parameters fix the structure of every result package, so a package
     // without it cannot be part of an answer, whatever the channel. The receiver refuses the whole
     // query rather than leave out what the package should have held, as a match quietly lost is
-    // indistinguishable from there being none. Without match tags, a package for a bundle index the
-    // parameters do not have is ignored; see OutOfRangeBundleIdxIsIgnored. In each test below every
-    // honest package is delivered as well, followed by a copy of one of them that is wrong in one
-    // way, so that only the refusal can end the query.
+    // indistinguishable from there being none. Without match tags, what becomes of a package for a
+    // bundle index the parameters do not have depends on the channel; see
+    // OutOfRangeBundleIdxIsIgnored. In each test below every honest package is delivered as well,
+    // followed by a copy of one of them that is wrong in one way, so that only the refusal can end
+    // the query.
 
     TEST(HostileSenderTests, TagResultPackageWithPSIResultFailsTheQuery)
     {

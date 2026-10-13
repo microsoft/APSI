@@ -4,10 +4,13 @@
 // STD
 #include <algorithm>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 // APSI
@@ -18,7 +21,9 @@
 
 // SEAL
 #include "seal/context.h"
+#include "seal/evaluator.h"
 #include "seal/keygenerator.h"
+#include "seal/serialization.h"
 
 // Google Test
 #include "gtest/gtest.h"
@@ -30,6 +35,13 @@ using namespace apsi::network;
 
 namespace APSITests {
     namespace {
+        /**
+        What Microsoft SEAL throws when it is to load as a ciphertext bytes that are a single value
+        repeated, as the garbage in these tests is: it reads them as the header of a version it
+        does not know.
+        */
+        constexpr const char *not_a_ciphertext_error = "incompatible version";
+
         shared_ptr<PSIParams> get_params()
         {
             static shared_ptr<PSIParams> params = nullptr;
@@ -102,28 +114,44 @@ namespace APSITests {
         /**
         A serialized result package written field by field, in the order ResultPackage::save
         writes them, so that a test can write combinations save never does. psi_ct is left out
-        when null. The ciphertexts are raw bytes, which need not be valid ciphertexts.
+        when null. The ciphertexts are raw bytes, which need not be valid ciphertexts. Each is
+        written to bytes of its own, as save writes it, unless write_equal_cts_once is set:
+        then equal ciphertexts are written once and all point there, as FlatBuffers allows.
         */
         string raw_package(
             uint32_t bundle_idx,
             const vector<unsigned char> *psi_ct,
             uint32_t label_byte_count,
             uint32_t nonce_byte_count,
-            const vector<vector<unsigned char>> &label_cts)
+            const vector<vector<unsigned char>> &label_cts,
+            bool write_equal_cts_once = false)
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
+            map<vector<unsigned char>, flatbuffers::Offset<fbs::Ciphertext>> written;
+            auto write_ct = [&](const vector<unsigned char> &ct) {
+                auto it = written.find(ct);
+                if (it != written.end()) {
+                    return it->second;
+                }
+
+                auto data = fbs_builder.CreateVector(ct.data(), ct.size());
+                auto offset = fbs::CreateCiphertext(fbs_builder, data);
+                if (write_equal_cts_once) {
+                    written.emplace(ct, offset);
+                }
+                return offset;
+            };
+
             flatbuffers::Offset<fbs::Ciphertext> psi_ct_offset;
             if (psi_ct) {
-                auto data = fbs_builder.CreateVector(psi_ct->data(), psi_ct->size());
-                psi_ct_offset = fbs::CreateCiphertext(fbs_builder, data);
+                psi_ct_offset = write_ct(*psi_ct);
             }
 
             auto label_cts_offset = fbs_builder.CreateVector([&] {
                 vector<flatbuffers::Offset<fbs::Ciphertext>> ret;
                 for (const auto &label_ct : label_cts) {
-                    auto data = fbs_builder.CreateVector(label_ct.data(), label_ct.size());
-                    ret.push_back(fbs::CreateCiphertext(fbs_builder, data));
+                    ret.push_back(write_ct(label_ct));
                 }
                 return ret;
             }());
@@ -144,7 +172,8 @@ namespace APSITests {
         }
 
         /**
-        Encrypts a vector of slot values, every slot set to value.
+        Encrypts a vector of slot values, every slot set to value, at the last level of the modulus
+        chain, where a sender's results are.
         */
         Ciphertext encrypt_value(const CryptoContext &context, uint64_t value)
         {
@@ -153,7 +182,42 @@ namespace APSITests {
             context.encoder()->encode(values, pt);
             Ciphertext ct;
             context.encryptor()->encrypt_symmetric(pt, ct);
+            Evaluator(*context.seal_context())
+                .mod_switch_to_inplace(ct, context.seal_context()->last_parms_id());
             return ct;
+        }
+
+        /**
+        Returns a ciphertext of size 2 whose data is zero, at the last level of the modulus chain,
+        where a sender's results are.
+        */
+        Ciphertext zero_result(const CryptoContext &context)
+        {
+            const auto &seal_context = *context.seal_context();
+            Ciphertext ct(seal_context, seal_context.last_parms_id());
+            ct.resize(2);
+            return ct;
+        }
+
+        /**
+        Loads the serialized result package, with the given parameters unless they are null, and
+        returns the message of the std::runtime_error that throws, or an empty string if it loads.
+        */
+        string package_load_error(
+            const string &bytes, const CryptoContext &context, const PSIParams *params)
+        {
+            stringstream ss(bytes);
+            ResultPackage rp;
+            try {
+                if (params) {
+                    rp.load(ss, context.seal_context(), *params);
+                } else {
+                    rp.load(ss, context.seal_context());
+                }
+            } catch (const runtime_error &ex) {
+                return ex.what();
+            }
+            return {};
         }
     } // namespace
 
@@ -168,9 +232,11 @@ namespace APSITests {
         KeyGenerator keygen(*context->seal_context());
         context->set_secret(keygen.secret_key());
 
-        // Symmetric encryption
+        // Symmetric encryption, at the last level of the modulus chain, where a sender's results
+        // are
+        auto last_parms_id = context->seal_context()->last_parms_id();
         Ciphertext ct;
-        context->encryptor()->encrypt_zero_symmetric(ct);
+        context->encryptor()->encrypt_zero_symmetric(last_parms_id, ct);
         rp.psi_result.set(std::move(ct));
         rp.label_byte_count = 1;
         rp.nonce_byte_count = 2;
@@ -187,7 +253,7 @@ namespace APSITests {
         ASSERT_TRUE(pt.is_zero());
 
         // Symmetric encryption as Serializable; not used in practice
-        auto ser_ct = context->encryptor()->encrypt_zero_symmetric();
+        auto ser_ct = context->encryptor()->encrypt_zero_symmetric(last_parms_id);
         rp.bundle_idx = 1;
         rp.psi_result.set(ser_ct);
         out_size = rp.save(ss);
@@ -343,9 +409,11 @@ namespace APSITests {
         KeyGenerator keygen(*context->seal_context());
         context->set_secret(keygen.secret_key());
 
+        // A package's ciphertexts must take at least 1/64 of the 64 KiB each loads to, so these
+        // garbage ciphertexts take 2 KiB each
         vector<unsigned char> good_ct =
             ciphertext_bytes(encrypt_value(*context, 1), compr_mode_type::none);
-        vector<unsigned char> garbage(100, 0xAB);
+        vector<unsigned char> garbage(2048, 0xAB);
 
         auto load = [&](const string &bytes, const PSIParams *with_params) {
             stringstream ss(bytes);
@@ -358,12 +426,7 @@ namespace APSITests {
             return rp;
         };
         auto load_error = [&](const string &bytes, const PSIParams *with_params) {
-            try {
-                static_cast<void>(load(bytes, with_params));
-            } catch (const runtime_error &ex) {
-                return string(ex.what());
-            }
-            return string();
+            return package_load_error(bytes, *context, with_params);
         };
 
         // The structure a result for these parameters has: three tag parts and no label, or
@@ -379,54 +442,332 @@ namespace APSITests {
             load(raw_package(0, nullptr, 10, 16, labeled), params.get()).label_result.size());
 
         // Ciphertexts that are not ciphertexts at all are noticed only when they are loaded
+        const string garbage_psi_error =
+            string("failed to load PSI ciphertext: ") + not_a_ciphertext_error;
+        const string garbage_label_error =
+            string("failed to load label ciphertext: ") + not_a_ciphertext_error;
         vector<vector<unsigned char>> garbage_parts(3, garbage);
-        ASSERT_NE(
-            string::npos,
-            load_error(raw_package(0, nullptr, 0, 0, garbage_parts), params.get())
-                .find("failed to load label ciphertext"));
+        ASSERT_EQ(
+            garbage_label_error,
+            load_error(raw_package(0, nullptr, 0, 0, garbage_parts), params.get()));
 
-        // Anything structurally wrong is refused before that: the messages name the structure,
-        // although every ciphertext is garbage
-        vector<string> structural_errors{
-            load_error(raw_package(0, &garbage, 0, 0, garbage_parts), params.get()),
-            load_error(
-                raw_package(0, nullptr, 0, 0, vector<vector<unsigned char>>(2, garbage)),
-                params.get()),
-            load_error(
-                raw_package(0, nullptr, 0, 0, vector<vector<unsigned char>>(4, garbage)),
-                params.get()),
-            load_error(raw_package(0, nullptr, 10, 16, garbage_parts), params.get()),
-            load_error(raw_package(0, nullptr, 0, 4, garbage_parts), params.get()),
-            load_error(
-                raw_package(0, nullptr, 1025, 0, vector<vector<unsigned char>>(3 + 513, garbage)),
-                params.get()),
-            load_error(
-                raw_package(0, nullptr, 10, 17, vector<vector<unsigned char>>(3 + 14, garbage)),
-                params.get()),
-            load_error(raw_package(2, nullptr, 0, 0, garbage_parts), params.get()),
+        // Anything structurally wrong is refused before that, although every ciphertext is
+        // garbage
+        const string refused = "failed to load ResultPackage: result package ";
+        vector<pair<string, string>> structural_errors{
+            { load_error(raw_package(0, &garbage, 0, 0, garbage_parts), params.get()),
+              "has a PSI result, which parameters with match tags rule out" },
+            { load_error(
+                  raw_package(0, nullptr, 0, 0, vector<vector<unsigned char>>(2, garbage)),
+                  params.get()),
+              "has 2 label parts but 3 are expected" },
+            { load_error(
+                  raw_package(0, nullptr, 0, 0, vector<vector<unsigned char>>(4, garbage)),
+                  params.get()),
+              "has 4 label parts but 3 are expected" },
+            { load_error(raw_package(0, nullptr, 10, 16, garbage_parts), params.get()),
+              "has 3 label parts but 16 are expected" },
+            { load_error(raw_package(0, nullptr, 0, 4, garbage_parts), params.get()),
+              "has a nonce_byte_count but no label" },
+            { load_error(
+                  raw_package(0, nullptr, 1025, 0, vector<vector<unsigned char>>(3 + 513, garbage)),
+                  params.get()),
+              "has too large a label_byte_count" },
+            { load_error(
+                  raw_package(0, nullptr, 10, 17, vector<vector<unsigned char>>(3 + 14, garbage)),
+                  params.get()),
+              "has too large a nonce_byte_count" },
+            { load_error(raw_package(2, nullptr, 0, 0, garbage_parts), params.get()),
+              "is for bundle index 2 but the parameters have only 2" },
         };
-        for (const auto &error : structural_errors) {
-            ASSERT_NE(string::npos, error.find("failed to load ResultPackage")) << error;
-            ASSERT_EQ(string::npos, error.find("ciphertext")) << error;
+        for (const auto &[error, reason] : structural_errors) {
+            ASSERT_EQ(refused + reason, error);
         }
 
-        // Without parameters nothing more is checked than before: this loads up to its first
-        // ciphertext
-        ASSERT_NE(
-            string::npos,
-            load_error(raw_package(0, &garbage, 0, 0, garbage_parts), nullptr).find("ciphertext"));
+        // Without parameters only what any parameters allow is checked, which this package has:
+        // it loads up to its first ciphertext
+        ASSERT_EQ(
+            garbage_psi_error, load_error(raw_package(0, &garbage, 0, 0, garbage_parts), nullptr));
 
         // With parameters without match tags, a package without a PSI result is refused before any
-        // ciphertext in it is loaded, as the schema refused it before match tags made the PSI
-        // result optional. One with a PSI result loads up to its first ciphertext.
-        string missing =
-            load_error(raw_package(0, nullptr, 0, 4, garbage_parts), get_params().get());
-        ASSERT_NE(string::npos, missing.find("PSI result is missing")) << missing;
-        ASSERT_EQ(string::npos, missing.find("ciphertext")) << missing;
-        ASSERT_NE(
-            string::npos,
-            load_error(raw_package(0, &garbage, 0, 4, garbage_parts), get_params().get())
-                .find("ciphertext"));
+        // ciphertext in it is loaded, as APSI 1.x, whose schema requires the PSI result, refuses
+        // it. One with a PSI result, and with no more label parts than its 29-byte label and 4-byte
+        // nonce take, three of 128 bits, loads up to its first ciphertext.
+        ASSERT_EQ(
+            string(
+                "failed to load ResultPackage: the PSI result is missing, but the parameters do "
+                "not use match tags"),
+            load_error(raw_package(0, nullptr, 29, 4, garbage_parts), get_params().get()));
+        ASSERT_EQ(
+            garbage_psi_error,
+            load_error(raw_package(0, &garbage, 29, 4, garbage_parts), get_params().get()));
+    }
+
+    TEST(ResultPackageTest, LoadRefusesCiphertextsThatCannotBeResults)
+    {
+        // A sender's results are in coefficient form, at the last level of the modulus chain, and
+        // of size 2 or 3. Either size loads whether or not the parameters allow relinearization,
+        // as these do. A package holding any other ciphertext is refused as soon as that
+        // ciphertext is loaded, before the next.
+        auto params = get_params();
+        auto context(make_shared<CryptoContext>(*params));
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
+        auto seal_context = context->seal_context();
+        ASSERT_NE(seal_context->first_parms_id(), seal_context->last_parms_id());
+        Evaluator evaluator(*seal_context);
+
+        Ciphertext fresh;
+        context->encryptor()->encrypt_zero_symmetric(fresh);
+        Ciphertext size_three;
+        evaluator.multiply(fresh, fresh, size_three);
+        Ciphertext size_four;
+        evaluator.multiply(size_three, fresh, size_four);
+        ASSERT_EQ(3, size_three.size());
+        ASSERT_EQ(4, size_four.size());
+        Ciphertext ntt = encrypt_value(*context, 0);
+        evaluator.transform_to_ntt_inplace(ntt);
+        evaluator.mod_switch_to_inplace(size_three, seal_context->last_parms_id());
+        evaluator.mod_switch_to_inplace(size_four, seal_context->last_parms_id());
+
+        vector<unsigned char> good =
+            ciphertext_bytes(encrypt_value(*context, 0), compr_mode_type::none);
+        vector<unsigned char> garbage(100, 0xAB);
+        auto load_error = [&](const string &bytes) {
+            return package_load_error(bytes, *context, params.get());
+        };
+
+        // Results of size 2 and 3 load
+        vector<unsigned char> three = ciphertext_bytes(size_three, compr_mode_type::none);
+        ASSERT_EQ(string(), load_error(raw_package(0, &good, 1, 0, { good })));
+        ASSERT_EQ(string(), load_error(raw_package(0, &three, 1, 0, { three })));
+
+        // Every other shape is refused, as a PSI result or as a label part, and before the
+        // garbage after it is loaded. A 20-byte label takes two label parts of 128 bits.
+        vector<pair<vector<unsigned char>, string>> wrong{
+            { ciphertext_bytes(fresh, compr_mode_type::none),
+              "it is not at the last level of the modulus chain, where a result is" },
+            { ciphertext_bytes(size_four, compr_mode_type::none),
+              "it has size 4, and a result has size 2 or 3" },
+            { ciphertext_bytes(ntt, compr_mode_type::none),
+              "it is in NTT form, and a result is in coefficient form" },
+        };
+        for (const auto &[bytes, reason] : wrong) {
+            ASSERT_EQ(
+                "failed to load PSI ciphertext: " + reason,
+                load_error(raw_package(0, &bytes, 1, 0, { garbage })));
+            ASSERT_EQ(
+                "failed to load label ciphertext: " + reason,
+                load_error(raw_package(0, &good, 20, 0, { bytes, garbage })));
+        }
+    }
+
+    TEST(ResultPackageTest, LoadWithoutTagsRefusesMoreLabelPartsThanTheLabelTakes)
+    {
+        // Without match tags a sender sends as many label parts as its label and nonce take, in
+        // parts of item_bit_count bits, and none without a label. Every part is loaded and
+        // decrypted, so no more are accepted. Fewer are, as by APSI 1.x, which reads short label
+        // data as a shorter label.
+        auto params = get_params();
+        ASSERT_EQ(size_t(128), params->item_bit_count());
+        auto context(make_shared<CryptoContext>(*params));
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
+
+        vector<unsigned char> good =
+            ciphertext_bytes(encrypt_value(*context, 0), compr_mode_type::none);
+        auto load_error =
+            [&](uint32_t label_byte_count, uint32_t nonce_byte_count, size_t part_count) {
+                return package_load_error(
+                    raw_package(
+                        0,
+                        &good,
+                        label_byte_count,
+                        nonce_byte_count,
+                        vector<vector<unsigned char>>(part_count, good)),
+                    *context,
+                    params.get());
+            };
+
+        // A 20-byte label and a 4-byte nonce take two parts of 128 bits
+        for (size_t part_count = 0; part_count <= 2; part_count++) {
+            ASSERT_EQ(string(), load_error(20, 4, part_count)) << part_count;
+        }
+        ASSERT_EQ(
+            string(
+                "failed to load ResultPackage: result package has 3 label parts but at most 2 "
+                "are expected"),
+            load_error(20, 4, 3));
+
+        // Without a label there are none, whatever the nonce_byte_count, which is then not read
+        for (uint32_t nonce_byte_count : { 0U, 16U, 17U }) {
+            ASSERT_EQ(string(), load_error(0, nonce_byte_count, 0)) << nonce_byte_count;
+            ASSERT_EQ(
+                string(
+                    "failed to load ResultPackage: result package has 1 label parts but at "
+                    "most 0 are expected"),
+                load_error(0, nonce_byte_count, 1))
+                << nonce_byte_count;
+        }
+    }
+
+    TEST(ResultPackageTest, LoadWithoutParamsRefusesMoreLabelPartsThanAnyParamsAllow)
+    {
+        // Without parameters, the bound on the label parts is the most any parameters allow:
+        // tag_part_count_max = 64 tag parts, and the label and nonce in parts of the smallest
+        // item_bit_count, 8 bits. That is 64 parts without a label, and 64 + 1024 + 16 = 1104 at
+        // the largest label and nonce.
+        auto context(make_shared<CryptoContext>(*get_params()));
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
+
+        auto load_error = [&](uint32_t label_byte_count,
+                              uint32_t nonce_byte_count,
+                              const vector<unsigned char> &ct,
+                              size_t part_count) {
+            return package_load_error(
+                raw_package(
+                    0,
+                    &ct,
+                    label_byte_count,
+                    nonce_byte_count,
+                    vector<vector<unsigned char>>(part_count, ct)),
+                *context,
+                nullptr);
+        };
+
+        // Without a label, a package of 64 parts loads, and one of 65 is refused
+        vector<unsigned char> good =
+            ciphertext_bytes(encrypt_value(*context, 0), compr_mode_type::none);
+        ASSERT_EQ(string(), load_error(0, 0, good, 64));
+        ASSERT_EQ(
+            string(
+                "failed to load ResultPackage: result package has 65 label parts but at most "
+                "64 are expected"),
+            load_error(0, 0, good, 65));
+
+        // At the largest label and nonce, a package of 1104 parts gets past the bound and fails
+        // only when its first ciphertext is loaded, as its ciphertexts are garbage so as not to
+        // load so many. One of 1105 parts is refused before that.
+        vector<unsigned char> garbage(2048, 0xAB);
+        ASSERT_EQ(
+            string("failed to load PSI ciphertext: ") + not_a_ciphertext_error,
+            load_error(1024, 16, garbage, 1104));
+        ASSERT_EQ(
+            string(
+                "failed to load ResultPackage: result package has 1105 label parts but at "
+                "most 1104 are expected"),
+            load_error(1024, 16, garbage, 1105));
+    }
+
+    TEST(ResultPackageTest, LoadWithoutTagsRefusesABundleIndexTheParamsDoNotHave)
+    {
+        // With parameters without match tags, as with them, a package for a bundle index the
+        // parameters do not have is refused before any ciphertext in it is loaded, here garbage.
+        // Without parameters the bundle index cannot be checked, and the package loads.
+        auto params = get_params();
+        ASSERT_EQ(size_t(1), params->bundle_idx_count());
+        auto context(make_shared<CryptoContext>(*params));
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
+
+        vector<unsigned char> good =
+            ciphertext_bytes(encrypt_value(*context, 0), compr_mode_type::none);
+        vector<unsigned char> garbage(2048, 0xAB);
+
+        ASSERT_EQ(
+            string(), package_load_error(raw_package(0, &good, 0, 0, {}), *context, params.get()));
+        ASSERT_EQ(
+            string(
+                "failed to load ResultPackage: result package is for bundle index 1 but the "
+                "parameters have only 1"),
+            package_load_error(raw_package(1, &garbage, 0, 0, {}), *context, params.get()));
+        ASSERT_EQ(string(), package_load_error(raw_package(1, &good, 0, 0, {}), *context, nullptr));
+    }
+
+    TEST(ResultPackageTest, LoadRefusesCiphertextsThatShareBytes)
+    {
+        // A sender saves every ciphertext to bytes of its own. FlatBuffers lets many offsets point
+        // at one object, and its verifier allows it, so a short package could otherwise hold one
+        // ciphertext many times over and have the receiver load each. Both overloads of load
+        // refuse a package whose label parts share bytes, with match tags or without them.
+        auto params = get_params();
+        auto tag_params = get_tag_params();
+        auto context(make_shared<CryptoContext>(*params));
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
+
+        vector<unsigned char> psi =
+            ciphertext_bytes(encrypt_value(*context, 1), compr_mode_type::none);
+        vector<unsigned char> part =
+            ciphertext_bytes(encrypt_value(*context, 0), compr_mode_type::none);
+
+        // Without match tags, a 20-byte label takes two parts; with them, the parameters call for
+        // three tag parts
+        vector<tuple<const PSIParams *, string, string>> packages{
+            { params.get(),
+              raw_package(0, &psi, 20, 0, { part, part }),
+              raw_package(0, &psi, 20, 0, { part, part }, true) },
+            { tag_params.get(),
+              raw_package(0, nullptr, 0, 0, { part, part, part }),
+              raw_package(0, nullptr, 0, 0, { part, part, part }, true) },
+        };
+        for (const auto &[package_params, honest, shared] : packages) {
+            ASSERT_LT(shared.size(), honest.size());
+            for (const PSIParams *with_params :
+                 { package_params, static_cast<const PSIParams *>(nullptr) }) {
+                ASSERT_EQ(string(), package_load_error(honest, *context, with_params));
+                ASSERT_EQ(
+                    string("failed to load ResultPackage: its ciphertexts share bytes"),
+                    package_load_error(shared, *context, with_params));
+            }
+        }
+    }
+
+    TEST(ResultPackageTest, LoadRefusesCiphertextsThatTakeTooFewBytes)
+    {
+        // SEAL compresses what it saves, so a package of ciphertexts whose data is zero, which are
+        // valid results, would load to thousands of times its size. A package's ciphertexts must
+        // take at least 1/64 of what they load to: each to 2 * 4096 coefficients of 8 bytes at the
+        // last level of the modulus chain, which has one prime.
+        if (Serialization::compr_mode_default == compr_mode_type::none) {
+            GTEST_SKIP() << "Microsoft SEAL is built without compression";
+        }
+
+        auto params = get_params();
+        auto tag_params = get_tag_params();
+        auto context(make_shared<CryptoContext>(*params));
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
+
+        vector<unsigned char> zero =
+            ciphertext_bytes(zero_result(*context), Serialization::compr_mode_default);
+        auto expected_error = [&](size_t ct_count) {
+            stringstream ss;
+            ss << "failed to load ResultPackage: its ciphertexts take " << ct_count * zero.size()
+               << " bytes, less than 1/64 of the " << ct_count * 2 * 4096 * 8
+               << " bytes they would load to";
+            return ss.str();
+        };
+
+        // A package of nothing but zeros is refused before any of its ciphertexts is loaded, with
+        // parameters or without them, and with match tags or without them
+        string zeros = raw_package(0, &zero, 20, 0, { zero, zero });
+        ASSERT_EQ(expected_error(3), package_load_error(zeros, *context, params.get()));
+        ASSERT_EQ(expected_error(3), package_load_error(zeros, *context, nullptr));
+        string tag_zeros = raw_package(0, nullptr, 0, 0, { zero, zero, zero });
+        ASSERT_EQ(expected_error(3), package_load_error(tag_zeros, *context, tag_params.get()));
+
+        // One result can honestly be a ciphertext of zeros: that of a label part whose polynomials
+        // are all zero, as they are when the part holds only the last bits of a short label and
+        // every item in the bin bundle has zeros there. A 17-byte label takes two parts of 128
+        // bits, the second holding only 8 bits. Such a package is accepted, which is why the bound
+        // is on the package as a whole rather than on each ciphertext.
+        vector<unsigned char> good =
+            ciphertext_bytes(encrypt_value(*context, 0), Serialization::compr_mode_default);
+        string honest = raw_package(0, &good, 17, 0, { good, zero });
+        ASSERT_EQ(string(), package_load_error(honest, *context, params.get()));
+        ASSERT_EQ(string(), package_load_error(honest, *context, nullptr));
     }
 
     TEST(ResultPackageTest, CheckTagStructure)
