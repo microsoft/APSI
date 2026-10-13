@@ -9,12 +9,15 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <set>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <tuple>
+#include <unordered_map>
 
 // APSI
 #include "apsi/log.h"
@@ -29,6 +32,7 @@
 #include "apsi/sender_db_generated.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/match_tag.h"
 
 // Kuku
 #include "kuku/locfunc.h"
@@ -1433,6 +1437,50 @@ namespace APSITests {
     }
 
     namespace {
+        /**
+        Parameters with match tags. The table holds bundle_idx_count bundle indices.
+        */
+        PSIParams create_tag_params(
+            uint32_t felts_per_item,
+            uint32_t tag_part_count,
+            uint32_t hash_func_count,
+            uint32_t max_items_per_bin,
+            size_t poly_modulus_degree,
+            uint64_t plain_modulus,
+            uint32_t bundle_idx_count = 1)
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = felts_per_item;
+            item_params.tag_part_count = tag_part_count;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = hash_func_count;
+            table_params.max_items_per_bin = max_items_per_bin;
+            table_params.table_size =
+                static_cast<uint32_t>(poly_modulus_degree / felts_per_item) * bundle_idx_count;
+
+            PSIParams::QueryParams query_params;
+            query_params.query_powers = { 1 };
+            if (max_items_per_bin >= 3) {
+                query_params.query_powers.insert(3);
+            }
+
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(poly_modulus_degree);
+            seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
+            seal_params.set_plain_modulus(plain_modulus);
+
+            return PSIParams(item_params, table_params, query_params, seal_params);
+        }
+
+        /**
+        Parameters with match tags of 48 bits, and 16 bits per item, over two bundle indices.
+        */
+        PSIParams create_tag_params()
+        {
+            return create_tag_params(1, 3, 3, 8, 4096, 65537, 2);
+        }
+
         apsi::util::felt_t evaluate_polyn(
             const FEltPolyn &polyn, apsi::util::felt_t x, const Modulus &mod)
         {
@@ -1443,6 +1491,21 @@ namespace APSITests {
             }
             return result;
         }
+
+        /**
+        What a test needs to know of an item stored with match tags: its HashedItem, its field
+        elements and its tag, and, for each of its locations, the bundle index and the first bin
+        of the location.
+        */
+        struct TaggedItemView {
+            HashedItem hashed_item;
+
+            vector<apsi::util::felt_t> felts;
+
+            vector<apsi::util::felt_t> tag;
+
+            vector<pair<uint32_t, size_t>> places;
+        };
 
         /**
         Computes the locations of a HashedItem as a SenderDB with the given parameters does, as
@@ -1469,6 +1532,590 @@ namespace APSITests {
             return places;
         }
 
+        /**
+        Computes what a SenderDB with the given OPRF key and parameters stores of an item,
+        independently of the SenderDB: the tag comes from the item's label key, which is what
+        the receiver computes it from too.
+        */
+        TaggedItemView view_of(const Item &item, const oprf::OPRFKey &key, const PSIParams &params)
+        {
+            auto [hashed_item, label_key] = oprf::OPRFSender::GetItemHash(item, key);
+
+            TaggedItemView view;
+            view.hashed_item = hashed_item;
+            view.felts = apsi::util::algebraize_item(
+                hashed_item, params.item_bit_count(), params.seal_params().plain_modulus());
+            view.tag = apsi::util::compute_match_tag(
+                label_key,
+                params.tag_part_count() * params.item_params().felts_per_item,
+                params.item_bit_count_per_felt());
+            view.places = places_of(hashed_item, params);
+            return view;
+        }
+
+        /**
+        Returns, for each location of the item, how many bin bundles there hold its tag where a
+        query for the item looks for it: how many give the tag's values for the item's field
+        elements in their tag polynomials. A stored item is held by exactly one bin bundle at
+        each of its locations, and a removed item by none, except with probability 2^-48 or less
+        per bin bundle.
+        */
+        vector<size_t> tag_holders(SenderDB &sender_db, const TaggedItemView &view)
+        {
+            const PSIParams &params = sender_db.get_params();
+            const Modulus &mod = params.seal_params().plain_modulus();
+            size_t felts_per_item = params.item_params().felts_per_item;
+
+            vector<size_t> holders;
+            for (const auto &place : view.places) {
+                size_t count = 0;
+                for (const BinBundleCache &cache : sender_db.get_cache_at(place.first)) {
+                    bool holds = true;
+                    for (size_t p = 0; holds && (p < params.tag_part_count()); p++) {
+                        for (size_t s = 0; holds && (s < felts_per_item); s++) {
+                            const FEltPolyn &polyn = cache.felt_interp_polyns[p][place.second + s];
+                            holds = evaluate_polyn(polyn, view.felts[s], mod) ==
+                                    view.tag[(p * felts_per_item) + s];
+                        }
+                    }
+                    count += holds ? 1 : 0;
+                }
+                holders.push_back(count);
+            }
+            return holders;
+        }
+
+        vector<size_t> held_once(const TaggedItemView &view)
+        {
+            return vector<size_t>(view.places.size(), 1);
+        }
+
+        vector<size_t> not_held(const TaggedItemView &view)
+        {
+            return vector<size_t>(view.places.size(), 0);
+        }
+
+        /**
+        Finds groups of items that share their place, their bin and their field element, among
+        the items Item(i, 0x5eed) for i from 1 to candidate_count, for parameters with a single
+        hash function and a single field element per item.
+        */
+        vector<vector<Item>> find_items_sharing_places(
+            const PSIParams &params, const oprf::OPRFKey &key, uint64_t candidate_count)
+        {
+            vector<Item> candidates;
+            candidates.reserve(candidate_count);
+            for (uint64_t i = 1; i <= candidate_count; i++) {
+                candidates.emplace_back(i, 0x5eed);
+            }
+            vector<HashedItem> hashed_items = oprf::OPRFSender::ComputeHashes(candidates, key);
+
+            map<tuple<uint32_t, size_t, apsi::util::felt_t>, vector<size_t>> by_place;
+            for (size_t i = 0; i < candidates.size(); i++) {
+                auto place = places_of(hashed_items[i], params).front();
+                apsi::util::felt_t felt = apsi::util::algebraize_item(
+                    hashed_items[i],
+                    params.item_bit_count(),
+                    params.seal_params().plain_modulus())[0];
+                by_place[make_tuple(place.first, place.second, felt)].push_back(i);
+            }
+
+            vector<vector<Item>> groups;
+            for (const auto &entry : by_place) {
+                if (entry.second.size() > 1) {
+                    groups.emplace_back();
+                    for (size_t i : entry.second) {
+                        groups.back().push_back(candidates[i]);
+                    }
+                }
+            }
+            return groups;
+        }
+    } // namespace
+
+    TEST(SenderDBTagTests, TagPartsPrecedeTheNonceAndLabel)
+    {
+        PSIParams params = create_tag_params();
+
+        // Without labels there is nothing to encrypt, and no nonce, whatever is asked for
+        SenderDB unlabeled(params, 0, 16);
+        ASSERT_FALSE(unlabeled.is_labeled());
+        ASSERT_EQ(0, unlabeled.get_nonce_byte_count());
+
+        // With labels the nonce is as given, as without match tags
+        SenderDB labeled(params, 10, 16);
+        ASSERT_TRUE(labeled.is_labeled());
+        ASSERT_EQ(16, labeled.get_nonce_byte_count());
+        SenderDB labeled_no_nonce(params, 10, 0);
+        ASSERT_EQ(0, labeled_no_nonce.get_nonce_byte_count());
+        ASSERT_THROW(SenderDB(params, 10, max_nonce_byte_count + 1), invalid_argument);
+
+        // And so it is saved
+        for (SenderDB *sender_db : { &unlabeled, &labeled, &labeled_no_nonce }) {
+            stringstream ss;
+            sender_db->save(ss);
+            SenderDB loaded = SenderDB::Load(ss).first;
+            ASSERT_EQ(sender_db->get_nonce_byte_count(), loaded.get_nonce_byte_count());
+            ASSERT_EQ(sender_db->get_label_byte_count(), loaded.get_label_byte_count());
+            ASSERT_TRUE(loaded.get_params().uses_tags());
+        }
+
+        // A BinBundle holds the tag parts, followed by the parts of the encrypted label, if any:
+        // 26 bytes of nonce and label make 13 parts of 16 bits
+        unlabeled.insert_or_assign(Item(1, 1));
+        labeled.insert_or_assign(make_pair(Item(1, 1), create_label(1, 10)));
+        for (auto [sender_db, label_size] :
+             { make_pair(&unlabeled, size_t(3)), make_pair(&labeled, size_t(3 + 13)) }) {
+            ASSERT_LT(0, sender_db->get_bin_bundle_count());
+            for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+                for (const BinBundleCache &cache : sender_db->get_cache_at(b)) {
+                    ASSERT_TRUE(cache.felt_matching_polyns.empty());
+                    ASSERT_FALSE(cache.batched_matching_polyn);
+                    ASSERT_EQ(label_size, cache.felt_interp_polyns.size());
+                    ASSERT_EQ(label_size, cache.batched_interp_polyns.size());
+                }
+            }
+        }
+    }
+
+    TEST(SenderDBTagTests, UnlabeledBasics)
+    {
+        PSIParams params = create_tag_params();
+        oprf::OPRFKey key = fixed_oprf_key();
+        SenderDB sender_db(params, key, 0, 16, true);
+
+        vector<Item> items;
+        for (uint64_t i = 0; i < 100; i++) {
+            items.emplace_back(i + 1, ~i);
+        }
+        sender_db.insert_or_assign(items);
+        ASSERT_EQ(items.size(), sender_db.get_item_count());
+        size_t bin_bundle_count = sender_db.get_bin_bundle_count();
+        for (const auto &item : items) {
+            ASSERT_TRUE(sender_db.has_item(item));
+            TaggedItemView view = view_of(item, key, params);
+            ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+        }
+
+        // There are no labels
+        ASSERT_THROW(static_cast<void>(sender_db.get_label(items[0])), logic_error);
+        ASSERT_THROW(
+            sender_db.insert_or_assign(make_pair(items[0], create_label(0, 1))), logic_error);
+
+        // Inserting items that are there already, or the same item twice, changes nothing
+        sender_db.insert_or_assign(vector<Item>{ items[0], items[1], items[1] });
+        ASSERT_EQ(items.size(), sender_db.get_item_count());
+        ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+        for (size_t i = 0; i < 2; i++) {
+            TaggedItemView view = view_of(items[i], key, params);
+            ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+        }
+
+        // Removing takes exactly the items removed
+        ASSERT_THROW(sender_db.remove(Item(1000, 1000)), logic_error);
+        ASSERT_EQ(items.size(), sender_db.get_item_count());
+        vector<Item> removed(items.begin(), items.begin() + 50);
+        sender_db.remove(removed);
+        ASSERT_EQ(items.size() - removed.size(), sender_db.get_item_count());
+        for (size_t i = 0; i < items.size(); i++) {
+            TaggedItemView view = view_of(items[i], key, params);
+            ASSERT_EQ(i >= removed.size(), sender_db.has_item(items[i]));
+            ASSERT_EQ(
+                i >= removed.size() ? held_once(view) : not_held(view),
+                tag_holders(sender_db, view));
+        }
+
+        // And they can come back
+        sender_db.insert_or_assign(removed);
+        ASSERT_EQ(items.size(), sender_db.get_item_count());
+        for (const auto &item : items) {
+            TaggedItemView view = view_of(item, key, params);
+            ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+        }
+
+        sender_db.remove(items);
+        ASSERT_EQ(0, sender_db.get_item_count());
+        ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+    }
+
+    TEST(SenderDBTagTests, LabeledBasics)
+    {
+        PSIParams params = create_tag_params();
+        oprf::OPRFKey key = fixed_oprf_key();
+        SenderDB sender_db(params, key, 20, 16, true);
+
+        vector<pair<Item, Label>> data;
+        for (uint64_t i = 0; i < 100; i++) {
+            data.emplace_back(Item(i + 1, ~i), create_label(static_cast<unsigned char>(i), 20));
+        }
+        sender_db.insert_or_assign(data);
+        ASSERT_EQ(data.size(), sender_db.get_item_count());
+        size_t bin_bundle_count = sender_db.get_bin_bundle_count();
+        for (const auto &item_label : data) {
+            ASSERT_TRUE(sender_db.has_item(item_label.first));
+            ASSERT_EQ(item_label.second, sender_db.get_label(item_label.first));
+            TaggedItemView view = view_of(item_label.first, key, params);
+            ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+        }
+
+        // A shorter label is padded, as without match tags
+        sender_db.insert_or_assign(make_pair(data[0].first, Label{ 1, 2, 3 }));
+        Label padded(20);
+        padded[0] = 1;
+        padded[1] = 2;
+        padded[2] = 3;
+        ASSERT_EQ(padded, sender_db.get_label(data[0].first));
+
+        // Updating changes the label and keeps the tag
+        for (auto &item_label : data) {
+            item_label.second =
+                create_label(static_cast<unsigned char>(item_label.second[0] + 100), 20);
+        }
+        sender_db.insert_or_assign(data);
+        ASSERT_EQ(data.size(), sender_db.get_item_count());
+        ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+        for (const auto &item_label : data) {
+            ASSERT_EQ(item_label.second, sender_db.get_label(item_label.first));
+            TaggedItemView view = view_of(item_label.first, key, params);
+            ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+        }
+
+        // A bad batch is refused whole, as without match tags
+        vector<pair<Item, Label>> duplicated{ data[0], data[0] };
+        ASSERT_THROW(sender_db.insert_or_assign(duplicated), invalid_argument);
+        ASSERT_THROW(
+            sender_db.insert_or_assign(make_pair(Item(1000, 1000), create_label(0, 21))),
+            invalid_argument);
+        ASSERT_THROW(sender_db.insert_or_assign(Item(1000, 1000)), logic_error);
+        ASSERT_EQ(data.size(), sender_db.get_item_count());
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1000)));
+
+        // Removing takes exactly the items removed
+        vector<Item> removed;
+        for (size_t i = 0; i < data.size(); i += 2) {
+            removed.push_back(data[i].first);
+        }
+        sender_db.remove(removed);
+        for (size_t i = 0; i < data.size(); i++) {
+            TaggedItemView view = view_of(data[i].first, key, params);
+            if (i % 2) {
+                ASSERT_EQ(data[i].second, sender_db.get_label(data[i].first));
+                ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+            } else {
+                ASSERT_FALSE(sender_db.has_item(data[i].first));
+                ASSERT_THROW(
+                    static_cast<void>(sender_db.get_label(data[i].first)), invalid_argument);
+                ASSERT_EQ(not_held(view), tag_holders(sender_db, view));
+            }
+        }
+    }
+
+    TEST(SenderDBTagTests, ItemsSharingTheirPlaceAreToldApart)
+    {
+        // With 13 bits per item, two items in a bin share their field element one time in 8192,
+        // so among thousands of items some share their bin and their field element: 16 pairs of
+        // the 15000 searched here. Such items go into different bin bundles at the same bundle
+        // index, and every operation on one of them must act on it alone. Every item here shares
+        // its place with another.
+        PSIParams params = create_tag_params(1, 4, 1, 16, 1024, 12289);
+        ASSERT_EQ(13, params.item_bit_count());
+        ASSERT_EQ(52, params.tag_bit_count());
+        oprf::OPRFKey key = fixed_oprf_key();
+
+        vector<vector<Item>> groups = find_items_sharing_places(params, key, 15000);
+        ASSERT_LE(size_t(10), groups.size());
+        size_t largest_group = 0;
+        vector<Item> items;
+        vector<Item> firsts;
+        for (const auto &group : groups) {
+            largest_group = max(largest_group, group.size());
+            items.insert(items.end(), group.begin(), group.end());
+            firsts.push_back(group.front());
+        }
+        unordered_map<Item, TaggedItemView> views;
+        for (const auto &item : items) {
+            views[item] = view_of(item, key, params);
+        }
+
+        for (size_t label_byte_count : { 0U, 8U }) {
+            SenderDB sender_db(params, key, label_byte_count, 16, true);
+
+            // Every label stored is new
+            unordered_map<Item, Label> labels;
+            unsigned char next_label = 0;
+            auto store = [&](const vector<Item> &to_store) {
+                if (!label_byte_count) {
+                    sender_db.insert_or_assign(to_store);
+                    return;
+                }
+                vector<pair<Item, Label>> data;
+                for (const auto &item : to_store) {
+                    labels[item] = create_label(next_label++, label_byte_count);
+                    data.emplace_back(item, labels[item]);
+                }
+                sender_db.insert_or_assign(data);
+            };
+            auto check = [&](const Item &item, bool present) {
+                const TaggedItemView &view = views.at(item);
+                ASSERT_EQ(present, sender_db.has_item(item));
+                ASSERT_EQ(present ? held_once(view) : not_held(view), tag_holders(sender_db, view));
+                if (label_byte_count && present) {
+                    ASSERT_EQ(labels.at(item), sender_db.get_label(item));
+                } else if (label_byte_count) {
+                    ASSERT_THROW(static_cast<void>(sender_db.get_label(item)), invalid_argument);
+                }
+            };
+
+            store(items);
+            ASSERT_EQ(items.size(), sender_db.get_item_count());
+            size_t bin_bundle_count = sender_db.get_bin_bundle_count();
+            ASSERT_LE(largest_group, bin_bundle_count);
+            for (const auto &item : items) {
+                check(item, true);
+            }
+
+            // Store the first of each group again: with labels, as a batch and then one at a
+            // time, which updates their labels; without, which does nothing
+            store(firsts);
+            for (const auto &item : firsts) {
+                store({ item });
+            }
+            ASSERT_EQ(items.size(), sender_db.get_item_count());
+            ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+            for (const auto &item : items) {
+                check(item, true);
+            }
+
+            // Remove the first of each group, and put them back
+            sender_db.remove(firsts);
+            ASSERT_EQ(items.size() - firsts.size(), sender_db.get_item_count());
+            for (size_t g = 0; g < groups.size(); g++) {
+                for (size_t i = 0; i < groups[g].size(); i++) {
+                    check(groups[g][i], i != 0);
+                }
+            }
+            store(firsts);
+            ASSERT_EQ(items.size(), sender_db.get_item_count());
+            for (const auto &item : items) {
+                check(item, true);
+            }
+
+            // The same through a save and a load
+            stringstream ss;
+            sender_db.save(ss);
+            sender_db = SenderDB::Load(ss).first;
+            ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+            for (const auto &item : items) {
+                check(item, true);
+            }
+            vector<Item> rest;
+            for (const auto &group : groups) {
+                sender_db.remove(group.back());
+                check(group.back(), false);
+                for (size_t i = 0; i + 1 < group.size(); i++) {
+                    check(group[i], true);
+                    rest.push_back(group[i]);
+                }
+            }
+
+            sender_db.remove(rest);
+            ASSERT_EQ(0, sender_db.get_item_count());
+            ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+        }
+    }
+
+    TEST(SenderDBTagTests, OverwriteChangesTheItemWhereItIsStored)
+    {
+        // See SenderDBTests.OverwriteChangesTheItemWhereItIsStored: an update must change the
+        // item where it is stored, however many bin bundles its bundle index has
+        PSIParams params = create_tag_params(1, 3, 3, 2, 2048, 65537);
+        oprf::OPRFKey key = fixed_oprf_key();
+        SenderDB sender_db(params, key, 20, 16, true);
+
+        vector<pair<Item, Label>> data;
+        for (uint64_t i = 0; i < 800; i++) {
+            data.emplace_back(Item(i, ~i), create_label(static_cast<unsigned char>(i), 20));
+        }
+        sender_db.set_data(data);
+        ASSERT_LE(size_t(3), sender_db.get_bin_bundle_count(0));
+        size_t bin_bundle_count = sender_db.get_bin_bundle_count();
+
+        for (auto &item_label : data) {
+            item_label.second =
+                create_label(static_cast<unsigned char>(item_label.second[0] + 100), 20);
+        }
+        sender_db.insert_or_assign(data);
+        for (size_t i = 0; i < data.size(); i += 37) {
+            data[i].second = create_label(static_cast<unsigned char>(data[i].second[0] + 50), 20);
+            sender_db.insert_or_assign(data[i]);
+        }
+
+        ASSERT_EQ(data.size(), sender_db.get_item_count());
+        ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+        for (const auto &item_label : data) {
+            ASSERT_EQ(item_label.second, sender_db.get_label(item_label.first));
+            TaggedItemView view = view_of(item_label.first, key, params);
+            ASSERT_EQ(held_once(view), tag_holders(sender_db, view));
+        }
+
+        vector<Item> items;
+        for (const auto &item_label : data) {
+            items.push_back(item_label.first);
+        }
+        sender_db.remove(items);
+        ASSERT_EQ(0, sender_db.get_item_count());
+        ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+    }
+
+    TEST(SenderDBTagTests, BinsHoldMaxItemsPerBin)
+    {
+        // Without match tags a bin holds fewer than max_items_per_bin items, as its matching
+        // polynomial has one more coefficient than it has items. With match tags there is no
+        // matching polynomial, and a bin holds max_items_per_bin items, whose label polynomials
+        // have max_items_per_bin coefficients.
+        auto largest = [](SenderDB &sender_db, bool matching) {
+            size_t largest_coeff_count = 0;
+            for (uint32_t b = 0; b < sender_db.get_params().bundle_idx_count(); b++) {
+                for (const BinBundleCache &cache : sender_db.get_cache_at(b)) {
+                    const auto &polyns =
+                        matching ? cache.felt_matching_polyns : cache.felt_interp_polyns[0];
+                    for (const auto &polyn : polyns) {
+                        largest_coeff_count = max(largest_coeff_count, polyn.size());
+                    }
+                }
+            }
+            return largest_coeff_count;
+        };
+
+        constexpr uint32_t max_items_per_bin = 4;
+
+        PSIParams tag_params = create_tag_params(1, 3, 3, max_items_per_bin, 2048, 65537);
+        SenderDB tag_db(tag_params, fixed_oprf_key(), 0, 0, true);
+        vector<Item> items;
+        for (uint64_t i = 0; i < 3000; i++) {
+            items.emplace_back(i, i);
+        }
+        tag_db.insert_or_assign(items);
+        ASSERT_LE(size_t(2), tag_db.get_bin_bundle_count());
+        ASSERT_EQ(max_items_per_bin, largest(tag_db, false));
+
+        PSIParams untagged_params = with_shallow_bins(*get_params1(), max_items_per_bin);
+        SenderDB untagged_db(untagged_params, fixed_oprf_key(), 4, 0, true);
+        vector<pair<Item, Label>> data;
+        for (uint64_t i = 0; i < 1000; i++) {
+            data.emplace_back(Item(i, i), create_label(static_cast<unsigned char>(i), 4));
+        }
+        untagged_db.insert_or_assign(data);
+        ASSERT_LE(size_t(2), untagged_db.get_bin_bundle_count());
+        ASSERT_EQ(max_items_per_bin - 1, largest(untagged_db, false));
+        ASSERT_EQ(max_items_per_bin, largest(untagged_db, true));
+    }
+
+    TEST(SenderDBTagTests, SaveLoadStripAndPackingRate)
+    {
+        for (bool labeled : { false, true }) {
+            // Two field elements and two tag parts per item
+            PSIParams params = create_tag_params(2, 2, 3, 8, 4096, 65537, 2);
+            oprf::OPRFKey key = fixed_oprf_key();
+            size_t label_byte_count = labeled ? 12 : 0;
+            SenderDB sender_db(params, key, label_byte_count, 16, true);
+
+            vector<pair<Item, Label>> data;
+            for (uint64_t i = 0; i < 2000; i++) {
+                data.emplace_back(
+                    Item(i, i + 1), create_label(static_cast<unsigned char>(i), label_byte_count));
+            }
+            if (labeled) {
+                sender_db.set_data(data);
+            } else {
+                vector<Item> items;
+                for (const auto &item_label : data) {
+                    items.push_back(item_label.first);
+                }
+                sender_db.set_data(items);
+            }
+            double packing_rate = sender_db.get_packing_rate();
+            ASSERT_LT(0.0, packing_rate);
+            ASSERT_GE(1.0, packing_rate);
+
+            stringstream ss;
+            size_t save_size = sender_db.save(ss);
+            auto [loaded, load_size] = SenderDB::Load(ss);
+            ASSERT_EQ(save_size, load_size);
+            ASSERT_EQ(params.to_string(), loaded.get_params().to_string());
+            ASSERT_EQ(sender_db.get_item_count(), loaded.get_item_count());
+            ASSERT_EQ(sender_db.get_bin_bundle_count(), loaded.get_bin_bundle_count());
+            ASSERT_EQ(sender_db.get_hashed_items(), loaded.get_hashed_items());
+            ASSERT_EQ(packing_rate, loaded.get_packing_rate());
+            ASSERT_EQ(sender_db.log2_fpp(1), loaded.log2_fpp(1));
+            ASSERT_TRUE(oprf_keys_equal(key, loaded.get_oprf_key()));
+            for (size_t i = 0; i < data.size(); i += 97) {
+                TaggedItemView view = view_of(data[i].first, key, params);
+                ASSERT_EQ(held_once(view), tag_holders(loaded, view));
+                if (labeled) {
+                    ASSERT_EQ(data[i].second, loaded.get_label(data[i].first));
+                }
+            }
+
+            // The loaded SenderDB can be changed as the original can
+            loaded.remove(data[0].first);
+            ASSERT_FALSE(loaded.has_item(data[0].first));
+            TaggedItemView removed_view = view_of(data[0].first, key, params);
+            ASSERT_EQ(not_held(removed_view), tag_holders(loaded, removed_view));
+
+            // Stripping keeps what a query needs, and the stripped SenderDB saves and loads
+            sender_db.strip();
+            ASSERT_TRUE(sender_db.is_stripped());
+            ASSERT_THROW(sender_db.insert_or_assign(vector<Item>{ Item(1, 1) }), logic_error);
+            ASSERT_THROW(static_cast<void>(sender_db.get_label(data[1].first)), logic_error);
+            stringstream stripped_ss;
+            sender_db.save(stripped_ss);
+            auto stripped = SenderDB::Load(stripped_ss).first;
+            ASSERT_TRUE(stripped.is_stripped());
+            ASSERT_EQ(sender_db.get_bin_bundle_count(), stripped.get_bin_bundle_count());
+            ASSERT_EQ(packing_rate, stripped.get_packing_rate());
+            for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+                for (const BinBundleCache &cache : stripped.get_cache_at(b)) {
+                    ASSERT_TRUE(cache.felt_interp_polyns.empty());
+                    ASSERT_FALSE(cache.batched_matching_polyn);
+                    ASSERT_EQ(
+                        loaded.get_cache_at(0)[0].get().batched_interp_polyns.size(),
+                        cache.batched_interp_polyns.size());
+                }
+            }
+        }
+    }
+
+    TEST(SenderDBTagTests, Log2Fpp)
+    {
+        // With match tags, an item matches a bin bundle wrongly only if the bundle gives its
+        // tag, with probability 2^-48 here, however many items the bin holds
+        PSIParams params = create_tag_params();
+        ASSERT_EQ(48, params.tag_bit_count());
+        SenderDB sender_db(params, fixed_oprf_key(), 0, 0, true);
+        ASSERT_EQ(-48.0, sender_db.log2_fpp(1));
+
+        vector<Item> items;
+        for (uint64_t i = 0; i < 10000; i++) {
+            items.emplace_back(i + 1, i + 1);
+        }
+        sender_db.insert_or_assign(items);
+
+        size_t max_bundles = 0;
+        for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+            max_bundles = max(max_bundles, sender_db.get_bin_bundle_count(b));
+        }
+        ASSERT_LE(size_t(2), max_bundles);
+        ASSERT_DOUBLE_EQ(-48.0 + log2(static_cast<double>(max_bundles)), sender_db.log2_fpp(1));
+        ASSERT_DOUBLE_EQ(sender_db.log2_fpp(1) + 10.0, sender_db.log2_fpp(1024));
+
+        // Tags come from a 128-bit key, so longer ones count as 128 bits
+        PSIParams long_tags = create_tag_params(2, 8, 3, 8, 4096, 65537);
+        ASSERT_EQ(256, long_tags.tag_bit_count());
+        ASSERT_EQ(-128.0, SenderDB(long_tags, 0).log2_fpp(1));
+    }
+
+    namespace {
         /**
         Returns the SenderDB that sender_db would be if it also held the bin bundles of others,
         after its own: what an older version of APSI could leave behind when it stored an item a

@@ -44,7 +44,14 @@ namespace apsi::sender {
     The SenderDB constructor allows the label byte count to be specified; unlabeled mode is
     activated by setting the label byte count to zero. It is possible to optionally specify the
     size of the nonce used in encrypting the labels, but this is best left to its default value
-    unless the user is absolutely sure of what they are doing.
+    unless the user is absolutely sure of what they are doing. An unlabeled SenderDB uses no
+    nonce, whatever nonce byte count is given.
+
+    With match tags (see PSIParams::uses_tags), a SenderDB stores the tag of every item, labeled or
+    not, as the item's first label parts. It derives the tag from the item's label key, which it
+    does not keep, so a SenderDB with match tags must be built from the original items. Since two
+    items can then share their field elements in a bin, it also keeps the full HashedItem of every
+    item until it is stripped.
 
     The SenderDB requires substantially more memory than the raw data would. Part of that memory
     can automatically be compressed when it is not in use; this feature is enabled by default,
@@ -316,6 +323,10 @@ namespace apsi::sender {
         upper bound rather than an exact figure -- both terms it adds are union bounds -- and it
         assumes the OPRF leaves items pseudorandom.
 
+        With match tags, a bin bundle gives an item a false positive only by giving it its tag,
+        so the term for one bin bundle is -min(tag_bit_count, 128), as
+        PSIParams::log2_fpp_per_bin_bundle gives it, however many items the bins hold.
+
         Throws std::invalid_argument if query_item_count is zero.
         */
         [[nodiscard]] double log2_fpp(std::size_t query_item_count) const;
@@ -374,6 +385,18 @@ namespace apsi::sender {
         void clear_internal();
 
         void generate_caches();
+
+        /**
+        Does the work of insert_or_assign for a labeled SenderDB whose parameters use match tags.
+        The caller holds the writer lock and has checked the batch.
+        */
+        void insert_or_assign_with_tags(const std::vector<std::pair<Item, Label>> &data);
+
+        /**
+        Does the work of insert_or_assign for an unlabeled SenderDB whose parameters use match
+        tags. The caller holds the writer lock.
+        */
+        void insert_or_assign_with_tags(const std::vector<Item> &data);
 
         /**
         The set of all items that have been inserted into the database

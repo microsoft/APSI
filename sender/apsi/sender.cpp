@@ -408,24 +408,31 @@ namespace apsi {
             rp->nonce_byte_count = safe_cast<uint32_t>(sender_db->get_nonce_byte_count());
             rp->label_byte_count = safe_cast<uint32_t>(sender_db->get_label_byte_count());
 
-            // Compute the matching result and move to rp
-            const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
-
             // Determine if we use Paterson-Stockmeyer or not
             uint32_t ps_low_degree = sender_db->get_params().query_params().ps_low_degree;
-            uint32_t degree = safe_cast<uint32_t>(matching_polyn.batched_coeffs.size()) - 1;
-            bool using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
-            if (using_ps) {
-                rp->psi_result = matching_polyn.eval_patstock(
-                    crypto_context, all_powers[bundle_idx], safe_cast<size_t>(ps_low_degree), pool);
-            } else {
-                rp->psi_result = matching_polyn.eval(all_powers[bundle_idx], pool);
+
+            // Compute the matching result and move to rp. With match tags there is no matching
+            // polynomial and no PSI result: the tag parts, which come first among the label
+            // parts, are what the receiver matches on.
+            if (!sender_db->get_params().uses_tags()) {
+                const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
+                uint32_t degree = safe_cast<uint32_t>(matching_polyn.batched_coeffs.size()) - 1;
+                bool using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
+                if (using_ps) {
+                    rp->psi_result = matching_polyn.eval_patstock(
+                        crypto_context,
+                        all_powers[bundle_idx],
+                        safe_cast<size_t>(ps_low_degree),
+                        pool);
+                } else {
+                    rp->psi_result = matching_polyn.eval(all_powers[bundle_idx], pool);
+                }
             }
 
             for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
                 // Compute the label result and move to rp
-                degree = safe_cast<uint32_t>(interp_polyn.batched_coeffs.size()) - 1;
-                using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
+                uint32_t degree = safe_cast<uint32_t>(interp_polyn.batched_coeffs.size()) - 1;
+                bool using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
                 if (using_ps) {
                     rp->label_result.emplace_back(interp_polyn.eval_patstock(
                         crypto_context, all_powers[bundle_idx], ps_low_degree, pool));

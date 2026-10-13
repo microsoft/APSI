@@ -4,6 +4,7 @@
 // STD
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <utility>
 
 // APSI
@@ -71,6 +72,60 @@ namespace apsi {
                 }
 
                 return bin.end();
+            }
+
+            /**
+            Helper function for a BinBundle that uses match tags. Finds the item with the given
+            field elements and HashedItem in the bins beginning at start_bin_idx, which the caller
+            has checked are all in range. Returns false if the item is not stored there, and
+            otherwise true, with positions[i] the index of the item in the i-th bin.
+
+            The item is identified by its HashedItem alone. With few bits per item, two items can
+            share their field elements, so those cannot tell them apart; they only let the cuckoo
+            filter rule out most bins without a search. The field element found with the
+            HashedItem must still be the item's, or the two have been stored inconsistently.
+            */
+            bool find_hashed_item(
+                const vector<vector<felt_t>> &item_bins,
+                const vector<vector<HashedItem>> &hashed_item_bins,
+                const vector<CuckooFilter> &filters,
+                const vector<felt_t> &items,
+                const HashedItem &item,
+                size_t start_bin_idx,
+                vector<size_t> &positions)
+            {
+                positions.clear();
+                positions.reserve(items.size());
+
+                size_t curr_bin_idx = start_bin_idx;
+                for (felt_t curr_item : items) {
+                    // See is_present for why a dropped item makes a negative inconclusive
+                    const CuckooFilter &curr_filter = filters[curr_bin_idx];
+                    if (!curr_filter.contains(curr_item) && !curr_filter.has_dropped_items()) {
+                        return false;
+                    }
+
+                    const vector<HashedItem> &hashed_item_bin = hashed_item_bins[curr_bin_idx];
+                    auto found = find(hashed_item_bin.begin(), hashed_item_bin.end(), item);
+                    if (found == hashed_item_bin.end()) {
+                        return false;
+                    }
+
+                    auto pos = static_cast<size_t>(distance(hashed_item_bin.begin(), found));
+                    if (item_bins[curr_bin_idx][pos] != curr_item) {
+                        APSI_LOG_ERROR(
+                            "Found an item in the bin at index "
+                            << curr_bin_idx
+                            << " with a field element other than the one expected; the internal "
+                               "state of this BinBundle has been corrupted");
+                        return false;
+                    }
+
+                    positions.push_back(pos);
+                    curr_bin_idx++;
+                }
+
+                return true;
             }
 
             void try_clear_irrelevant_bits(
@@ -431,10 +486,12 @@ namespace apsi {
             size_t ps_low_degree,
             size_t num_bins,
             bool compressed,
-            bool stripped)
+            bool stripped,
+            size_t tag_part_count)
             : crypto_context_(std::move(crypto_context)), compressed_(compressed),
-              label_size_(label_size), max_bin_size_(max_bin_size), ps_low_degree_(ps_low_degree),
-              num_bins_(num_bins), cache_(crypto_context_, label_size_)
+              label_size_(label_size), tag_part_count_(tag_part_count), max_bin_size_(max_bin_size),
+              ps_low_degree_(ps_low_degree), num_bins_(num_bins),
+              cache_(crypto_context_, label_size_)
         {
             if (!crypto_context_.evaluator()) {
                 throw invalid_argument("evaluator is not set in crypto_context");
@@ -444,6 +501,9 @@ namespace apsi {
             }
             if (!num_bins) {
                 throw invalid_argument("num_bins cannot be zero");
+            }
+            if (tag_part_count > label_size) {
+                throw invalid_argument("tag_part_count cannot be larger than label_size");
             }
 
             // Set up internal data structures
@@ -529,6 +589,12 @@ namespace apsi {
         {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped BinBundle");
+                throw logic_error("failed to insert data");
+            }
+            if (uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to insert an item without its HashedItem in a BinBundle that uses "
+                    "match tags");
                 throw logic_error("failed to insert data");
             }
             if (item_labels.empty()) {
@@ -630,6 +696,12 @@ namespace apsi {
                 APSI_LOG_ERROR("Cannot overwrite data in a stripped BinBundle");
                 throw logic_error("failed to overwrite data");
             }
+            if (uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to overwrite an item without its HashedItem in a BinBundle that "
+                    "uses match tags");
+                throw logic_error("failed to overwrite data");
+            }
             if (items.empty()) {
                 APSI_LOG_ERROR("No item data to insert");
                 return false;
@@ -673,6 +745,12 @@ namespace apsi {
         {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot overwrite data in a stripped BinBundle");
+                throw logic_error("failed to overwrite data");
+            }
+            if (uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to overwrite an item without its HashedItem in a BinBundle that "
+                    "uses match tags");
                 throw logic_error("failed to overwrite data");
             }
             if (item_labels.empty()) {
@@ -763,6 +841,12 @@ namespace apsi {
                 APSI_LOG_ERROR("Cannot search for data in a stripped BinBundle");
                 throw logic_error("failed to search for data");
             }
+            if (uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to search for an item without its HashedItem in a BinBundle that "
+                    "uses match tags");
+                throw logic_error("failed to search for data");
+            }
             if (items.empty()) {
                 APSI_LOG_ERROR("No item data to search for");
                 return false;
@@ -804,6 +888,12 @@ namespace apsi {
         {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot remove data from a stripped BinBundle");
+                throw logic_error("failed to remove data");
+            }
+            if (uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to remove an item without its HashedItem from a BinBundle that uses "
+                    "match tags");
                 throw logic_error("failed to remove data");
             }
             if (items.empty()) {
@@ -890,6 +980,12 @@ namespace apsi {
                 APSI_LOG_ERROR("Cannot retrieve labels from a stripped BinBundle");
                 throw logic_error("failed to retrieve labels");
             }
+            if (uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to retrieve labels without a HashedItem from a BinBundle that uses "
+                    "match tags");
+                throw logic_error("failed to retrieve labels");
+            }
             if (items.empty()) {
                 APSI_LOG_ERROR("No item data to search for");
                 return false;
@@ -935,6 +1031,324 @@ namespace apsi {
             return true;
         }
 
+        int32_t BinBundle::multi_insert(
+            const TaggedAlgItemLabel &item, size_t start_bin_idx, bool dry_run)
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot insert data to a stripped BinBundle");
+                throw logic_error("failed to insert data");
+            }
+            if (!uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to insert an item with its HashedItem in a BinBundle that does not "
+                    "use match tags");
+                throw logic_error("failed to insert data");
+            }
+
+            const AlgItemLabel &item_labels = item.alg_item_label;
+            if (item_labels.empty()) {
+                APSI_LOG_ERROR("No item or label data to insert");
+                return -1;
+            }
+
+            // Check that item_labels has correct size
+            size_t label_size = get_label_size();
+            for (const auto &curr_item_label : item_labels) {
+                size_t curr_label_size = curr_item_label.second.size();
+                if (curr_label_size != label_size) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert item-label with incorrect label size "
+                        << curr_label_size << " (expected " << label_size << ")");
+                    throw invalid_argument("failed to insert data");
+                }
+            }
+
+            // Return -1 if there isn't enough room in the BinBundle to insert at the given location
+            if (start_bin_idx >= get_num_bins() ||
+                item_labels.size() > get_num_bins() - start_bin_idx) {
+                return -1;
+            }
+
+            // The label polynomials interpolate through the items' field elements, so an item
+            // whose field element is already in its bin cannot be inserted here
+            size_t curr_bin_idx = start_bin_idx;
+            for (const auto &curr_item_label : item_labels) {
+                if (is_present(
+                        item_bins_[curr_bin_idx], filters_[curr_bin_idx], curr_item_label.first)) {
+                    return -1;
+                }
+
+                curr_bin_idx++;
+            }
+
+            // If we're here, that means we can insert in all bins
+            size_t max_bin_size = 0;
+            curr_bin_idx = start_bin_idx;
+            for (const auto &curr_item_label : item_labels) {
+                felt_t curr_item = curr_item_label.first;
+                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
+
+                // Compare the would-be bin size here to the running max
+                max_bin_size = std::max(max_bin_size, curr_bin.size() + 1);
+
+                // Insert if not dry run
+                if (!dry_run) {
+                    // See the unlabeled overload: a refusal is recorded rather than refused, so
+                    // that the item, its labels and its HashedItem stay in step.
+                    CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                    if (!curr_filter.add(curr_item)) {
+                        APSI_LOG_DEBUG(
+                            "Cuckoo filter for the bin at index "
+                            << curr_bin_idx << " refused an item with " << curr_bin.size()
+                            << " already in the bin; lookups in this bin now search it directly");
+                    }
+                    curr_bin.push_back(curr_item);
+                    hashed_item_bins_[curr_bin_idx].push_back(item.item);
+
+                    // Insert the new label; loop over each label part
+                    for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                        label_bins_[label_idx][curr_bin_idx].push_back(
+                            curr_item_label.second[label_idx]);
+                    }
+
+                    // Indicate that the polynomials need to be recomputed
+                    cache_invalid_ = true;
+                }
+
+                curr_bin_idx++;
+            }
+
+            return safe_cast<int32_t>(max_bin_size);
+        }
+
+        bool BinBundle::try_multi_overwrite(const TaggedAlgItemLabel &item, size_t start_bin_idx)
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot overwrite data in a stripped BinBundle");
+                throw logic_error("failed to overwrite data");
+            }
+            if (!uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to overwrite an item by its HashedItem in a BinBundle that does not "
+                    "use match tags");
+                throw logic_error("failed to overwrite data");
+            }
+
+            const AlgItemLabel &item_labels = item.alg_item_label;
+            if (item_labels.empty()) {
+                APSI_LOG_ERROR("No item or label data to insert");
+                return false;
+            }
+
+            // Check that item_labels has correct size
+            size_t label_size = get_label_size();
+            for (const auto &curr_item_label : item_labels) {
+                size_t curr_label_size = curr_item_label.second.size();
+                if (curr_label_size != label_size) {
+                    APSI_LOG_ERROR(
+                        "Attempted to overwrite item-label with incorrect label size "
+                        << curr_label_size << " (expected " << label_size << ")");
+                    throw invalid_argument("failed to overwrite data");
+                }
+            }
+
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() ||
+                item_labels.size() > get_num_bins() - start_bin_idx) {
+                return false;
+            }
+
+            // Find the item by its HashedItem. If it is not here, this BinBundle is left as it is.
+            vector<felt_t> items;
+            items.reserve(item_labels.size());
+            for (const auto &curr_item_label : item_labels) {
+                items.push_back(curr_item_label.first);
+            }
+
+            vector<size_t> positions;
+            if (!find_hashed_item(
+                    item_bins_,
+                    hashed_item_bins_,
+                    filters_,
+                    items,
+                    item.item,
+                    start_bin_idx,
+                    positions)) {
+                return false;
+            }
+
+            // The tag parts are the same as before, as the tag depends only on the item, but
+            // writing every label part keeps this simple
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    label_bins_[label_idx][start_bin_idx + item_idx][positions[item_idx]] =
+                        item_labels[item_idx].second[label_idx];
+                }
+            }
+
+            // Indicate that the polynomials need to be recomputed
+            cache_invalid_ = true;
+
+            return true;
+        }
+
+        bool BinBundle::multi_contains(
+            const vector<felt_t> &items, const HashedItem &item, size_t start_bin_idx) const
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot search for data in a stripped BinBundle");
+                throw logic_error("failed to search for data");
+            }
+            if (!uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to search for an item by its HashedItem in a BinBundle that does "
+                    "not use match tags");
+                throw logic_error("failed to search for data");
+            }
+            if (items.empty()) {
+                APSI_LOG_ERROR("No item data to search for");
+                return false;
+            }
+
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx) {
+                return false;
+            }
+
+            vector<size_t> positions;
+            return find_hashed_item(
+                item_bins_, hashed_item_bins_, filters_, items, item, start_bin_idx, positions);
+        }
+
+        bool BinBundle::multi_contains(const TaggedAlgItemLabel &item, size_t start_bin_idx) const
+        {
+            vector<felt_t> items;
+            items.reserve(item.alg_item_label.size());
+            for (const auto &curr_item_label : item.alg_item_label) {
+                items.push_back(curr_item_label.first);
+            }
+
+            return multi_contains(items, item.item, start_bin_idx);
+        }
+
+        bool BinBundle::try_multi_remove(
+            const vector<felt_t> &items, const HashedItem &item, size_t start_bin_idx)
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot remove data from a stripped BinBundle");
+                throw logic_error("failed to remove data");
+            }
+            if (!uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to remove an item by its HashedItem from a BinBundle that does not "
+                    "use match tags");
+                throw logic_error("failed to remove data");
+            }
+            if (items.empty()) {
+                APSI_LOG_ERROR("No item data to remove");
+                return false;
+            }
+
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx) {
+                return false;
+            }
+
+            // Find the item. If it is not here, this BinBundle is left as it is.
+            vector<size_t> positions;
+            if (!find_hashed_item(
+                    item_bins_,
+                    hashed_item_bins_,
+                    filters_,
+                    items,
+                    item,
+                    start_bin_idx,
+                    positions)) {
+                return false;
+            }
+
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
+                size_t curr_bin_idx = start_bin_idx + item_idx;
+                auto pos = static_cast<ptrdiff_t>(positions[item_idx]);
+
+                // See the overload without a HashedItem for when a filter may hold no tag for the
+                // item
+                CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                if (!curr_filter.remove(items[item_idx]) && !curr_filter.has_dropped_items()) {
+                    APSI_LOG_WARNING(
+                        "Cuckoo filter for the bin at index "
+                        << curr_bin_idx << " held no tag for an item being removed from the bin");
+                }
+
+                // Remove the item, its HashedItem and its label parts, all at the same position
+                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
+                curr_bin.erase(curr_bin.begin() + pos);
+                vector<HashedItem> &hashed_item_bin = hashed_item_bins_[curr_bin_idx];
+                hashed_item_bin.erase(hashed_item_bin.begin() + pos);
+                for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
+                    vector<felt_t> &label_bin = label_bins_[label_idx][curr_bin_idx];
+                    label_bin.erase(label_bin.begin() + pos);
+                }
+            }
+
+            // Indicate that the polynomials need to be recomputed
+            cache_invalid_ = true;
+
+            return true;
+        }
+
+        bool BinBundle::try_get_multi_label(
+            const vector<felt_t> &items,
+            const HashedItem &item,
+            size_t start_bin_idx,
+            vector<felt_t> &labels) const
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot retrieve labels from a stripped BinBundle");
+                throw logic_error("failed to retrieve labels");
+            }
+            if (!uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to retrieve labels by HashedItem from a BinBundle that does not use "
+                    "match tags");
+                throw logic_error("failed to retrieve labels");
+            }
+            if (items.empty()) {
+                APSI_LOG_ERROR("No item data to search for");
+                return false;
+            }
+
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx) {
+                return false;
+            }
+
+            vector<size_t> positions;
+            if (!find_hashed_item(
+                    item_bins_,
+                    hashed_item_bins_,
+                    filters_,
+                    items,
+                    item,
+                    start_bin_idx,
+                    positions)) {
+                labels.clear();
+                return false;
+            }
+
+            // Lay the label parts out as the overload without a HashedItem does
+            labels.clear();
+            labels.resize(mul_safe(items.size(), get_label_size()));
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
+                for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
+                    labels[(items.size() * label_idx) + item_idx] =
+                        label_bins_[label_idx][start_bin_idx + item_idx][positions[item_idx]];
+                }
+            }
+
+            return true;
+        }
+
         void BinBundle::clear(bool stripped)
         {
             // Set the stripped flag
@@ -944,6 +1358,12 @@ namespace apsi {
             item_bins_.clear();
             if (!stripped_) {
                 item_bins_.resize(num_bins_);
+            }
+
+            // Clear the HashedItems kept alongside the items with match tags
+            hashed_item_bins_.clear();
+            if (!stripped_ && uses_tags()) {
+                hashed_item_bins_.resize(num_bins_);
             }
 
             // Clear label data
@@ -999,16 +1419,19 @@ namespace apsi {
             ThreadPoolMgr tpm;
 
             TaskGroup tasks(tpm.thread_pool());
-            tasks.add([&] {
-                // Compute and cache the batched "matching polynomials". They're computed in both
-                // labeled and unlabeled PSI.
-                BatchedPlaintextPolyn bmp(
-                    cache_.felt_matching_polyns,
-                    crypto_context_,
-                    static_cast<uint32_t>(ps_low_degree_),
-                    compressed_);
-                cache_.batched_matching_polyn = std::move(bmp);
-            });
+
+            // Compute and cache the batched "matching polynomials". They're computed in both
+            // labeled and unlabeled PSI, but not with match tags, which need none.
+            if (!uses_tags()) {
+                tasks.add([&] {
+                    BatchedPlaintextPolyn bmp(
+                        cache_.felt_matching_polyns,
+                        crypto_context_,
+                        static_cast<uint32_t>(ps_low_degree_),
+                        compressed_);
+                    cache_.batched_matching_polyn = std::move(bmp);
+                });
+            }
 
             for (size_t label_idx = 0; label_idx < cache_.felt_interp_polyns.size(); label_idx++) {
                 tasks.add([&, label_idx] {
@@ -1038,7 +1461,9 @@ namespace apsi {
 
             size_t num_bins = get_num_bins();
             size_t label_size = get_label_size();
-            cache_.felt_matching_polyns.resize(num_bins);
+            if (!uses_tags()) {
+                cache_.felt_matching_polyns.resize(num_bins);
+            }
             cache_.felt_interp_polyns.resize(label_size);
             for (auto &fips : cache_.felt_interp_polyns) {
                 fips.resize(num_bins);
@@ -1061,7 +1486,9 @@ namespace apsi {
             } else {
                 // For each bin in the bundle, compute and cache the corresponding "matching
                 // polynomial" and "label polynomials". They have the same roots and interpolation
-                // points, so computing them together shares most of the work.
+                // points, so computing them together shares most of the work. With match tags no
+                // matching polynomial is kept: the tag parts, which are label parts, decide
+                // whether an item matches.
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
                     tasks.add([&, bin_idx] {
                         vector<gsl::span<const felt_t>> label_values;
@@ -1072,9 +1499,11 @@ namespace apsi {
 
                         // Compute and cache the matching polynomial and the label polynomials
                         FEltPolyn fmp;
-                        vector<FEltPolyn> fips =
-                            newton_interpolate_polyns(item_bins_[bin_idx], label_values, mod, &fmp);
-                        cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
+                        vector<FEltPolyn> fips = newton_interpolate_polyns(
+                            item_bins_[bin_idx], label_values, mod, uses_tags() ? nullptr : &fmp);
+                        if (!uses_tags()) {
+                            cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
+                        }
                         for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
                             cache_.felt_interp_polyns[label_idx][bin_idx] =
                                 std::move(fips[label_idx]);
@@ -1111,6 +1540,7 @@ namespace apsi {
             stripped_ = true;
 
             item_bins_.clear();
+            hashed_item_bins_.clear();
             label_bins_.clear();
             filters_.clear();
 
@@ -1181,10 +1611,16 @@ namespace apsi {
 
             flatbuffers::Offset<fbs::BinBundleCache> bin_bundle_cache;
             if (!cache_invalid_) {
-                auto felt_matching_polyns =
-                    fbs_create_felt_matrix(fbs_builder, cache_.felt_matching_polyns);
-                auto batched_matching_polyn = fbs_create_batched_plaintext_polyn(
-                    fbs_builder, cache_.batched_matching_polyn.batched_coeffs);
+                // With match tags there is no matching polynomial, so its fields are left out;
+                // without them, they are written first, as in APSI 1.x.
+                flatbuffers::Offset<fbs::FEltMatrix> felt_matching_polyns;
+                flatbuffers::Offset<fbs::BatchedPlaintextPolyn> batched_matching_polyn;
+                if (!uses_tags()) {
+                    felt_matching_polyns =
+                        fbs_create_felt_matrix(fbs_builder, cache_.felt_matching_polyns);
+                    batched_matching_polyn = fbs_create_batched_plaintext_polyn(
+                        fbs_builder, cache_.batched_matching_polyn.batched_coeffs);
+                }
 
                 auto felt_interp_polyns = fbs_builder.CreateVector([&] {
                     vector<flatbuffers::Offset<fbs::FEltMatrix>> ret;
@@ -1206,11 +1642,35 @@ namespace apsi {
                 }());
 
                 fbs::BinBundleCacheBuilder bin_bundle_cache_builder(fbs_builder);
-                bin_bundle_cache_builder.add_felt_matching_polyns(felt_matching_polyns);
-                bin_bundle_cache_builder.add_batched_matching_polyn(batched_matching_polyn);
+                if (!uses_tags()) {
+                    bin_bundle_cache_builder.add_felt_matching_polyns(felt_matching_polyns);
+                    bin_bundle_cache_builder.add_batched_matching_polyn(batched_matching_polyn);
+                }
                 bin_bundle_cache_builder.add_felt_interp_polyns(felt_interp_polyns);
                 bin_bundle_cache_builder.add_batched_interp_polyns(batched_interp_polyns);
                 bin_bundle_cache = bin_bundle_cache_builder.Finish();
+            }
+
+            // Write the HashedItems kept alongside the items, bin by bin, for a BinBundle with
+            // match tags that is not stripped; any other BinBundle has none
+            bool has_hashed_items = uses_tags() && !stripped_;
+            flatbuffers::Offset<flatbuffers::Vector<const fbs::ItemHash *>> hashed_items;
+            if (has_hashed_items) {
+                hashed_items = fbs_builder.CreateVectorOfStructs([&] {
+                    vector<fbs::ItemHash> ret;
+                    for (const auto &hashed_item_bin : hashed_item_bins_) {
+                        for (const auto &hashed_item : hashed_item_bin) {
+                            // Read the two 64-bit halves with memcpy to avoid strict-aliasing UB
+                            const auto &v = hashed_item.value();
+                            uint64_t lw = 0;
+                            uint64_t hw = 0;
+                            memcpy(&lw, v.data(), sizeof(lw));
+                            memcpy(&hw, v.data() + sizeof(lw), sizeof(hw));
+                            ret.emplace_back(lw, hw);
+                        }
+                    }
+                    return ret;
+                }());
             }
 
             fbs::BinBundleBuilder bin_bundle_builder(fbs_builder);
@@ -1220,6 +1680,9 @@ namespace apsi {
             bin_bundle_builder.add_label_bins(label_bins);
             bin_bundle_builder.add_cache(bin_bundle_cache);
             bin_bundle_builder.add_stripped(stripped_);
+            if (has_hashed_items) {
+                bin_bundle_builder.add_hashed_items(hashed_items);
+            }
 
             auto bb = bin_bundle_builder.Finish();
             fbs_builder.FinishSizePrefixed(bb);
@@ -1378,6 +1841,48 @@ namespace apsi {
                 }
             }
 
+            // A BinBundle with match tags that is not stripped identifies its items by the
+            // HashedItems kept alongside them, so they must be present, one for each item, and
+            // otherwise absent
+            bool expect_hashed_items = uses_tags() && !stripped_;
+            if (expect_hashed_items != (bb->hashed_items() != nullptr)) {
+                APSI_LOG_ERROR(
+                    "The loaded BinBundle "
+                    << (expect_hashed_items ? "lacks" : "has")
+                    << " the HashedItems of its items, which "
+                    << (expect_hashed_items ? "a" : "only a")
+                    << " BinBundle with match tags that is not stripped has");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            if (expect_hashed_items) {
+                const auto &hashed_items = *bb->hashed_items();
+                size_t item_count = 0;
+                for (const auto &item_bin : item_bins_) {
+                    item_count += item_bin.size();
+                }
+
+                if (hashed_items.size() != item_count) {
+                    APSI_LOG_ERROR(
+                        "The loaded BinBundle has " << hashed_items.size()
+                                                    << " HashedItems for its " << item_count
+                                                    << " items");
+                    throw runtime_error("failed to load BinBundle");
+                }
+
+                // The HashedItems are stored bin by bin, in the order of the items
+                flatbuffers::uoffset_t hashed_item_idx = 0;
+                for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
+                    vector<HashedItem> &hashed_item_bin = hashed_item_bins_[bin_idx];
+                    hashed_item_bin.reserve(item_bins_[bin_idx].size());
+                    for (size_t i = 0; i < item_bins_[bin_idx].size(); i++) {
+                        const auto *hashed_item = hashed_items[hashed_item_idx++];
+                        hashed_item_bin.emplace_back(
+                            hashed_item->low_word(), hashed_item->high_word());
+                    }
+                }
+            }
+
             // If the BinBundle is stripped the cache must be present
             if (stripped_ && !bb->cache()) {
                 APSI_LOG_ERROR(
@@ -1390,80 +1895,114 @@ namespace apsi {
             if (bb->cache()) {
                 const auto &cache = *bb->cache();
 
-                // Do we have the right number of rows in the loaded felt_matching_polyns data?
-                const auto &felt_matching_polyns = *cache.felt_matching_polyns()->rows();
-                if (!stripped_ && (felt_matching_polyns.size() != num_bins)) {
-                    APSI_LOG_ERROR(
-                        "The loaded BinBundle cache contains an incorrect number ("
-                        << felt_matching_polyns.size() << ") of matching polynomials (expected "
-                        << num_bins << ")");
-                    throw runtime_error("failed to load BinBundle");
-                }
-
                 // We keep track of the largest polynomial coefficient count
                 size_t max_coeff_count = 0;
 
-                for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
-                    const auto &felt_matching_polyn =
-                        *felt_matching_polyns[static_cast<flatbuffers::uoffset_t>(bin_idx)]
-                             ->felts();
-
-                    // Copy over the matching polynomial coefficients for this bin index
-                    FEltPolyn p;
-                    p.reserve(felt_matching_polyn.size());
-                    copy(felt_matching_polyn.begin(), felt_matching_polyn.end(), back_inserter(p));
-                    cache_.felt_matching_polyns.push_back(std::move(p));
-
-                    // Keep track of the largest coefficient count
-                    max_coeff_count = max<size_t>(max_coeff_count, felt_matching_polyn.size());
-                }
-
-                // max_coeff_count can't be larger than the bin size
-                if (max_coeff_count > max_bin_size_) {
+                // With match tags there is no matching polynomial, and its fields must be absent:
+                // finding them means the data was written for parameters without match tags.
+                // Without match tags they must be present. The schema cannot require them, since
+                // a BinBundle with match tags leaves them out, so the requirement is enforced
+                // here.
+                if (uses_tags() &&
+                    (cache.felt_matching_polyns() || cache.batched_matching_polyn())) {
                     APSI_LOG_ERROR(
-                        "The loaded BinBundle cache contains too many ("
-                        << max_coeff_count << ") matching polynomial coefficients (maximum is "
-                        << max_bin_size_ << ")");
+                        "The loaded BinBundle cache contains matching polynomials but this "
+                        "BinBundle uses match tags");
+                    throw runtime_error("failed to load BinBundle");
+                }
+                if (!uses_tags() &&
+                    (!cache.felt_matching_polyns() || !cache.batched_matching_polyn())) {
+                    APSI_LOG_ERROR(
+                        "The loaded BinBundle cache contains no matching polynomials but this "
+                        "BinBundle does not use match tags");
                     throw runtime_error("failed to load BinBundle");
                 }
 
-                // Each "column" of coefficients is batched into a single plaintext, so check that
-                // the number of plaintexts actually matches max_coeff_count.
-                const auto &batched_matching_polyn = *cache.batched_matching_polyn()->coeffs();
-                if (!stripped_ && (batched_matching_polyn.size() != max_coeff_count)) {
-                    APSI_LOG_ERROR(
-                        "The loaded BinBundle cache contains an incorrect number ("
-                        << batched_matching_polyn.size()
-                        << ") of batched matching polynomial coefficients (expected "
-                        << max_coeff_count << ")");
-                    throw runtime_error("failed to load BinBundle");
-                }
-                if (stripped_ && (batched_matching_polyn.size() > max_bin_size_)) {
-                    APSI_LOG_ERROR(
-                        "The loaded BinBundle cache contains too many ("
-                        << batched_matching_polyn.size()
-                        << ") batched matching polynomial coefficients (maximum is "
-                        << max_bin_size_ << ")");
-                    throw runtime_error("failed to load BinBundle");
-                }
+                if (!uses_tags()) {
+                    // Do we have the right number of rows in the loaded felt_matching_polyns data?
+                    const auto &felt_matching_polyns = *cache.felt_matching_polyns()->rows();
+                    if (!stripped_ && (felt_matching_polyns.size() != num_bins)) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains an incorrect number ("
+                            << felt_matching_polyns.size() << ") of matching polynomials (expected "
+                            << num_bins << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
 
-                // Create the batched matching polynomial; we load the data below
-                cache_.batched_matching_polyn = crypto_context_;
+                    for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
+                        const auto &felt_matching_polyn =
+                            *felt_matching_polyns[static_cast<flatbuffers::uoffset_t>(bin_idx)]
+                                 ->felts();
 
-                // The number of plaintexts is correct; copy them over
-                for (const auto *coeff_idx : batched_matching_polyn) {
-                    // Get the current coefficient data
-                    const auto &batched_matching_polyn_coeff = *coeff_idx->data();
+                        // Copy over the matching polynomial coefficients for this bin index
+                        FEltPolyn p;
+                        p.reserve(felt_matching_polyn.size());
+                        copy(
+                            felt_matching_polyn.begin(),
+                            felt_matching_polyn.end(),
+                            back_inserter(p));
+                        cache_.felt_matching_polyns.push_back(std::move(p));
 
-                    // Copy the data over to a local vector
-                    vector<unsigned char> pt_data(batched_matching_polyn_coeff.size());
-                    copy_bytes(
-                        batched_matching_polyn_coeff.data(),
-                        batched_matching_polyn_coeff.size(),
-                        pt_data.data());
+                        // Keep track of the largest coefficient count
+                        max_coeff_count = max<size_t>(max_coeff_count, felt_matching_polyn.size());
+                    }
 
-                    // Move the loaded data to the cache
-                    cache_.batched_matching_polyn.batched_coeffs.push_back(std::move(pt_data));
+                    // max_coeff_count can't be larger than the bin size
+                    if (max_coeff_count > max_bin_size_) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains too many ("
+                            << max_coeff_count << ") matching polynomial coefficients (maximum is "
+                            << max_bin_size_ << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    // Each "column" of coefficients is batched into a single plaintext, so check
+                    // that the number of plaintexts actually matches max_coeff_count.
+                    const auto &batched_matching_polyn = *cache.batched_matching_polyn()->coeffs();
+                    if (!stripped_ && (batched_matching_polyn.size() != max_coeff_count)) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains an incorrect number ("
+                            << batched_matching_polyn.size()
+                            << ") of batched matching polynomial coefficients (expected "
+                            << max_coeff_count << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+                    if (stripped_ && (batched_matching_polyn.size() > max_bin_size_)) {
+                        APSI_LOG_ERROR(
+                            "The loaded BinBundle cache contains too many ("
+                            << batched_matching_polyn.size()
+                            << ") batched matching polynomial coefficients (maximum is "
+                            << max_bin_size_ << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    // Create the batched matching polynomial; we load the data below
+                    cache_.batched_matching_polyn = crypto_context_;
+
+                    // The number of plaintexts is correct; copy them over
+                    for (const auto *coeff_idx : batched_matching_polyn) {
+                        // Get the current coefficient data
+                        const auto &batched_matching_polyn_coeff = *coeff_idx->data();
+
+                        // Copy the data over to a local vector
+                        vector<unsigned char> pt_data(batched_matching_polyn_coeff.size());
+                        copy_bytes(
+                            batched_matching_polyn_coeff.data(),
+                            batched_matching_polyn_coeff.size(),
+                            pt_data.data());
+
+                        // Move the loaded data to the cache
+                        cache_.batched_matching_polyn.batched_coeffs.push_back(std::move(pt_data));
+                    }
+                } else {
+                    // With match tags, the label polynomial of a bin of k items has k
+                    // coefficients, or the single coefficient of the zero polynomial when the bin
+                    // is empty. The item bins were checked above against max_bin_size_, so the
+                    // largest count cannot exceed it either.
+                    for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
+                        max_coeff_count = max<size_t>(
+                            max_coeff_count, max<size_t>(item_bins_[bin_idx].size(), 1));
+                    }
                 }
 
                 // We are now done with the item cache data; next check that the label cache size is
@@ -1495,6 +2034,10 @@ namespace apsi {
                 }
                 cache_.batched_interp_polyns.reserve(label_size);
 
+                // The coefficient count shared by the batched interpolation polynomials of a
+                // stripped BinBundle with match tags
+                size_t stripped_coeff_count = 0;
+
                 for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
                     // The felt interpolation polynomial data is present only when the BinBundle is
                     // not stripped
@@ -1520,19 +2063,28 @@ namespace apsi {
                                  ->operator[](static_cast<flatbuffers::uoffset_t>(bin_idx))
                                  ->felts();
 
-                        // Compare the number of interpolation polynomial coefficients to the number
-                        // of matching polynomial coefficients
-                        size_t matching_polyn_coeff_count =
-                            cache_.felt_matching_polyns[bin_idx].size();
                         size_t interp_polyn_coeff_count = felt_interp_polyn.size();
+                        size_t expected_interp_polyn_coeff_count = 0;
+                        if (uses_tags()) {
+                            // See above: a bin of k items has a polynomial of k coefficients, and
+                            // an empty one the zero polynomial with one
+                            expected_interp_polyn_coeff_count =
+                                max<size_t>(item_bins_[bin_idx].size(), 1);
+                        } else {
+                            // Compare the number of interpolation polynomial coefficients to the
+                            // number of matching polynomial coefficients
+                            size_t matching_polyn_coeff_count =
+                                cache_.felt_matching_polyns[bin_idx].size();
 
-                        // This is an empty bin if the matching polynomial has zero or one
-                        // coefficients; in this case the interpolation polynomial size should equal
-                        // the matching polynomial size. Otherwise the interpolation polynomial size
-                        // is one less than the matching polynomial size.
-                        bool empty_bin = matching_polyn_coeff_count <= 1;
-                        size_t expected_interp_polyn_coeff_count =
-                            empty_bin ? matching_polyn_coeff_count : matching_polyn_coeff_count - 1;
+                            // This is an empty bin if the matching polynomial has zero or one
+                            // coefficients; in this case the interpolation polynomial size should
+                            // equal the matching polynomial size. Otherwise the interpolation
+                            // polynomial size is one less than the matching polynomial size.
+                            bool empty_bin = matching_polyn_coeff_count <= 1;
+                            expected_interp_polyn_coeff_count =
+                                empty_bin ? matching_polyn_coeff_count
+                                          : matching_polyn_coeff_count - 1;
+                        }
 
                         if (!stripped_ &&
                             (interp_polyn_coeff_count != expected_interp_polyn_coeff_count)) {
@@ -1559,9 +2111,18 @@ namespace apsi {
                              ->coeffs();
                     flatbuffers::uoffset_t batched_interp_polyn_coeff_count =
                         batched_interp_polyn.size();
-                    bool empty_bundle = max_coeff_count <= 1;
-                    size_t expected_batch_interp_polyn_coeff_count =
-                        empty_bundle ? max_coeff_count : max_coeff_count - 1;
+
+                    // Without match tags, max_coeff_count counts the coefficients of the matching
+                    // polynomials, which have one more than the interpolation polynomials unless
+                    // the bundle is empty. With match tags it counts the coefficients of the
+                    // interpolation polynomials themselves.
+                    size_t expected_batch_interp_polyn_coeff_count = max_coeff_count;
+                    if (!uses_tags()) {
+                        bool empty_bundle = max_coeff_count <= 1;
+                        expected_batch_interp_polyn_coeff_count =
+                            empty_bundle ? max_coeff_count : max_coeff_count - 1;
+                    }
+
                     if (!stripped_ && (batched_interp_polyn_coeff_count !=
                                        expected_batch_interp_polyn_coeff_count)) {
                         APSI_LOG_ERROR(
@@ -1578,6 +2139,29 @@ namespace apsi {
                             << ") batched interpolation polynomial coefficients (maximum is "
                             << max_bin_size_ << ")");
                         throw runtime_error("failed to load BinBundle");
+                    }
+
+                    // A query is answered from these polynomials alone when there are match tags,
+                    // so a stripped BinBundle must give each of them at least one coefficient,
+                    // and the same number for all of them, as every label polynomial of a bin has
+                    // the same number of coefficients.
+                    if (uses_tags() && stripped_) {
+                        if (!batched_interp_polyn_coeff_count) {
+                            APSI_LOG_ERROR(
+                                "The loaded BinBundle cache contains a batched interpolation "
+                                "polynomial with no coefficients");
+                            throw runtime_error("failed to load BinBundle");
+                        }
+                        if (label_idx == 0) {
+                            stripped_coeff_count = batched_interp_polyn_coeff_count;
+                        } else if (batched_interp_polyn_coeff_count != stripped_coeff_count) {
+                            APSI_LOG_ERROR(
+                                "The loaded BinBundle cache contains batched interpolation "
+                                "polynomials with different numbers of coefficients ("
+                                << batched_interp_polyn_coeff_count << " and "
+                                << stripped_coeff_count << ")");
+                            throw runtime_error("failed to load BinBundle");
+                        }
                     }
 
                     // Create a new batched interpolation polynomial; we load the data below

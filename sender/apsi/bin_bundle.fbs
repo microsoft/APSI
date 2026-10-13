@@ -19,13 +19,25 @@ table BatchedPlaintextPolyn {
     coeffs:[Plaintext] (required);
 }
 
+// A BinBundle with match tags has no matching polynomial and leaves out felt_matching_polyns and
+// batched_matching_polyn; a BinBundle without match tags always writes both. BinBundle::load
+// requires each to be present or absent as the BinBundle's kind demands, so they are not marked
+// required here. That changes only what the verifier accepts, not what is written.
 table BinBundleCache {
-    felt_matching_polyns:FEltMatrix (required);
-    batched_matching_polyn:BatchedPlaintextPolyn (required);
+    felt_matching_polyns:FEltMatrix;
+    batched_matching_polyn:BatchedPlaintextPolyn;
     felt_interp_polyns:[FEltMatrix];
     batched_interp_polyns:[BatchedPlaintextPolyn];
 }
 
+struct ItemHash {
+    low_word:uint64;
+    high_word:uint64;
+}
+
+// hashed_items holds the HashedItem of every item in item_bins, bin by bin and in the same order,
+// for a BinBundle with match tags that is not stripped, and is absent otherwise. It is how such a
+// BinBundle identifies its items. A new field must go at the end to keep the layout of older ones.
 table BinBundle {
     bundle_idx:uint32;
     mod:uint64;
@@ -33,6 +45,7 @@ table BinBundle {
     label_bins:[FEltMatrix];
     cache:BinBundleCache;
     stripped:bool;
+    hashed_items:[ItemHash];
 }
 
 root_type BinBundle;

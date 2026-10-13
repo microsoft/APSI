@@ -1061,23 +1061,25 @@ namespace APSITests {
         }
 
         // How many bin bundles a bundle index may hold. Two things open a new one: a location
-        // filling its bin, and -- in labeled mode only -- two items whose field elements collide,
-        // since interpolation needs distinct points and BinBundle::multi_insert refuses the
-        // repeat. The second dominates when max_items_per_bin approaches the square root of the
-        // field element space, which is where a capacity-only estimate silently under-predicts.
+        // filling its bin, and -- in labeled mode, and always with match tags -- two items whose
+        // field elements collide, since interpolation needs distinct points and
+        // BinBundle::multi_insert refuses the repeat. The second dominates when max_items_per_bin
+        // approaches the square root of the field element space, which is where a capacity-only
+        // estimate silently under-predicts.
         double bundle_bound(
             double sender_size,
             double hash_func_count,
             double table_size,
             double max_items_per_bin,
             double item_bit_count_per_felt,
-            double label_byte_count)
+            double label_byte_count,
+            bool uses_tags)
         {
             double mean = hash_func_count * sender_size / table_size;
             double per_bin = load_bound(mean, table_size);
             double bundles = max(1.0, ceil(per_bin / max_items_per_bin));
 
-            if (label_byte_count > 0.0) {
+            if (label_byte_count > 0.0 || uses_tags) {
                 double in_bin = min(per_bin, max_items_per_bin);
                 double space = pow(2.0, item_bit_count_per_felt);
                 double colliding_pairs = in_bin * in_bin / (2.0 * space);
@@ -1310,7 +1312,8 @@ namespace APSITests {
                 static_cast<double>(params.table_params().table_size),
                 static_cast<double>(params.table_params().max_items_per_bin),
                 static_cast<double>(params.item_bit_count_per_felt()),
-                label_bytes);
+                label_bytes,
+                params.uses_tags());
 
             double fpp = params.log2_fpp_per_bin_bundle() + log2(bundles) + log2(receiver);
 

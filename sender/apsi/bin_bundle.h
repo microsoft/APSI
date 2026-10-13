@@ -142,33 +142,47 @@ namespace apsi::sender {
 
         /**
         For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose
-        roots are precisely the items in the bin.
+        roots are precisely the items in the bin. Note that this field is empty when the
+        BinBundle uses match tags, which need no matching polynomial.
         */
         std::vector<FEltPolyn> felt_matching_polyns;
 
         /**
-        For each bin, stores the Newton intepolation polynomial whose value at each item in the
-        bin equals the item's corresponding label. Note that this field is empty when doing
-        unlabeled PSI.
+        For each bin, stores the Newton interpolation polynomial whose value at each item in the bin
+        equals the item's corresponding label. Note that this field is empty when doing unlabeled
+        PSI without match tags. With match tags, the first label parts are the parts of the items'
+        match tags, so this field is not empty even for unlabeled PSI.
         */
         std::vector<std::vector<FEltPolyn>> felt_interp_polyns;
 
         /**
         Cached seal::Plaintext representation of the "matching" polynomial of this BinBundle.
+        Note that this field is empty when the BinBundle uses match tags.
         */
         BatchedPlaintextPolyn batched_matching_polyn;
 
         /**
         Cached seal::Plaintext representation of the interpolation polynomial of this BinBundle.
-        Note that this field is empty when doing unlabeled PSI.
+        Note that this field is empty when doing unlabeled PSI without match tags.
         */
         std::vector<BatchedPlaintextPolyn> batched_interp_polyns;
     }; // struct BinBundleCache
 
     /**
-    Represents a specific bin bundle and stores the associated data. The type parameter L
-    represents the label type. This is either a field element (in the case of labeled PSI), or
-    an element of the unit type (in the case of unlabeled PSI).
+    Represents a specific bin bundle and stores the associated data.
+
+    A BinBundle with a non-zero tag part count uses match tags (see PSIParams::uses_tags). Its
+    label parts then begin with that many parts of each item's match tag, followed by the parts
+    of the item's encrypted label, if any, so its label size is never zero. Such a BinBundle
+    computes no matching polynomial: a query is answered with the label polynomials alone. With
+    few bits per item, two different items can share their field elements, so a BinBundle with
+    match tags that is not stripped also keeps each item's HashedItem alongside its field
+    elements, and every operation that looks for an existing item finds it by its HashedItem.
+    The tag is used only by the receiver, to decide matches.
+
+    The operations taking an apsi::util::TaggedAlgItemLabel or a HashedItem are the ones for a
+    BinBundle with match tags, and the others are for a BinBundle without them. Each kind throws
+    std::logic_error on the other kind of BinBundle.
     */
     class BinBundle {
     private:
@@ -189,6 +203,13 @@ namespace apsi::sender {
             - Field elements in the bin
         */
         std::vector<std::vector<apsi::util::felt_t>> item_bins_;
+
+        /**
+        For a BinBundle with match tags that is not stripped, the HashedItem of the item at each
+        position of item_bins_, in the same positions; empty otherwise. The HashedItem identifies an
+        item, as two items can share their field elements.
+        */
+        std::vector<std::vector<HashedItem>> hashed_item_bins_;
 
         /**
         Item-size chunks of the label (decomposed into field elements) for each bin in the
@@ -222,6 +243,12 @@ namespace apsi::sender {
         std::size_t label_size_;
 
         /**
+        The number of label parts, at the beginning of each label, that hold the item's match
+        tag; zero when the BinBundle does not use match tags.
+        */
+        std::size_t tag_part_count_;
+
+        /**
         Maximum size of the bins.
         */
         std::size_t max_bin_size_;
@@ -249,7 +276,8 @@ namespace apsi::sender {
         /**
         Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is
         just the "matching" polynomial. For labeled PSI, this is the "matching" polynomial and
-        the Newton interpolation polynomial. Resulting values are stored in cache_.
+        the Newton interpolation polynomial. With match tags, this is only the Newton
+        interpolation polynomials. Resulting values are stored in cache_.
         */
         void regen_polyns();
 
@@ -260,6 +288,12 @@ namespace apsi::sender {
         void regen_plaintexts();
 
     public:
+        /**
+        Creates an empty BinBundle. A non-zero tag_part_count makes it use match tags: the first
+        tag_part_count of its label_size label parts then hold the match tags of its items, so
+        label_size must be at least tag_part_count. Throws std::invalid_argument if the
+        arguments are inconsistent.
+        */
         BinBundle(
             CryptoContext crypto_context,
             std::size_t label_size,
@@ -267,7 +301,8 @@ namespace apsi::sender {
             std::size_t ps_low_degree,
             std::size_t num_bins,
             bool compressed,
-            bool stripped);
+            bool stripped,
+            std::size_t tag_part_count = 0);
 
         BinBundle(const BinBundle &copy) = delete;
 
@@ -280,17 +315,31 @@ namespace apsi::sender {
         /**
         Inserts item-label pairs into sequential bins, beginning at start_bin_idx. If dry_run is
         specified, no change is made to the BinBundle. On success, returns the size of the
-        largest bin bins in the modified range, after insertion has taken place. On failed
-        insertion, returns -1. On failure, no modification is made to the BinBundle.
+        largest bin in the modified range, after insertion has taken place. On failed
+        insertion, returns -1. On failure, no modification is made to the BinBundle. Throws
+        std::logic_error if the BinBundle uses match tags.
         */
         template <typename T>
         std::int32_t multi_insert(
             const std::vector<T> &item_labels, std::size_t start_bin_idx, bool dry_run);
 
         /**
+        Inserts an item and its label parts, tag parts first, into sequential bins of a BinBundle
+        that uses match tags, beginning at start_bin_idx, and records the item's HashedItem with it.
+        Like the labeled form of the template, this fails if one of the item's field elements is
+        already in its bin, since the label polynomials need distinct points. If dry_run is
+        specified, no change is made to the BinBundle. On success, returns the size of the largest
+        bin in the modified range, after insertion has taken place. On failed insertion, returns -1,
+        and no modification is made to the BinBundle. Throws std::logic_error if the BinBundle does
+        not use match tags.
+        */
+        std::int32_t multi_insert(
+            const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx, bool dry_run);
+
+        /**
         Does a dry-run insertion of item-label pairs into sequential bins, beginning at
         start_bin_idx. This does not mutate the BinBundle. On success, returns the size of the
-        largest bin bins in the modified range, after insertion has taken place. On failed
+        largest bin in the modified range, after insertion has taken place. On failed
         insertion, returns -1.
         */
         template <typename T>
@@ -301,8 +350,18 @@ namespace apsi::sender {
         }
 
         /**
+        Does a dry-run insertion of an item into a BinBundle that uses match tags; see
+        multi_insert.
+        */
+        std::int32_t multi_insert_dry_run(
+            const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx)
+        {
+            return multi_insert(item, start_bin_idx, true);
+        }
+
+        /**
         Inserts item-label pairs into sequential bins, beginning at start_bin_idx. On success,
-        returns the size of the largest bin bins in the modified range, after insertion has
+        returns the size of the largest bin in the modified range, after insertion has
         taken place. On failed insertion, returns -1. On failure, no modification is made to the
         BinBundle.
         */
@@ -314,40 +373,108 @@ namespace apsi::sender {
         }
 
         /**
+        Inserts an item into a BinBundle that uses match tags; see multi_insert.
+        */
+        std::int32_t multi_insert_for_real(
+            const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx)
+        {
+            return multi_insert(item, start_bin_idx, false);
+        }
+
+        /**
         Attempts to overwrite the stored items' labels with the given labels. Returns true iff
         it found a contiguous sequence of given items. If no such sequence was found, this
-        BinBundle is not mutated. This function can be called on a
-        BinBundle<std::vector<apsi::util::felt_t>> but it won't do anything except force the cache
-        to get recomputed, so don't bother. The labeled case has T equal to
-        std::pair<apsi::util::felt_t, std::vector<apsi::util::felt_t>>.
+        BinBundle is not mutated. This function can be called on an unlabeled BinBundle but it won't
+        do anything except force the cache to get recomputed, so don't bother. The labeled case has
+        T equal to std::pair<apsi::util::felt_t, std::vector<apsi::util::felt_t>>. Throws
+        std::logic_error if the BinBundle uses match tags.
         */
         template <typename T>
         bool try_multi_overwrite(const std::vector<T> &item_labels, std::size_t start_bin_idx);
 
         /**
+        Attempts to overwrite the label parts of an item stored in a BinBundle that uses match
+        tags with the given ones. The item is found by its HashedItem alone. Returns true iff the
+        item was found, in which case all its label parts are overwritten; otherwise this
+        BinBundle is not mutated. Throws std::logic_error if the BinBundle does not use match
+        tags.
+        */
+        bool try_multi_overwrite(
+            const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx);
+
+        /**
         Returns whether the given items are stored in sequential bins, beginning at
         start_bin_idx, found exactly as try_multi_overwrite and try_multi_remove find them. Any
         labels given are ignored. Unlike those functions, this never changes the BinBundle, so it
-        can be used to find out where an item is stored before deciding what to change.
+        can be used to find out where an item is stored before deciding what to change. Throws
+        std::logic_error if the BinBundle uses match tags.
         */
         template <typename T>
         bool multi_contains(const std::vector<T> &item_labels, std::size_t start_bin_idx) const;
 
         /**
+        Returns whether the item with the given field elements and HashedItem is stored in
+        sequential bins of a BinBundle that uses match tags, beginning at start_bin_idx. The item
+        is found by its HashedItem alone, exactly as try_multi_overwrite, try_multi_remove and
+        try_get_multi_label find it, and this never changes the BinBundle. Throws
+        std::logic_error if the BinBundle does not use match tags.
+        */
+        bool multi_contains(
+            const std::vector<apsi::util::felt_t> &items,
+            const HashedItem &item,
+            std::size_t start_bin_idx) const;
+
+        /**
+        Returns whether the given item is stored in a BinBundle that uses match tags; see the
+        overload taking a HashedItem. Its label parts are ignored.
+        */
+        bool multi_contains(
+            const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx) const;
+
+        /**
         Attempts to remove the stored items and labels. Returns true iff it found a contiguous
         sequence of given items and the data was successfully removed. If no such sequence was
-        found, this BinBundle is not mutated.
+        found, this BinBundle is not mutated. Throws std::logic_error if the BinBundle uses match
+        tags.
         */
         bool try_multi_remove(
             const std::vector<apsi::util::felt_t> &items, std::size_t start_bin_idx);
 
         /**
+        Attempts to remove the item with the given field elements and HashedItem, and its label
+        parts, from sequential bins of a BinBundle that uses match tags, beginning at
+        start_bin_idx. The item is found by its HashedItem alone. Returns true iff it found the
+        item and removed it; otherwise this BinBundle is not mutated. Throws std::logic_error if
+        the BinBundle does not use match tags.
+        */
+        bool try_multi_remove(
+            const std::vector<apsi::util::felt_t> &items,
+            const HashedItem &item,
+            std::size_t start_bin_idx);
+
+        /**
         Sets the given labels to the set of labels associated with the sequence of items in this
-        BinBundle, starting at start_idx. If any item is not present in its respective bin, this
-        returns false and clears the given labels vector. Returns true on success.
+        BinBundle, starting at start_bin_idx. If any item is not present in its respective bin, this
+        returns false and clears the given labels vector. Returns true on success. Throws
+        std::logic_error if the BinBundle uses match tags.
         */
         bool try_get_multi_label(
             const std::vector<apsi::util::felt_t> &items,
+            std::size_t start_bin_idx,
+            std::vector<apsi::util::felt_t> &labels) const;
+
+        /**
+        Sets the given labels to the label parts of the item with the given field elements and
+        HashedItem, stored in sequential bins of a BinBundle that uses match tags, beginning at
+        start_bin_idx, laid out as the overload without a HashedItem lays them out: part p of the
+        item's i-th field element is at labels[p * items.size() + i]. The tag parts come first. The
+        item is found by its HashedItem alone. If it is not found, this returns false and clears the
+        given labels vector. Returns true on success. Throws std::logic_error if the BinBundle does
+        not use match tags.
+        */
+        bool try_get_multi_label(
+            const std::vector<apsi::util::felt_t> &items,
+            const HashedItem &item,
             std::size_t start_bin_idx,
             std::vector<apsi::util::felt_t> &labels) const;
 
@@ -381,6 +508,17 @@ namespace apsi::sender {
         void regen_cache();
 
         /**
+        Returns a constant reference to the HashedItems kept alongside the items of a BinBundle
+        that uses match tags and is not stripped, in the same positions as get_item_bins; empty
+        otherwise.
+        */
+        [[nodiscard]] const std::vector<std::vector<HashedItem>> &get_hashed_item_bins()
+            const noexcept
+        {
+            return hashed_item_bins_;
+        }
+
+        /**
         Returns a constant reference to the items in this BinBundle.
         */
         [[nodiscard]] const std::vector<std::vector<apsi::util::felt_t>> &get_item_bins()
@@ -395,6 +533,23 @@ namespace apsi::sender {
         [[nodiscard]] std::size_t get_label_size() const noexcept
         {
             return label_size_;
+        }
+
+        /**
+        Returns the number of label parts that hold the match tags of the items; zero when the
+        BinBundle does not use match tags.
+        */
+        [[nodiscard]] std::size_t get_tag_part_count() const noexcept
+        {
+            return tag_part_count_;
+        }
+
+        /**
+        Returns whether this BinBundle uses match tags.
+        */
+        [[nodiscard]] bool uses_tags() const noexcept
+        {
+            return tag_part_count_ != 0;
         }
 
         /**
@@ -434,17 +589,23 @@ namespace apsi::sender {
         void strip();
 
         /**
-        Saves the BinBundle to a stream.
+        Saves the BinBundle to a stream. A BinBundle with match tags writes no matching
+        polynomials, and, unless it is stripped, writes the HashedItems of its items. A BinBundle
+        without match tags writes exactly what it always has.
         */
         std::size_t save(std::ostream &out, std::uint32_t bundle_idx) const;
 
         /**
-        Loads the BinBundle from a buffer.
+        Loads the BinBundle from a buffer. The data must have been saved by a BinBundle of the
+        same kind: with match tags, it must hold no matching polynomials, and must hold the
+        HashedItems of its items exactly when it is not stripped; without match tags, it must
+        hold the matching polynomials and no HashedItems. Throws std::runtime_error if the data
+        is invalid or of the other kind.
         */
         std::pair<std::uint32_t, std::size_t> load(gsl::span<const unsigned char> in);
 
         /**
-        Loads the BinBundle from a stream.
+        Loads the BinBundle from a stream; see the overload taking a buffer.
         */
         std::pair<std::uint32_t, std::size_t> load(std::istream &in);
     }; // class BinBundle
