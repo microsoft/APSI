@@ -120,8 +120,10 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 
 # Microsoft SEAL
 # The version range is checked here rather than passed to find_package, because SEAL installs a
-# SameMinorVersion config file that would reject any minor version other than its own.
-set(APSI_SEAL_MINIMUM_VERSION 4.4.5)
+# SameMinorVersion config file that would reject any minor version other than its own. Bit-packed
+# serialization (seal::compr_mode_type::bitpack) is new in 4.6.0; 4.6.1 fixes the 64-bit
+# multiplication of MSVC builds for ARM64, and 4.6.2 fixes configuring with an installed GSL 5.
+set(APSI_SEAL_MINIMUM_VERSION 4.6.2)
 set(APSI_SEAL_MAXIMUM_VERSION_EXCLUSIVE 5.0.0)
 find_package(SEAL CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)
@@ -132,7 +134,8 @@ elseif(SEAL_VERSION VERSION_LESS APSI_SEAL_MINIMUM_VERSION
         "Microsoft SEAL: found ${SEAL_VERSION}, but APSI requires at least "
         "${APSI_SEAL_MINIMUM_VERSION} and older than ${APSI_SEAL_MAXIMUM_VERSION_EXCLUSIVE}")
 else()
-    message(STATUS "Microsoft SEAL: found (${SEAL_VERSION})")
+    message(STATUS "Microsoft SEAL: found (${SEAL_VERSION}; zlib: ${SEAL_USE_ZLIB}, "
+                   "Zstandard: ${SEAL_USE_ZSTD})")
 endif()
 
 # Microsoft GSL

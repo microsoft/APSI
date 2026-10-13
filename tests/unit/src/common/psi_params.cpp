@@ -475,12 +475,28 @@ namespace APSITests {
         ASSERT_EQ(static_cast<size_t>(8), loaded.first.query_params().query_powers.size());
 
         // Round-tripping it must reproduce the same bytes, so a future change to the writer is
-        // caught here rather than by whoever tries to read this version's output later.
+        // caught here rather than by whoever tries to read this version's output later. The one
+        // difference is in the minor version of the five SEALHeaders, one for the encryption
+        // parameters and one for each of the moduli in them: Microsoft SEAL 4.4, which wrote this
+        // buffer, recorded its library version 4.4 there, and Microsoft SEAL 4.5 and later record
+        // the serialization format version 4.0.
+        vector<unsigned char> expected(begin(frozen), end(frozen));
+        size_t seal_header_count = 0;
+        for (size_t i = 0; i + 5 <= expected.size(); i++) {
+            // Magic number 0xA15E, header size 0x10, version 4.4
+            if (expected[i] == 0x5e && expected[i + 1] == 0xa1 && expected[i + 2] == 0x10 &&
+                expected[i + 3] == 0x04 && expected[i + 4] == 0x04) {
+                expected[i + 4] = 0x00;
+                seal_header_count++;
+            }
+        }
+        ASSERT_EQ(size_t(5), seal_header_count);
+
         stringstream out;
         loaded.first.save(out);
         string written = out.str();
-        ASSERT_EQ(sizeof(frozen), written.size());
-        ASSERT_EQ(0, memcmp(frozen, written.data(), sizeof(frozen)));
+        ASSERT_EQ(expected.size(), written.size());
+        ASSERT_EQ(0, memcmp(expected.data(), written.data(), expected.size()));
     }
 
     TEST(PSIParamsTest, JSONLoadPSIParams)

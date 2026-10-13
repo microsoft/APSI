@@ -1,5 +1,19 @@
 # List of Changes
 
+## Version 2.0.0
+
+### Breaking changes
+
+- Required Microsoft SEAL 4.6.2 or a newer 4.x release. Bit-packed serialization is new in Microsoft SEAL 4.6.0, 4.6.1 corrects wrong results with MSVC for ARM64, and 4.6.2 can be configured with an installed Microsoft GSL 5 (`SEAL_BUILD_DEPS=OFF`, as vcpkg builds it). `vcpkg.json` asks for `seal` 4.6.2 with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query arrived in. If the vcpkg registry does not have Microsoft SEAL 4.6.2, configure with an overlay port for it; see [Microsoft SEAL 4.6.2](README.md#microsoft-seal-462).
+
+### Changed and fixed
+
+- Results a sender saves in `none`, `zlib` or `zstd` mode can be read by receivers built with Microsoft SEAL 4.0, which cannot read what Microsoft SEAL 4.1 to 4.4 save: Microsoft SEAL 4.5 and later record in what they save the serialization format version, 4.0 for these results, rather than their own version. A serialized `PSIParams`, or an uncompressed `SenderDB`, therefore differs from what APSI 1.1.0 writes with Microsoft SEAL 4.4 only in these version bytes, and both versions load both.
+
+### Build
+
+- The configure step reports whether Microsoft SEAL was built with zlib and Zstandard.
+
 ## Version 1.1.0
 
 - The installed paths no longer carry the version: headers go to `include/apsi`, the CMake package to `lib/cmake/APSI`, and the library is named `apsi`. Code can include `apsi/...` from the standard include directory alone. Consumers using `find_package(APSI)` and `APSI::apsi` need no change. Installing over APSI 1.0 leaves its versioned files in place; remove them first.
