@@ -91,7 +91,8 @@ namespace apsi {
             Helper function. Logs that the cuckoo filters of refused_count of the bins beginning at
             start_bin_idx refused an item, once the item is stored. Logging allocates and calls the
             user's handler, either of which can throw, and an exception would report as failed a
-            change that has been made. The message is dropped instead.
+            change that has been made; a SenderDB that moves an item between BinBundles relies on
+            a change, once begun, not to throw. The message is dropped instead.
             */
             void log_filter_refusals(size_t refused_count, size_t start_bin_idx) noexcept
             {
@@ -1204,6 +1205,117 @@ namespace apsi {
             }
 
             return new_max_bin_size;
+        }
+
+        bool BinBundle::try_multi_replace(
+            const HashedItem &stored_item,
+            size_t pos,
+            const TaggedAlgItemLabel &item,
+            size_t start_bin_idx,
+            bool dry_run)
+        {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot replace data in a stripped BinBundle");
+                throw logic_error("failed to replace data");
+            }
+            if (!uses_tags()) {
+                APSI_LOG_ERROR(
+                    "Attempted to replace an item by its HashedItem in a BinBundle that does not "
+                    "use match tags");
+                throw logic_error("failed to replace data");
+            }
+
+            const AlgItemLabel &item_labels = item.alg_item_label;
+            if (item_labels.empty()) {
+                APSI_LOG_ERROR("No item or label data to replace with");
+                return false;
+            }
+
+            // Check that item_labels has correct size
+            size_t label_size = get_label_size();
+            for (const auto &curr_item_label : item_labels) {
+                size_t curr_label_size = curr_item_label.second.size();
+                if (curr_label_size != label_size) {
+                    APSI_LOG_ERROR(
+                        "Attempted to replace an item with an item-label of incorrect label size "
+                        << curr_label_size << " (expected " << label_size << ")");
+                    throw invalid_argument("failed to replace data");
+                }
+            }
+
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() ||
+                item_labels.size() > get_num_bins() - start_bin_idx) {
+                return false;
+            }
+
+            // The stored item must be at position pos of every bin; if it is not, this BinBundle
+            // is left as it is. Its place is given rather than searched for, so that nothing here
+            // allocates.
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                size_t curr_bin_idx = start_bin_idx + item_idx;
+                const vector<HashedItem> &hashed_item_bin = hashed_item_bins_[curr_bin_idx];
+                if ((pos >= item_bins_[curr_bin_idx].size()) || (pos >= hashed_item_bin.size()) ||
+                    !(hashed_item_bin[pos] == stored_item)) {
+                    return false;
+                }
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    if (pos >= label_bins_[label_idx][curr_bin_idx].size()) {
+                        return false;
+                    }
+                }
+            }
+
+            // The label polynomials need distinct points, so each of the new item's field
+            // elements may be in its bin only where the stored item's is, which it replaces
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                size_t curr_bin_idx = start_bin_idx + item_idx;
+                const vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
+                auto found =
+                    get_iterator(curr_bin, filters_[curr_bin_idx], item_labels[item_idx].first);
+                if ((found != curr_bin.end()) &&
+                    (static_cast<size_t>(distance(curr_bin.begin(), found)) != pos)) {
+                    return false;
+                }
+            }
+
+            if (dry_run) {
+                return true;
+            }
+
+            // Nothing below allocates: the new item takes the stored item's places
+            size_t refused_count = 0;
+            for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
+                size_t curr_bin_idx = start_bin_idx + item_idx;
+                felt_t stored_felt = item_bins_[curr_bin_idx][pos];
+                felt_t new_felt = item_labels[item_idx].first;
+
+                // The stored item was found, so its tag is in the filter unless the filter has
+                // dropped one; see try_multi_remove
+                if (stored_felt != new_felt) {
+                    CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                    static_cast<void>(curr_filter.remove(stored_felt));
+                    if (!curr_filter.add(new_felt)) {
+                        refused_count++;
+                    }
+                }
+
+                item_bins_[curr_bin_idx][pos] = new_felt;
+                hashed_item_bins_[curr_bin_idx][pos] = item.item;
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                    label_bins_[label_idx][curr_bin_idx][pos] =
+                        item_labels[item_idx].second[label_idx];
+                }
+            }
+
+            // Indicate that the polynomials need to be recomputed
+            cache_invalid_ = true;
+
+            if (refused_count) {
+                log_filter_refusals(refused_count, start_bin_idx);
+            }
+
+            return true;
         }
 
         bool BinBundle::try_multi_overwrite(const TaggedAlgItemLabel &item, size_t start_bin_idx)

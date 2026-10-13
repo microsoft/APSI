@@ -11,6 +11,9 @@
 #include <mutex>
 #include <shared_mutex>
 #include <sstream>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
 #include <unordered_set>
 
 // APSI
@@ -361,13 +364,366 @@ namespace apsi {
             }
 
             /**
+            Returns whether each of the felt_count bins of a BinBundle beginning at start_bin_idx
+            holds fewer than max_bin_size items. An item occupies one place in each of the bins
+            of its location, so with match tags those bins always hold equally many items, but
+            each is checked.
+            */
+            bool has_room(
+                const BinBundle &bundle,
+                size_t start_bin_idx,
+                size_t felt_count,
+                size_t max_bin_size)
+            {
+                const vector<vector<felt_t>> &item_bins = bundle.get_item_bins();
+                for (size_t felt_idx = 0; felt_idx < felt_count; felt_idx++) {
+                    if (item_bins[start_bin_idx + felt_idx].size() >= max_bin_size) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            /**
+            Reads the item stored at position pos of the felt_count bins of a BinBundle with match
+            tags beginning at start_bin_idx: its HashedItem, its field elements, and all its label
+            parts, tag parts included, in the form multi_insert takes. An item is stored at the
+            same position in each of the bins of its location. Returns false if the bins do not
+            hold one item there, which happens only if the BinBundle has been corrupted.
+            */
+            bool read_stored_item(
+                const BinBundle &bundle,
+                size_t start_bin_idx,
+                size_t felt_count,
+                size_t pos,
+                TaggedAlgItemLabel &stored_item)
+            {
+                const vector<vector<felt_t>> &item_bins = bundle.get_item_bins();
+                const vector<vector<HashedItem>> &hashed_item_bins = bundle.get_hashed_item_bins();
+                const vector<vector<vector<felt_t>>> &label_bins = bundle.get_label_bins();
+                size_t label_size = bundle.get_label_size();
+
+                stored_item.alg_item_label.clear();
+                stored_item.alg_item_label.reserve(felt_count);
+                for (size_t felt_idx = 0; felt_idx < felt_count; felt_idx++) {
+                    size_t curr_bin_idx = start_bin_idx + felt_idx;
+                    if ((pos >= item_bins[curr_bin_idx].size()) ||
+                        (pos >= hashed_item_bins[curr_bin_idx].size())) {
+                        return false;
+                    }
+
+                    const HashedItem &hashed_item = hashed_item_bins[curr_bin_idx][pos];
+                    if (felt_idx == 0) {
+                        stored_item.item = hashed_item;
+                    } else if (!(hashed_item == stored_item.item)) {
+                        return false;
+                    }
+
+                    vector<felt_t> label_parts(label_size);
+                    for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                        const vector<felt_t> &label_bin = label_bins[label_idx][curr_bin_idx];
+                        if (pos >= label_bin.size()) {
+                            return false;
+                        }
+                        label_parts[label_idx] = label_bin[pos];
+                    }
+
+                    stored_item.alg_item_label.emplace_back(
+                        item_bins[curr_bin_idx][pos], std::move(label_parts));
+                }
+
+                return true;
+            }
+
+            /**
+            What insert_by_relocation did: moved a stored item and inserted the new one in its
+            place; found no move possible, as no BinBundle is both full and free of the new item's
+            field elements, or none has room; declined a move through a BinBundle that the batch
+            had not changed; or found no move among the BinBundles it tried.
+            */
+            enum class Relocation { moved, impossible, declined, not_found };
+
+            /**
+            Inserts an item into one of the BinBundles of a SenderDB with match tags at the item's
+            bundle index, none of which accepts it, by first moving an item already stored there to
+            another of them. Unless it returns Relocation::moved, the BinBundles are left as they
+            were, and the caller puts the item in a new BinBundle.
+
+            A bin cannot hold two items with the same field element, as its label polynomials
+            interpolate through them. When the item's bins are full in some BinBundles and hold one
+            of its field elements in all the others, the item would need a new BinBundle, which
+            costs every query tag_part_count more result ciphertexts and one more per label part,
+            although there is room for it. Instead, this moves a stored item out of a source, a
+            BinBundle whose bins at the location are full and hold none of the item's field
+            elements, into a destination whose bins there have room and hold none of the moved
+            item's field elements, and puts the new item in its place. Every lookup searches all the
+            BinBundles at a bundle index, so the moved item is still found. With one field element
+            per item, such a move exists whenever the bins have room for the item and not every
+            BinBundle holds its field element: a full source holds max_bin_size distinct field
+            elements, more than a destination with room, so one of them is not in the destination.
+            With more field elements per item, a single move is merely tried.
+
+            Only BinBundles the batch has already changed, and so regenerates anyway, are used:
+            moving an item through any other would make the batch encode all its plaintexts again,
+            while the new BinBundle the move avoids costs almost nothing to generate. So a large
+            batch moves items for free, and a small one opens a new BinBundle instead. Newer
+            BinBundles are tried first, and the stored items of a source in the order they are
+            stored, so the choice is deterministic.
+
+            Nothing is changed until dry runs have shown that the moved item fits in the destination
+            and that the new item can take its place in the source. Adding the moved item to the
+            destination then either throws having changed nothing, as it reserves memory first, or
+            succeeds, and replacing it in the source neither allocates nor throws, and cannot fail,
+            as the source has not changed since its dry run. So nothing ever needs to be undone, and
+            the moved item is stored throughout, and in the end exactly once.
+            */
+            Relocation insert_by_relocation(
+                vector<BinBundle> &bundle_set,
+                const TaggedAlgItemLabel &item,
+                size_t bin_idx,
+                size_t max_bin_size)
+            {
+                size_t felt_count = item.alg_item_label.size();
+
+                // A BinBundle with room holds one of the item's field elements, or the item would
+                // have gone into it. One that is full can take the item only if it holds none of
+                // them, which its dry run shows by returning a size, one too large, rather than
+                // -1; the item fits once a stored item has made way for it.
+                vector<size_t> sources;
+                vector<size_t> destinations;
+                for (size_t set_idx = bundle_set.size(); set_idx-- > 0;) {
+                    BinBundle &bundle = bundle_set[set_idx];
+                    if (has_room(bundle, bin_idx, felt_count, max_bin_size)) {
+                        destinations.push_back(set_idx);
+                        continue;
+                    }
+
+                    int32_t new_size = bundle.multi_insert_dry_run(item, bin_idx);
+                    if ((new_size > 0) && (static_cast<size_t>(new_size) <= max_bin_size + 1)) {
+                        sources.push_back(set_idx);
+                    }
+                }
+
+                if (sources.empty() || destinations.empty()) {
+                    return Relocation::impossible;
+                }
+
+                // Each destination's field elements at the location, collected once per call
+                unordered_map<size_t, vector<unordered_set<felt_t>>> destination_felts;
+
+                // Whether a move was declined as it would change a BinBundle the batch has not
+                bool declined = false;
+
+                for (size_t source_idx : sources) {
+                    for (size_t destination_idx : destinations) {
+                        BinBundle &source = bundle_set[source_idx];
+                        BinBundle &destination = bundle_set[destination_idx];
+
+                        // A BinBundle's cache is invalid exactly when this batch has changed it,
+                        // or made it, so that the batch regenerates it anyway
+                        if (!source.cache_invalid() || !destination.cache_invalid()) {
+                            declined = true;
+                            continue;
+                        }
+
+                        // Collect the destination's field elements the first time it is tried
+                        auto [felts_it, felts_new] = destination_felts.try_emplace(destination_idx);
+                        vector<unordered_set<felt_t>> &dest_felts = felts_it->second;
+                        if (felts_new) {
+                            dest_felts.resize(felt_count);
+                            for (size_t felt_idx = 0; felt_idx < felt_count; felt_idx++) {
+                                const vector<felt_t> &bin =
+                                    destination.get_item_bins()[bin_idx + felt_idx];
+                                dest_felts[felt_idx].reserve(bin.size());
+                                dest_felts[felt_idx].insert(bin.begin(), bin.end());
+                            }
+                        }
+
+                        // Try the stored items in the order they are stored. One can move if the
+                        // destination holds none of its field elements.
+                        const vector<vector<felt_t>> &source_bins = source.get_item_bins();
+                        size_t stored_count = source_bins[bin_idx].size();
+                        for (size_t pos = 0; pos < stored_count; pos++) {
+                            bool movable = true;
+                            for (size_t felt_idx = 0; movable && (felt_idx < felt_count);
+                                 felt_idx++) {
+                                const vector<felt_t> &bin = source_bins[bin_idx + felt_idx];
+                                movable =
+                                    (pos < bin.size()) && !dest_felts[felt_idx].count(bin[pos]);
+                            }
+                            if (!movable) {
+                                continue;
+                            }
+
+                            TaggedAlgItemLabel stored_item;
+                            if (!read_stored_item(source, bin_idx, felt_count, pos, stored_item)) {
+                                log_noexcept([&] {
+                                    APSI_LOG_ERROR(
+                                        "Insert-or-Assign worker: the bins beginning at index "
+                                        << bin_idx
+                                        << " of a BinBundle do not hold one item at the same "
+                                           "position; the internal state of the BinBundle has "
+                                           "been corrupted");
+                                });
+                                return Relocation::not_found;
+                            }
+
+                            // Check the whole move before changing anything
+                            int32_t new_dest_size =
+                                destination.multi_insert_dry_run(stored_item, bin_idx);
+                            if ((new_dest_size <= 0) ||
+                                (static_cast<size_t>(new_dest_size) > max_bin_size) ||
+                                !source.try_multi_replace(
+                                    stored_item.item, pos, item, bin_idx, true)) {
+                                continue;
+                            }
+
+                            // Add the moved item to the destination before replacing it in the
+                            // source, so that nothing ever needs to be undone; see above.
+                            if (destination.multi_insert_for_real(stored_item, bin_idx) < 0) {
+                                APSI_LOG_ERROR(
+                                    "Insert-or-Assign worker: failed to move an item to another "
+                                    "BinBundle at bin index "
+                                    << bin_idx);
+                                throw logic_error("failed to move an item to another BinBundle");
+                            }
+                            if (!source.try_multi_replace(
+                                    stored_item.item, pos, item, bin_idx, false)) {
+                                APSI_LOG_ERROR(
+                                    "Insert-or-Assign worker: failed to put an item in place of "
+                                    "one moved to another BinBundle at bin index "
+                                    << bin_idx);
+                                throw logic_error(
+                                    "failed to put an item in place of one moved out of its way");
+                            }
+
+                            return Relocation::moved;
+                        }
+                    }
+                }
+
+                return declined ? Relocation::declined : Relocation::not_found;
+            }
+
+            /**
+            Places the new items at a bundle index that holds no BinBundles, for a SenderDB with
+            match tags and one field element per item, in as few BinBundles as any placement of
+            them can use. entries are the positions in data_with_indices of the items at this
+            bundle index, in the order in which they are to be stored.
+
+            A bin of n items in which no field element appears more than m times needs
+            max(ceil(n / K), m) BinBundles, for a capacity K: no BinBundle holds more than K items
+            in a bin or one field element twice. This uses B BinBundles, the largest of those
+            numbers over the bins of the bundle index, and is therefore optimal. In each bin, the
+            items are sorted by field element, so that equal ones are adjacent, and dealt to the
+            B BinBundles in turn. Equal field elements, at most B of them, go to distinct
+            BinBundles, and each BinBundle gets at most ceil(n / B) <= K items. The bins of all B
+            BinBundles are then about equally full, which also keeps the interpolation, whose
+            cost grows with the square of the number of items in a bin, cheaper than filling the
+            BinBundles one after another, and leaves room in each of them for items inserted
+            later.
+
+            Placing items one at a time, newest BinBundle first, can need more BinBundles: an
+            item whose field element is in the one BinBundle with room opens a new one, although
+            an older, full one could have taken it had a stored item been moved. Nothing is moved
+            here, and every BinBundle is new, so no cache is regenerated more than once.
+            */
+            void pack_tagged_items(
+                const vector<pair<TaggedAlgItemLabel, size_t>> &data_with_indices,
+                const vector<size_t> &entries,
+                vector<BinBundle> &bundle_set,
+                CryptoContext &crypto_context,
+                uint32_t bins_per_bundle,
+                size_t label_size,
+                size_t tag_part_count,
+                size_t max_bin_size,
+                size_t ps_low_degree,
+                bool compressed)
+            {
+                // Each item here has one field element, by which it is sorted and dealt
+                auto felt_of = [&](size_t entry) {
+                    return data_with_indices[entry].first.alg_item_label[0].first;
+                };
+
+                // Group the items by bin
+                vector<vector<size_t>> bins(bins_per_bundle);
+                for (size_t entry : entries) {
+                    size_t bin_idx = data_with_indices[entry].second % bins_per_bundle;
+                    bins[bin_idx].push_back(entry);
+                }
+
+                // Sort each bin by field element, and find how many BinBundles the fullest bin, or
+                // the most repeated field element, needs
+                size_t bundle_count = 0;
+                for (auto &bin : bins) {
+                    if (bin.empty()) {
+                        continue;
+                    }
+
+                    stable_sort(bin.begin(), bin.end(), [&](size_t a, size_t b) {
+                        return felt_of(a) < felt_of(b);
+                    });
+
+                    size_t repeat_count = 1;
+                    size_t max_repeat_count = 1;
+                    for (size_t i = 1; i < bin.size(); i++) {
+                        repeat_count =
+                            (felt_of(bin[i]) == felt_of(bin[i - 1])) ? repeat_count + 1 : 1;
+                        max_repeat_count = max(max_repeat_count, repeat_count);
+                    }
+
+                    size_t fill_count = (bin.size() + max_bin_size - 1) / max_bin_size;
+                    bundle_count = max({ bundle_count, fill_count, max_repeat_count });
+                }
+
+                // Make the BinBundles. They are added to the bundle index only once all of them
+                // hold their items.
+                vector<BinBundle> packed;
+                packed.reserve(bundle_count);
+                for (size_t i = 0; i < bundle_count; i++) {
+                    packed.emplace_back(
+                        crypto_context,
+                        label_size,
+                        max_bin_size,
+                        ps_low_degree,
+                        bins_per_bundle,
+                        compressed,
+                        false,
+                        tag_part_count);
+                }
+
+                // Deal each bin's items to the BinBundles in turn
+                for (size_t bin_idx = 0; bin_idx < bins.size(); bin_idx++) {
+                    const vector<size_t> &bin = bins[bin_idx];
+                    for (size_t i = 0; i < bin.size(); i++) {
+                        int32_t new_size = packed[i % bundle_count].multi_insert_for_real(
+                            data_with_indices[bin[i]].first, bin_idx);
+                        if ((new_size <= 0) || (static_cast<size_t>(new_size) > max_bin_size)) {
+                            APSI_LOG_ERROR(
+                                "Insert-or-Assign worker: failed to insert an item into a new "
+                                "BinBundle while packing the bin at index "
+                                << bin_idx);
+                            throw logic_error("failed to insert item into a new BinBundle");
+                        }
+                    }
+                }
+
+                bundle_set = std::move(packed);
+            }
+
+            /**
             Inserts the given items and corresponding labels into bin_bundles at their respective
             cuckoo indices, for the items whose bundle index is bundle_index. An item goes into the
             newest BinBundle that accepts it, or into a new BinBundle if none does. A bin holds at
             most max_bin_size - 1 items, or max_bin_size with match tags, which a non-zero
             tag_part_count selects. If overwrite is set, every item must already be stored in the
             BinBundles at its bundle index; its labels are overwritten in every one of them that
-            holds it, and nothing is inserted.
+            holds it, and nothing is inserted. With match tags, new items at a bundle index without
+            BinBundles are packed into as few as possible (see pack_tagged_items), and an item that
+            no BinBundle accepts goes into a new BinBundle only if moving a stored item between
+            BinBundles this batch has already changed cannot make room for it in one of them (see
+            insert_by_relocation).
             */
             template <typename T>
             void insert_or_assign_worker(
@@ -390,6 +746,57 @@ namespace apsi {
                         << bundle_index << "; mode of operation: "
                         << (overwrite ? "overwriting existing" : "inserting new"));
                 });
+
+                constexpr bool with_tags = is_same_v<T, TaggedAlgItemLabel>;
+
+                // With match tags and one field element per item, the new items at a bundle index
+                // that holds no BinBundles, as after set_data has cleared the SenderDB, are all
+                // known before any is placed, and are packed into as few BinBundles as possible
+                if constexpr (with_tags) {
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_index];
+                    if (!overwrite && bundle_set.empty()) {
+                        vector<size_t> entries;
+                        bool one_felt = true;
+                        for (size_t entry = 0; entry < data_with_indices.size(); entry++) {
+                            const auto &data_with_idx = data_with_indices[entry];
+                            if (unpack_cuckoo_idx(data_with_idx.second, bins_per_bundle).second ==
+                                bundle_index) {
+                                entries.push_back(entry);
+                                one_felt =
+                                    one_felt && (data_with_idx.first.alg_item_label.size() == 1);
+                            }
+                        }
+
+                        if (one_felt && !entries.empty()) {
+                            pack_tagged_items(
+                                data_with_indices,
+                                entries,
+                                bundle_set,
+                                crypto_context,
+                                bins_per_bundle,
+                                label_size,
+                                tag_part_count,
+                                max_bin_size,
+                                ps_low_degree,
+                                compressed);
+                            log_noexcept([&] {
+                                APSI_LOG_DEBUG(
+                                    "Insert-or-Assign worker: finished processing bundle index "
+                                    << bundle_index << "; packed " << entries.size()
+                                    << " items into " << bundle_set.size() << " new BinBundles");
+                            });
+                            return;
+                        }
+                    }
+                }
+
+                // With match tags, how many BinBundles were opened, how many items were inserted by
+                // moving another, how many moves were declined as they would have changed a
+                // BinBundle this batch had not, and how many searches found no move
+                size_t opened_count = 0;
+                size_t moved_count = 0;
+                size_t declined_count = 0;
+                size_t not_found_count = 0;
 
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices) {
@@ -486,6 +893,27 @@ namespace apsi {
                         }
                     }
 
+                    // With match tags, an item can fail to fit only because its field elements
+                    // are in the bins with room, and moving a stored item may make room for it
+                    if constexpr (with_tags) {
+                        if (!written) {
+                            switch (insert_by_relocation(bundle_set, data, bin_idx, max_bin_size)) {
+                            case Relocation::moved:
+                                written = true;
+                                moved_count++;
+                                break;
+                            case Relocation::declined:
+                                declined_count++;
+                                break;
+                            case Relocation::not_found:
+                                not_found_count++;
+                                break;
+                            case Relocation::impossible:
+                                break;
+                            }
+                        }
+                    }
+
                     // If we had conflicts everywhere when trying to insert, then we need to make a
                     // new BinBundle and insert the data there
                     if (!written) {
@@ -512,14 +940,27 @@ namespace apsi {
 
                         // Push a new BinBundle to the set of BinBundles at this bundle index
                         bundle_set.push_back(std::move(new_bin_bundle));
+                        opened_count++;
                     }
                 }
 
-                log_noexcept([&] {
-                    APSI_LOG_DEBUG(
-                        "Insert-or-Assign worker: finished processing bundle index "
-                        << bundle_index);
-                });
+                if constexpr (with_tags) {
+                    log_noexcept([&] {
+                        APSI_LOG_DEBUG(
+                            "Insert-or-Assign worker: finished processing bundle index "
+                            << bundle_index << "; opened " << opened_count << " BinBundles; moved "
+                            << moved_count << " items to make room; declined " << declined_count
+                            << " moves through BinBundles the batch had not changed; "
+                               "found no move for "
+                            << not_found_count << " items");
+                    });
+                } else {
+                    log_noexcept([&] {
+                        APSI_LOG_DEBUG(
+                            "Insert-or-Assign worker: finished processing bundle index "
+                            << bundle_index);
+                    });
+                }
             }
 
             /**
@@ -1035,12 +1476,24 @@ namespace apsi {
             STOPWATCH(sender_stopwatch, "SenderDB::generate_caches");
             log_noexcept([] { APSI_LOG_INFO("Start generating bin bundle caches"); });
 
+            // Only the bin bundles changed since their caches were last generated are regenerated.
+            size_t regen_count = 0;
+            size_t bundle_count = 0;
             for (auto &bundle_idx : bin_bundles_) {
                 for (auto &bb : bundle_idx) {
+                    bundle_count++;
+                    if (bb.cache_invalid()) {
+                        regen_count++;
+                    }
                     bb.regen_cache();
                 }
             }
 
+            log_noexcept([&] {
+                APSI_LOG_DEBUG(
+                    "Regenerated the caches of " << regen_count << " of " << bundle_count
+                                                 << " bin bundles");
+            });
             log_noexcept([] { APSI_LOG_INFO("Finished generating bin bundle caches"); });
         }
 
@@ -1179,8 +1632,8 @@ namespace apsi {
                     return hashed_items_.find(item_label_pair.first) == hashed_items_.end();
                 });
 
-            // Dispatch the insertion, first for the new data, then for the data we're gonna
-            // overwrite
+            // Dispatch the insertion, first for the data we're gonna overwrite, then for the new
+            // data
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
             uint32_t ps_low_degree = params_.query_params().ps_low_degree;
@@ -1383,6 +1836,9 @@ namespace apsi {
             auto new_item_count = distance(hashed_data.begin(), new_data_end);
             auto existing_item_count = distance(new_data_end, hashed_data.end());
 
+            // Overwrite the existing items before inserting the new ones, as without match tags.
+            // The BinBundles the overwrites change are regenerated anyway, so placing the new items
+            // can then move stored items through them as well; see insert_by_relocation.
             try {
                 if (existing_item_count) {
                     APSI_LOG_INFO(

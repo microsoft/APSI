@@ -53,6 +53,16 @@ namespace apsi::sender {
     items can then share their field elements in a bin, it also keeps the full HashedItem of every
     item until it is stripped.
 
+    With match tags and one field element per item, the items inserted at a bundle index that
+    has no bin bundles, as set_data inserts them, are placed all at once in as few bin bundles
+    as any placement could use: no bin bundle can hold more than max_items_per_bin items in a
+    bin or one field element twice there, and the items of each bin are spread evenly over the
+    bin bundles. Items inserted later go into the newest bin bundle that has room for them, as in
+    APSI 1.x. An item whose field element is already in every bin bundle with room at its location
+    can take the place of a stored item, which moves to a bin bundle with room, but only if the same
+    update already changes both bin bundles: otherwise the move would make the update regenerate
+    their caches as well, and the item goes into a new bin bundle instead.
+
     The SenderDB requires substantially more memory than the raw data would. Part of that memory
     can automatically be compressed when it is not in use; this feature is enabled by default,
     and can be disabled when constructing the SenderDB. The downside of in-memory compression is

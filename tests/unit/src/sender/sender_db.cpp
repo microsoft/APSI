@@ -18,8 +18,11 @@
 #include <thread>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 
 // APSI
+#include "apsi/bin_bundle.h"
+#include "apsi/crypto_context.h"
 #include "apsi/log.h"
 #include "apsi/network/stream_channel.h"
 #include "apsi/oprf/oprf_common.h"
@@ -33,6 +36,7 @@
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/match_tag.h"
+#include "apsi/util/utils.h"
 
 // Kuku
 #include "kuku/locfunc.h"
@@ -2144,7 +2148,10 @@ namespace APSITests {
         for (uint64_t i = 0; i < 3000; i++) {
             items.emplace_back(i, i);
         }
-        tag_db.insert_or_assign(items);
+        // The first item goes in alone, so that the others are placed one at a time and fill
+        // bins, rather than being packed into equally full BinBundles
+        tag_db.insert_or_assign(items[0]);
+        tag_db.insert_or_assign(vector<Item>(items.begin() + 1, items.end()));
         ASSERT_LE(size_t(2), tag_db.get_bin_bundle_count());
         ASSERT_EQ(max_items_per_bin, largest(tag_db, false));
 
@@ -2465,30 +2472,48 @@ namespace APSITests {
         }
 
         /**
-        Collects the warnings logged while it exists, and restores the global logger and log
-        level when it is destroyed.
+        Collects the debug messages and the warnings logged while it exists, and restores the
+        global logger and log level when it is destroyed.
         */
-        class WarningCapture {
+        class LogCapture {
         public:
-            WarningCapture() : saved_level_(GetLogLevel())
+            LogCapture() : saved_level_(GetLogLevel())
             {
                 array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::debug)] = [this](const string &msg) {
+                    messages_.push_back(msg);
+                };
                 log_handlers[static_cast<size_t>(LogLevel::warning)] = [this](const string &msg) {
                     warnings_.push_back(msg);
                 };
                 SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
-                SetLogLevel(LogLevel::warning);
+                SetLogLevel(LogLevel::debug);
             }
 
-            ~WarningCapture()
+            ~LogCapture()
             {
                 CloseLogger();
                 SetLogLevel(saved_level_);
             }
 
-            WarningCapture(const WarningCapture &) = delete;
+            LogCapture(const LogCapture &) = delete;
 
-            WarningCapture &operator=(const WarningCapture &) = delete;
+            LogCapture &operator=(const LogCapture &) = delete;
+
+            /**
+            Returns the sum of the numbers that follow the given text in the debug messages.
+            */
+            size_t sum(const string &text) const
+            {
+                size_t total = 0;
+                for (const auto &msg : messages_) {
+                    size_t pos = msg.find(text);
+                    if (pos != string::npos) {
+                        total += static_cast<size_t>(stoull(msg.substr(pos + text.size())));
+                    }
+                }
+                return total;
+            }
 
             /**
             Returns how many of the warnings contain the given text.
@@ -2503,6 +2528,8 @@ namespace APSITests {
 
         private:
             LogLevel saved_level_;
+
+            vector<string> messages_;
 
             vector<string> warnings_;
         };
@@ -2584,7 +2611,7 @@ namespace APSITests {
             // stored more than once
             vector<pair<Item, Label>> update = make_data(checked);
             {
-                WarningCapture capture;
+                LogCapture capture;
                 ASSERT_NO_THROW(sender_db->insert_or_assign(update));
                 ASSERT_EQ(locations_by_copy_count[3], capture.count("overwriting all 3 copies"));
                 ASSERT_EQ(locations_by_copy_count[2], capture.count("overwriting all 2 copies"));
@@ -2631,7 +2658,7 @@ namespace APSITests {
             ASSERT_EQ(first.size(), sender_db->get_item_count());
             vector<pair<Item, Label>> last_update = make_data(checked);
             {
-                WarningCapture capture;
+                LogCapture capture;
                 sender_db->insert_or_assign(last_update);
                 ASSERT_EQ(0, capture.count("copies of an item"));
             }
@@ -2820,5 +2847,791 @@ namespace APSITests {
             }
         }
         ASSERT_LT(size_t(0), updated_count);
+    }
+
+    namespace {
+        /**
+        Parameters with match tags and 13 bits per item that can be queried: every power up to
+        max_items_per_bin is sent, so that the sender multiplies no two ciphertexts, which the
+        single 54-bit prime has no room for. The table holds one bundle index.
+        */
+        PSIParams create_queryable_tag_params(
+            uint32_t felts_per_item,
+            uint32_t tag_part_count,
+            uint32_t hash_func_count,
+            uint32_t max_items_per_bin)
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = felts_per_item;
+            item_params.tag_part_count = tag_part_count;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = hash_func_count;
+            table_params.max_items_per_bin = max_items_per_bin;
+            table_params.table_size = 2048 / felts_per_item;
+
+            PSIParams::QueryParams query_params;
+            for (uint32_t power = 1; power <= max_items_per_bin; power++) {
+                query_params.query_powers.insert(power);
+            }
+
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(2048);
+            seal_params.set_coeff_modulus(CoeffModulus::Create(2048, { 54 }));
+            seal_params.set_plain_modulus(12289);
+
+            return { item_params, table_params, query_params, seal_params };
+        }
+
+        /**
+        Returns the hash functions with which a SenderDB with the given parameters finds the
+        locations of an item. Making one takes time, so they are made once for many items.
+        */
+        vector<kuku::LocFunc> hash_functions_of(const PSIParams &params)
+        {
+            vector<kuku::LocFunc> hash_funcs;
+            for (uint32_t i = 0; i < params.table_params().hash_func_count; i++) {
+                hash_funcs.emplace_back(params.table_params().table_size, kuku::make_item(i, 0));
+            }
+            return hash_funcs;
+        }
+
+        /**
+        Returns the locations of a HashedItem in the order in which a SenderDB with the given
+        parameters processes them, as pairs of a bundle index and the first bin of the location.
+        The order matters to newest-first placement when two locations share a bundle index.
+        */
+        vector<pair<uint32_t, size_t>> places_in_insertion_order(
+            const HashedItem &hashed_item,
+            const PSIParams &params,
+            const vector<kuku::LocFunc> &hash_funcs)
+        {
+            kuku::item_type kuku_item;
+            memcpy(&kuku_item, hashed_item.value().data(), sizeof(kuku_item));
+
+            unordered_set<kuku::location_type> locations;
+            for (const auto &hash_func : hash_funcs) {
+                locations.emplace(hash_func(kuku_item));
+            }
+
+            vector<pair<uint32_t, size_t>> places;
+            for (auto location : locations) {
+                places.emplace_back(
+                    location / params.items_per_bundle(),
+                    (location % params.items_per_bundle()) * params.item_params().felts_per_item);
+            }
+            return places;
+        }
+
+        /**
+        Computes what a SenderDB with the given OPRF key and parameters stores of each of the
+        given items, as view_of does, for many items at once.
+        */
+        vector<TaggedItemView> views_of(
+            const vector<Item> &items, const oprf::OPRFKey &key, const PSIParams &params)
+        {
+            size_t felts_per_item = params.item_params().felts_per_item;
+            auto hashes_and_tags = oprf::OPRFSender::ComputeHashesAndMatchTags(
+                items,
+                key,
+                params.tag_part_count() * felts_per_item,
+                params.item_bit_count_per_felt());
+
+            vector<kuku::LocFunc> hash_funcs = hash_functions_of(params);
+            vector<TaggedItemView> views;
+            views.reserve(items.size());
+            for (auto &[hashed_item, tag] : hashes_and_tags) {
+                TaggedItemView view;
+                view.hashed_item = hashed_item;
+                view.felts = apsi::util::algebraize_item(
+                    hashed_item, params.item_bit_count(), params.seal_params().plain_modulus());
+                view.tag = std::move(tag);
+                for (const auto &place :
+                     places_in_insertion_order(hashed_item, params, hash_funcs)) {
+                    view.places.push_back(place);
+                }
+                sort(view.places.begin(), view.places.end());
+                views.push_back(std::move(view));
+            }
+            return views;
+        }
+
+        /**
+        Computes what a SenderDB with the given OPRF key and parameters stores of items, as
+        views_of does, and keeps what it has computed: a view takes hashing its item with the
+        OPRF, which is most of what checking where items are stored costs when the same items are
+        checked again.
+        */
+        class ViewCache {
+        public:
+            ViewCache(const oprf::OPRFKey &key, const PSIParams &params)
+                : key_(key), params_(params)
+            {}
+
+            [[nodiscard]] const PSIParams &params() const
+            {
+                return params_;
+            }
+
+            /**
+            Returns the views of the given items, in the same order
+            */
+            vector<TaggedItemView> of(const vector<Item> &items)
+            {
+                vector<Item> missing;
+                for (const auto &item : items) {
+                    if (views_.find(item) == views_.end()) {
+                        missing.push_back(item);
+                    }
+                }
+
+                vector<TaggedItemView> computed = views_of(missing, key_, params_);
+                for (size_t i = 0; i < missing.size(); i++) {
+                    views_.emplace(missing[i], std::move(computed[i]));
+                }
+
+                vector<TaggedItemView> views;
+                views.reserve(items.size());
+                for (const auto &item : items) {
+                    views.push_back(views_.at(item));
+                }
+                return views;
+            }
+
+        private:
+            oprf::OPRFKey key_;
+
+            PSIParams params_;
+
+            unordered_map<Item, TaggedItemView> views_;
+        };
+
+        /**
+        Returns how many BinBundles each bundle index would have if the given batches of items,
+        none of them stored before, were inserted one after another into an empty SenderDB with
+        match tags that places items newest BinBundle first and never moves one: at each
+        location, an item goes into the newest BinBundle whose bins there have room and hold
+        none of its field elements, and into a new BinBundle if there is none.
+        */
+        vector<size_t> newest_first_bundle_counts(
+            ViewCache &views, const vector<vector<Item>> &batches)
+        {
+            const PSIParams &params = views.params();
+            size_t max_items_per_bin = params.table_params().max_items_per_bin;
+            size_t felts_per_item = params.item_params().felts_per_item;
+
+            // For each bundle index, the BinBundles; for each of them, the field elements of the
+            // items at each location, by the first bin of the location
+            vector<vector<unordered_map<size_t, vector<vector<apsi::util::felt_t>>>>> bundles(
+                params.bundle_idx_count());
+            vector<kuku::LocFunc> hash_funcs = hash_functions_of(params);
+            for (const auto &batch : batches) {
+                for (const auto &view : views.of(batch)) {
+                    const vector<apsi::util::felt_t> &felts = view.felts;
+                    for (const auto &[bundle_idx, start_bin] :
+                         places_in_insertion_order(view.hashed_item, params, hash_funcs)) {
+                        auto &bundle_set = bundles[bundle_idx];
+                        bool placed = false;
+                        for (size_t i = bundle_set.size(); !placed && (i-- > 0);) {
+                            auto &stored = bundle_set[i][start_bin];
+                            bool clash = any_of(stored.begin(), stored.end(), [&](const auto &s) {
+                                for (size_t j = 0; j < felts_per_item; j++) {
+                                    if (s[j] == felts[j]) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            });
+                            if ((stored.size() < max_items_per_bin) && !clash) {
+                                stored.push_back(felts);
+                                placed = true;
+                            }
+                        }
+                        if (!placed) {
+                            bundle_set.emplace_back();
+                            bundle_set.back()[start_bin].push_back(felts);
+                        }
+                    }
+                }
+            }
+
+            vector<size_t> counts;
+            for (const auto &bundle_set : bundles) {
+                counts.push_back(bundle_set.size());
+            }
+            return counts;
+        }
+
+        /**
+        Returns the fewest BinBundles that each bundle index can hold the given items in, with one
+        field element per item: no BinBundle holds more than max_items_per_bin items in a bin, or
+        a field element twice in one, so a bin of n items in which no field element appears more
+        than m times needs max(ceil(n / max_items_per_bin), m) of them.
+        */
+        vector<size_t> fewest_bundle_counts(ViewCache &views, const vector<Item> &items)
+        {
+            const PSIParams &params = views.params();
+            size_t max_items_per_bin = params.table_params().max_items_per_bin;
+            map<pair<uint32_t, size_t>, map<apsi::util::felt_t, size_t>> bins;
+            for (const auto &view : views.of(items)) {
+                for (const auto &place : view.places) {
+                    bins[place][view.felts[0]]++;
+                }
+            }
+
+            vector<size_t> counts(params.bundle_idx_count(), 0);
+            for (const auto &[place, felt_counts] : bins) {
+                size_t item_count = 0;
+                size_t repeat_count = 0;
+                for (const auto &felt_count : felt_counts) {
+                    item_count += felt_count.second;
+                    repeat_count = max(repeat_count, felt_count.second);
+                }
+                size_t fill_count = (item_count + max_items_per_bin - 1) / max_items_per_bin;
+                counts[place.first] = max({ counts[place.first], fill_count, repeat_count });
+            }
+            return counts;
+        }
+
+        /**
+        Returns the BinBundles of a SenderDB with match tags that is not stripped, read back from
+        what it saves, by bundle index and in the order the SenderDB keeps them.
+        */
+        vector<vector<BinBundle>> saved_bin_bundles(const SenderDB &sender_db)
+        {
+            const PSIParams &params = sender_db.get_params();
+            stringstream ss;
+            sender_db.save(ss);
+            static_cast<void>(apsi::util::read_from_stream(ss));
+
+            CryptoContext crypto_context(params);
+            crypto_context.set_evaluator();
+            size_t label_part_count = params.tag_part_count();
+            if (sender_db.is_labeled()) {
+                size_t label_bit_count =
+                    (sender_db.get_nonce_byte_count() + sender_db.get_label_byte_count()) * 8;
+                label_part_count +=
+                    (label_bit_count + params.item_bit_count() - 1) / params.item_bit_count();
+            }
+
+            vector<vector<BinBundle>> bundles(params.bundle_idx_count());
+            for (size_t i = 0; i < sender_db.get_bin_bundle_count(); i++) {
+                vector<unsigned char> data = apsi::util::read_from_stream(ss);
+                BinBundle bundle(
+                    crypto_context,
+                    label_part_count,
+                    params.table_params().max_items_per_bin,
+                    params.query_params().ps_low_degree,
+                    params.bins_per_bundle(),
+                    sender_db.is_compressed(),
+                    false,
+                    params.tag_part_count());
+                uint32_t bundle_idx = bundle.load(data).first;
+                bundles.at(bundle_idx).push_back(std::move(bundle));
+            }
+            return bundles;
+        }
+
+        /**
+        Checks everything a SenderDB with match tags that is not stripped stores against what it
+        should store: in every bin, distinct field elements, at most max_items_per_bin of them,
+        each with its HashedItem and every label part; each of the given items at each of its
+        locations in exactly one BinBundle, found there by BinBundle::multi_contains, with its tag
+        and the same label parts at every location; and nothing else. If labels are given,
+        SenderDB::get_label must give them, for every item or, of many, for a sample of about a
+        hundred: the label parts are checked for every item above, and get_label hashes each item
+        it is given with the OPRF.
+        */
+        void check_tag_layout(
+            SenderDB &sender_db,
+            ViewCache &views,
+            const vector<Item> &items,
+            const unordered_map<Item, Label> *labels = nullptr)
+        {
+            const PSIParams &params = sender_db.get_params();
+            vector<vector<BinBundle>> bundles = saved_bin_bundles(sender_db);
+
+            size_t stored_count = 0;
+            for (const auto &bundle_set : bundles) {
+                for (const BinBundle &bundle : bundle_set) {
+                    ASSERT_FALSE(bundle.empty());
+                    const auto &item_bins = bundle.get_item_bins();
+                    const auto &hashed_item_bins = bundle.get_hashed_item_bins();
+                    for (size_t bin = 0; bin < item_bins.size(); bin++) {
+                        const auto &item_bin = item_bins[bin];
+                        ASSERT_LE(item_bin.size(), params.table_params().max_items_per_bin);
+                        ASSERT_EQ(item_bin.size(), hashed_item_bins[bin].size());
+                        set<apsi::util::felt_t> distinct(item_bin.begin(), item_bin.end());
+                        ASSERT_EQ(item_bin.size(), distinct.size()) << "bin " << bin;
+                        for (const auto &label_bins : bundle.get_label_bins()) {
+                            ASSERT_EQ(item_bin.size(), label_bins[bin].size());
+                        }
+                        stored_count += item_bin.size();
+                    }
+                }
+            }
+
+            size_t expected_count = 0;
+            for (const auto &view : views.of(items)) {
+                vector<apsi::util::felt_t> first_alg_label;
+                for (const auto &[bundle_idx, start_bin] : view.places) {
+                    expected_count += params.item_params().felts_per_item;
+                    size_t holder_count = 0;
+                    for (const BinBundle &bundle : bundles[bundle_idx]) {
+                        if (!bundle.multi_contains(view.felts, view.hashed_item, start_bin)) {
+                            continue;
+                        }
+                        holder_count++;
+
+                        vector<apsi::util::felt_t> alg_label;
+                        ASSERT_TRUE(bundle.try_get_multi_label(
+                            view.felts, view.hashed_item, start_bin, alg_label));
+                        ASSERT_TRUE(equal(view.tag.begin(), view.tag.end(), alg_label.begin()));
+                        if (first_alg_label.empty()) {
+                            first_alg_label = alg_label;
+                        }
+                        ASSERT_EQ(first_alg_label, alg_label);
+                    }
+                    ASSERT_EQ(1, holder_count);
+                }
+            }
+            ASSERT_EQ(expected_count, stored_count);
+
+            if (labels) {
+                size_t step = max<size_t>(1, items.size() / 100);
+                for (size_t i = 0; i < items.size(); i += step) {
+                    ASSERT_EQ(labels->at(items[i]), sender_db.get_label(items[i]));
+                }
+            }
+        }
+
+        /**
+        Returns, for each of the given items and each of its locations, the position at its
+        bundle index of the BinBundle that holds it there: what changes when an item is moved.
+        */
+        vector<vector<size_t>> holders_of(
+            const SenderDB &sender_db, ViewCache &views, const vector<Item> &items)
+        {
+            vector<vector<BinBundle>> bundles = saved_bin_bundles(sender_db);
+            vector<vector<size_t>> holders;
+            for (const auto &view : views.of(items)) {
+                holders.emplace_back();
+                for (const auto &[bundle_idx, start_bin] : view.places) {
+                    const auto &bundle_set = bundles[bundle_idx];
+                    size_t holder = bundle_set.size();
+                    for (size_t i = 0; i < bundle_set.size(); i++) {
+                        if (bundle_set[i].multi_contains(view.felts, view.hashed_item, start_bin)) {
+                            holder = i;
+                        }
+                    }
+                    holders.back().push_back(holder);
+                }
+            }
+            return holders;
+        }
+
+        // What the debug messages of an insertion say
+        const string moved_text = " BinBundles; moved ";
+        const string declined_text = "items to make room; declined ";
+        const string opened_text = "; opened ";
+        const string regenerated_text = "Regenerated the caches of ";
+
+        /**
+        Searches the items Item(i, 0x5eed), for i from 1 to candidate_count, for four at one
+        location of parameters with a single hash function, so that inserted one at a time into
+        bins that hold two items, a and b fill a first BinBundle, c goes into a second, and d
+        fits into neither, as it shares a field element with c, while it would fit into the
+        first BinBundle had a been moved to the second: a and b share no field element with each
+        other or with d, and a shares none with c. Returns them in the order a, b, c, d, or
+        nothing if there are none.
+        */
+        vector<Item> find_items_forcing_a_move(
+            const PSIParams &params, const oprf::OPRFKey &key, uint64_t candidate_count)
+        {
+            vector<Item> candidates;
+            for (uint64_t i = 1; i <= candidate_count; i++) {
+                candidates.emplace_back(i, 0x5eed);
+            }
+            vector<TaggedItemView> views = views_of(candidates, key, params);
+
+            map<pair<uint32_t, size_t>, vector<size_t>> by_place;
+            for (size_t i = 0; i < candidates.size(); i++) {
+                by_place[views[i].places.front()].push_back(i);
+            }
+            auto share = [&](size_t x, size_t y) {
+                for (size_t j = 0; j < views[x].felts.size(); j++) {
+                    if (views[x].felts[j] == views[y].felts[j]) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            for (const auto &entry : by_place) {
+                const vector<size_t> &at = entry.second;
+                for (size_t c : at) {
+                    for (size_t d : at) {
+                        if ((c == d) || !share(c, d)) {
+                            continue;
+                        }
+                        for (size_t a : at) {
+                            if ((a == c) || (a == d) || share(a, c) || share(a, d)) {
+                                continue;
+                            }
+                            for (size_t b : at) {
+                                if ((b != a) && (b != c) && (b != d) && !share(b, a) &&
+                                    !share(b, d)) {
+                                    return {
+                                        candidates[a], candidates[b], candidates[c], candidates[d]
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return {};
+        }
+
+        vector<Item> make_items(uint64_t first, size_t count)
+        {
+            vector<Item> items;
+            for (uint64_t i = first; i < first + count; i++) {
+                items.emplace_back(i, 0xc0ffee);
+            }
+            return items;
+        }
+    } // namespace
+
+    TEST(SenderDBTagTests, BulkInsertionUsesTheFewestBinBundlesPossible)
+    {
+        // With one field element per item, the items inserted into a bundle index that holds no
+        // BinBundles go into as few as any placement can use: in each bin, max(ceil(n / K), m),
+        // for n items of which no field element appears more than m times. Nothing is moved, and
+        // every BinBundle is generated once.
+        oprf::OPRFKey key = fixed_oprf_key();
+        for (uint32_t hash_func_count : { 1U, 3U }) {
+            PSIParams params = create_tag_params(1, 4, hash_func_count, 16, 1024, 12289, 2);
+            ViewCache views(key, params);
+            vector<Item> items = make_items(1, hash_func_count == 1 ? 12000 : 6000);
+            vector<size_t> fewest = fewest_bundle_counts(views, items);
+            vector<size_t> newest = newest_first_bundle_counts(views, { items });
+
+            for (size_t label_byte_count : { 0U, 8U }) {
+                SenderDB sender_db(params, key, label_byte_count, 16, true);
+                unordered_map<Item, Label> labels;
+                {
+                    LogCapture capture;
+                    if (label_byte_count) {
+                        vector<pair<Item, Label>> data;
+                        for (const auto &item : items) {
+                            labels[item] = create_label(
+                                static_cast<unsigned char>(labels.size()), label_byte_count);
+                            data.emplace_back(item, labels[item]);
+                        }
+                        sender_db.set_data(data);
+                    } else {
+                        sender_db.set_data(items);
+                    }
+                    ASSERT_EQ(0, capture.sum(moved_text));
+                    ASSERT_EQ(sender_db.get_bin_bundle_count(), capture.sum(regenerated_text));
+                }
+
+                for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+                    ASSERT_EQ(fewest[b], sender_db.get_bin_bundle_count(b));
+                    ASSERT_LE(fewest[b], newest[b]);
+                }
+                ASSERT_NO_FATAL_FAILURE(check_tag_layout(
+                    sender_db, views, items, label_byte_count ? &labels : nullptr));
+            }
+        }
+    }
+
+    TEST(SenderDBTagTests, ItemsAreMovedOnlyBetweenBinBundlesTheBatchChanges)
+    {
+        // Bins hold two items, and four items share a location: inserted one at a time, a and b
+        // fill a first BinBundle, c goes into a second, and d fits into neither, as it shares a
+        // field element with c. Moving a to the second BinBundle makes room for d in the first.
+        for (uint32_t felts_per_item : { 1U, 2U }) {
+            PSIParams params =
+                create_queryable_tag_params(felts_per_item, 4 / felts_per_item, 1, 2);
+            oprf::OPRFKey key = fixed_oprf_key();
+            ViewCache views(key, params);
+            vector<Item> all = find_items_forcing_a_move(params, key, 10000);
+            ASSERT_EQ(4, all.size());
+            const Item &a = all[0];
+            const Item &b = all[1];
+            const Item &c = all[2];
+            const Item &d = all[3];
+            uint32_t bundle_idx = view_of(a, key, params).places.front().first;
+
+            // Newest-first placement needs three BinBundles for them, inserted at once or not.
+            // Inserted at once, they go into two: with one field element per item they are
+            // packed, and otherwise every BinBundle is new and a is moved for d.
+            ASSERT_EQ(3, newest_first_bundle_counts(views, { all })[bundle_idx]);
+            ASSERT_EQ(
+                3, newest_first_bundle_counts(views, { { a }, { b }, { c }, { d } })[bundle_idx]);
+            {
+                SenderDB sender_db(params, key, 0, 0, true);
+                LogCapture capture;
+                sender_db.set_data(all);
+                ASSERT_EQ(2, sender_db.get_bin_bundle_count(bundle_idx));
+                ASSERT_EQ(felts_per_item == 1 ? 0 : 1, capture.sum(moved_text));
+                ASSERT_NO_FATAL_FAILURE(check_tag_layout(sender_db, views, all));
+            }
+
+            // Inserted alone, d would need a to be moved between two BinBundles whose caches are
+            // valid, and both would be regenerated in full. It goes into a third BinBundle
+            // instead, which costs almost nothing to generate.
+            {
+                SenderDB sender_db(params, key, 0, 0, true);
+                for (const auto &item : { a, b, c }) {
+                    sender_db.insert_or_assign(item);
+                }
+                ASSERT_EQ(2, sender_db.get_bin_bundle_count(bundle_idx));
+                LogCapture capture;
+                sender_db.insert_or_assign(d);
+                ASSERT_EQ(3, sender_db.get_bin_bundle_count(bundle_idx));
+                ASSERT_EQ(1, capture.sum(declined_text));
+                ASSERT_EQ(0, capture.sum(moved_text));
+                ASSERT_EQ(1, capture.sum(regenerated_text));
+                ASSERT_NO_FATAL_FAILURE(check_tag_layout(sender_db, views, all));
+            }
+
+            // A batch that also updates the labels of a and c changes both BinBundles anyway, and
+            // then moves a to make room for d
+            auto sender_db = make_shared<SenderDB>(params, key, 8, 16, true);
+            unordered_map<Item, Label> labels;
+            unsigned char next_label = 1;
+            auto label = [&](const Item &item) {
+                labels[item] = create_label(next_label++, 8);
+                return make_pair(item, labels[item]);
+            };
+            for (const auto &item : { a, b, c }) {
+                sender_db->insert_or_assign(label(item));
+            }
+            vector<vector<size_t>> before = holders_of(*sender_db, views, { a, b, c });
+            {
+                LogCapture capture;
+                sender_db->insert_or_assign(
+                    vector<pair<Item, Label>>{ label(a), label(c), label(d) });
+                ASSERT_EQ(1, capture.sum(moved_text));
+                ASSERT_EQ(0, capture.sum(opened_text));
+                ASSERT_EQ(2, capture.sum(regenerated_text));
+            }
+            ASSERT_EQ(2, sender_db->get_bin_bundle_count(bundle_idx));
+            vector<vector<size_t>> after = holders_of(*sender_db, views, all);
+            ASSERT_EQ(size_t(0), before[0][0]);
+            ASSERT_EQ(size_t(1), after[0][0]);
+            ASSERT_EQ(before[1], after[1]);
+            ASSERT_EQ(before[2], after[2]);
+            ASSERT_EQ(size_t(0), after[3][0]);
+            ASSERT_NO_FATAL_FAILURE(check_tag_layout(*sender_db, views, all, &labels));
+
+            // A query finds every item with its label, and nothing else. With a single hash
+            // function, items at one location go into separate queries.
+            for (const auto &item : all) {
+                ASSERT_EQ(
+                    vector<vector<Label>>{ { labels.at(item) } },
+                    query_labels(sender_db, key, { item }));
+            }
+            ASSERT_EQ(
+                vector<vector<Label>>{ {} }, query_labels(sender_db, key, { Item(0, 0x5eed) }));
+
+            // The moved item is updated and removed where it now is
+            sender_db->insert_or_assign(vector<pair<Item, Label>>{ label(a), label(d) });
+            ASSERT_NO_FATAL_FAILURE(check_tag_layout(*sender_db, views, all, &labels));
+            sender_db->remove(a);
+            ASSERT_FALSE(sender_db->has_item(a));
+            ASSERT_NO_FATAL_FAILURE(check_tag_layout(*sender_db, views, { b, c, d }, &labels));
+
+            // And the same holds after a save and a load
+            stringstream ss;
+            sender_db->save(ss);
+            SenderDB loaded = SenderDB::Load(ss).first;
+            ASSERT_NO_FATAL_FAILURE(check_tag_layout(loaded, views, { b, c, d }, &labels));
+            loaded.remove(vector<Item>{ b, c, d });
+            ASSERT_EQ(0, loaded.get_bin_bundle_count());
+        }
+    }
+
+    TEST(SenderDBTagTests, DenseUpdatesKeepEveryItemInItsPlace)
+    {
+        // With 13 bits per field element and small bins, items often share field elements, bins
+        // fill up, and batches move items to make room. Whatever happens, every item stays at
+        // each of its locations, exactly once, with its tag and label, every bin holds distinct
+        // field elements, and no more BinBundles are used than newest-first placement would use.
+        // With one field element per item, the first batch goes in alone so that the next one is
+        // placed newest-first and moves items, rather than being packed.
+        //
+        // The layout is checked at the end of each phase of updates rather than after each
+        // update. An item lost, stored twice, or stored without its tag or label stays so, as
+        // nothing later puts it right, so the check at the end of the phase finds it.
+        oprf::OPRFKey key = fixed_oprf_key();
+        size_t moved_count = 0;
+        for (uint32_t felts_per_item : { 1U, 4U }) {
+            PSIParams params =
+                create_tag_params(felts_per_item, 4 / felts_per_item, 3, 32, 1024, 12289);
+            ViewCache views(key, params);
+            size_t label_byte_count = (felts_per_item == 1) ? 8 : 0;
+            SenderDB sender_db(params, key, label_byte_count, 16, true);
+            unordered_map<Item, Label> labels;
+            unsigned char next_label = 0;
+
+            auto store = [&](const vector<Item> &items) {
+                if (!label_byte_count) {
+                    sender_db.insert_or_assign(items);
+                    return;
+                }
+
+                vector<pair<Item, Label>> data;
+                for (const auto &item : items) {
+                    labels[item] = create_label(next_label++, label_byte_count);
+                    data.emplace_back(item, labels[item]);
+                }
+                sender_db.insert_or_assign(data);
+            };
+
+            auto check = [&](SenderDB &db, const vector<Item> &items) {
+                ASSERT_EQ(items.size(), db.get_item_count());
+                ASSERT_NO_FATAL_FAILURE(
+                    check_tag_layout(db, views, items, label_byte_count ? &labels : nullptr));
+            };
+
+            // Insert the batches one after another
+            size_t first_count = (felts_per_item == 1) ? 20000 : 6000;
+            vector<vector<Item>> batches{ make_items(1, 1),
+                                          make_items(2, first_count),
+                                          make_items(first_count + 2, 300),
+                                          make_items(first_count + 302, 3) };
+            vector<Item> items;
+            for (const auto &batch : batches) {
+                LogCapture capture;
+                store(batch);
+                moved_count += capture.sum(moved_text);
+                items.insert(items.end(), batch.begin(), batch.end());
+                ASSERT_EQ(items.size(), sender_db.get_item_count());
+            }
+
+            ASSERT_NO_FATAL_FAILURE(check(sender_db, items));
+            vector<size_t> newest = newest_first_bundle_counts(views, batches);
+            for (uint32_t b = 0; b < params.bundle_idx_count(); b++) {
+                ASSERT_LE(sender_db.get_bin_bundle_count(b), newest[b]);
+            }
+
+            // Remove a fifth of the items and insert as many new ones, twice
+            for (uint64_t round = 0; round < 2; round++) {
+                vector<Item> removed;
+                vector<Item> kept;
+                for (size_t i = 0; i < items.size(); i++) {
+                    ((i % 5 == round) ? removed : kept).push_back(items[i]);
+                }
+                sender_db.remove(removed);
+                ASSERT_EQ(kept.size(), sender_db.get_item_count());
+
+                vector<Item> added = make_items(1000000 * (round + 1), removed.size());
+                LogCapture capture;
+                store(added);
+                moved_count += capture.sum(moved_text);
+                kept.insert(kept.end(), added.begin(), added.end());
+                items = kept;
+            }
+
+            ASSERT_NO_FATAL_FAILURE(check(sender_db, items));
+
+            // Updating every label finds every item where it is
+            if (label_byte_count) {
+                store(items);
+                ASSERT_NO_FATAL_FAILURE(check(sender_db, items));
+            }
+
+            // A save and a load keep everything, and the loaded SenderDB can be changed
+            stringstream ss;
+            sender_db.save(ss);
+            SenderDB loaded = SenderDB::Load(ss).first;
+            ASSERT_EQ(sender_db.get_bin_bundle_count(), loaded.get_bin_bundle_count());
+            ASSERT_NO_FATAL_FAILURE(check(loaded, items));
+
+            loaded.remove(items);
+            ASSERT_EQ(0, loaded.get_bin_bundle_count());
+        }
+
+        // The batches moved items
+        ASSERT_LT(size_t(0), moved_count);
+    }
+
+    TEST(SenderDBTagTests, QueriesFindMovedItems)
+    {
+        // A query finds a moved item, with its label, where it now is, also once the SenderDB is
+        // stripped, saved and loaded, and finds no item that is not stored. Items of four field
+        // elements share one often enough for a bulk insertion to move many of them.
+        PSIParams params = create_queryable_tag_params(4, 1, 3, 32);
+        oprf::OPRFKey key = fixed_oprf_key();
+        ViewCache views(key, params);
+        auto sender_db = make_shared<SenderDB>(params, key, 8, 16, true);
+
+        unordered_map<Item, Label> labels;
+        unsigned char next_label = 0;
+        auto store = [&](const vector<Item> &items) {
+            vector<pair<Item, Label>> data;
+            for (const auto &item : items) {
+                labels[item] = create_label(next_label++, 8);
+                data.emplace_back(item, labels[item]);
+            }
+            sender_db->insert_or_assign(data);
+        };
+
+        // Find the items that inserting more items moves
+        vector<Item> items = make_items(1, 9000);
+        store(items);
+        vector<vector<size_t>> before = holders_of(*sender_db, views, items);
+        {
+            LogCapture capture;
+            vector<Item> added = make_items(9001, 3000);
+            store(added);
+            ASSERT_LT(size_t(0), capture.sum(moved_text));
+            items.insert(items.end(), added.begin(), added.end());
+        }
+        vector<vector<size_t>> after = holders_of(*sender_db, views, items);
+        vector<Item> moved;
+        for (size_t i = 0; i < before.size(); i++) {
+            if (before[i] != after[i]) {
+                moved.push_back(items[i]);
+            }
+        }
+        ASSERT_LT(size_t(0), moved.size());
+        ASSERT_NO_FATAL_FAILURE(check_tag_layout(*sender_db, views, items, &labels));
+
+        // Query the moved items, as many other stored items, and as many that are not stored
+        vector<Item> queried(
+            moved.begin(), moved.begin() + static_cast<ptrdiff_t>(min<size_t>(moved.size(), 60)));
+        size_t moved_queried = queried.size();
+        unordered_set<Item> chosen(queried.begin(), queried.end());
+        for (size_t i = 0; (i < items.size()) && (queried.size() < 2 * moved_queried); i += 101) {
+            if (chosen.insert(items[i]).second) {
+                queried.push_back(items[i]);
+            }
+        }
+        size_t stored_count = queried.size();
+        vector<Item> absent = make_items(5000000, stored_count);
+        queried.insert(queried.end(), absent.begin(), absent.end());
+        auto query = [&](const shared_ptr<SenderDB> &db) {
+            vector<vector<Label>> results = query_labels(db, key, queried);
+            for (size_t i = 0; i < queried.size(); i++) {
+                if (i < stored_count) {
+                    ASSERT_EQ(vector<Label>{ labels.at(queried[i]) }, results[i]) << "item " << i;
+                } else {
+                    ASSERT_TRUE(results[i].empty()) << "item " << i;
+                }
+            }
+        };
+        ASSERT_NO_FATAL_FAILURE(query(sender_db));
+
+        sender_db->strip();
+        stringstream ss;
+        sender_db->save(ss);
+        auto loaded = make_shared<SenderDB>(SenderDB::Load(ss).first);
+        ASSERT_TRUE(loaded->is_stripped());
+        ASSERT_NO_FATAL_FAILURE(query(loaded));
     }
 } // namespace APSITests

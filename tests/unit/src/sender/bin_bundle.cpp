@@ -1771,6 +1771,101 @@ namespace APSITests {
         }
     }
 
+    TEST(BinBundleTagTests, ReplaceTakesTheStoredItemsPlaces)
+    {
+        // An item that replaces a stored one takes its places in the bins, with its HashedItem
+        // and every label part, so that the bins hold as many items as before: this is how an
+        // item takes the place of one moved to another BinBundle
+        for (uint32_t felts_per_item : { 1U, 2U, 3U }) {
+            PSIParams params = make_tag_params(felts_per_item);
+            CryptoContext context(params);
+            context.set_evaluator();
+
+            size_t label_size = tag_part_count + 2;
+            BinBundle bb = make_tag_bundle(context, params, label_size);
+
+            vector<felt_t> felts_a(felts_per_item, 5);
+            vector<felt_t> felts_b(felts_per_item, 6);
+            vector<felt_t> felts_c(felts_per_item, 7);
+            TaggedAlgItemLabel a = make_tagged_item(1, felts_a, label_size, 100);
+            TaggedAlgItemLabel b = make_tagged_item(2, felts_b, label_size, 200);
+            TaggedAlgItemLabel c = make_tagged_item(3, felts_c, label_size, 300);
+            ASSERT_EQ(1, bb.multi_insert_for_real(a, 0));
+            ASSERT_EQ(2, bb.multi_insert_for_real(b, 0));
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
+
+            // A dry run changes nothing
+            ASSERT_TRUE(bb.try_multi_replace(a.item, 0, c, 0, true));
+            ASSERT_TRUE(bb.multi_contains(a, 0));
+            ASSERT_FALSE(bb.multi_contains(c, 0));
+            ASSERT_FALSE(bb.cache_invalid());
+
+            // Nothing is replaced that is not stored where it is looked for, and no item takes a
+            // place if another stored item has one of its field elements
+            ASSERT_FALSE(bb.try_multi_replace(c.item, 0, c, 0, false));
+            ASSERT_FALSE(bb.try_multi_replace(a.item, 1, c, 0, false));
+            ASSERT_FALSE(bb.try_multi_replace(a.item, 2, c, 0, false));
+            ASSERT_FALSE(bb.try_multi_replace(a.item, 0, c, felts_per_item, false));
+            ASSERT_FALSE(bb.try_multi_replace(
+                a.item, 0, make_tagged_item(4, felts_b, label_size, 400), 0, false));
+            ASSERT_FALSE(bb.try_multi_replace(a.item, 0, c, bb.get_num_bins(), false));
+            ASSERT_TRUE(bb.multi_contains(a, 0));
+            ASSERT_FALSE(bb.cache_invalid());
+
+            // c takes the places of a, and b is left as it was
+            ASSERT_TRUE(bb.try_multi_replace(a.item, 0, c, 0, false));
+            ASSERT_TRUE(bb.cache_invalid());
+            ASSERT_FALSE(bb.multi_contains(a, 0));
+            ASSERT_TRUE(bb.multi_contains(c, 0));
+            ASSERT_TRUE(bb.multi_contains(b, 0));
+            for (size_t s = 0; s < felts_per_item; s++) {
+                ASSERT_EQ(vector<felt_t>({ felts_c[s], felts_b[s] }), bb.get_item_bins()[s]);
+                ASSERT_EQ(vector<HashedItem>({ c.item, b.item }), bb.get_hashed_item_bins()[s]);
+            }
+            vector<felt_t> labels;
+            ASSERT_TRUE(bb.try_get_multi_label(felts_c, c.item, 0, labels));
+            ASSERT_EQ(labels_of(c), labels);
+            ASSERT_TRUE(bb.try_get_multi_label(felts_b, b.item, 0, labels));
+            ASSERT_EQ(labels_of(b), labels);
+
+            // The field elements of a are free again, and those of c are taken
+            ASSERT_EQ(
+                -1, bb.multi_insert_dry_run(make_tagged_item(5, felts_c, label_size, 500), 0));
+            ASSERT_EQ(
+                3, bb.multi_insert_for_real(make_tagged_item(5, felts_a, label_size, 500), 0));
+
+            // An item can take the places of one with the same field elements
+            TaggedAlgItemLabel c2 = make_tagged_item(6, felts_c, label_size, 600);
+            ASSERT_TRUE(bb.try_multi_replace(c.item, 0, c2, 0, false));
+            ASSERT_FALSE(bb.multi_contains(c, 0));
+            ASSERT_TRUE(bb.try_get_multi_label(felts_c, c2.item, 0, labels));
+            ASSERT_EQ(labels_of(c2), labels);
+            for (size_t s = 0; s < felts_per_item; s++) {
+                ASSERT_EQ(3, bb.get_item_bins()[s].size());
+                for (size_t p = 0; p < label_size; p++) {
+                    ASSERT_EQ(3, bb.get_label_bins()[p][s].size());
+                }
+            }
+
+            // The regenerated cache is that of a BinBundle that held these items from the start
+            bb.regen_cache();
+            BinBundle fresh = make_tag_bundle(context, params, label_size);
+            ASSERT_EQ(1, fresh.multi_insert_for_real(c2, 0));
+            ASSERT_EQ(2, fresh.multi_insert_for_real(b, 0));
+            ASSERT_EQ(
+                3, fresh.multi_insert_for_real(make_tagged_item(5, felts_a, label_size, 500), 0));
+            fresh.regen_cache();
+            for (size_t p = 0; p < label_size; p++) {
+                ASSERT_EQ(
+                    fresh.get_cache().felt_interp_polyns[p], bb.get_cache().felt_interp_polyns[p]);
+                ASSERT_EQ(
+                    fresh.get_cache().batched_interp_polyns[p].batched_coeffs,
+                    bb.get_cache().batched_interp_polyns[p].batched_coeffs);
+            }
+        }
+    }
+
     TEST(BinBundleTagTests, ItemsWithTheSameFieldElementsAreToldApart)
     {
         // With few bits per item, different items can have the same field elements in the same
@@ -1868,6 +1963,101 @@ namespace APSITests {
         }
     }
 
+    TEST(BinBundleTagTests, AMoveCompletesWhenLoggingThrows)
+    {
+        // A SenderDB moves an item to another BinBundle by inserting it there and then putting a
+        // new item in its place, and relies on neither step throwing once it has begun to change
+        // a BinBundle: an exception could only be met by undoing a change, which can fail in
+        // turn, and the item would be lost or stored twice. Each step logs, once its change is
+        // made, that cuckoo filters refused an item, and logging can throw, as it allocates and
+        // calls the user's handler; here the handler throws. The values of
+        // BinBundleTests.AnItemTheFilterRefusesIsStillFound fill the filters of the bins in both
+        // BinBundles, so that the filters refuse the moved item in one and the new item in the
+        // other.
+        const vector<felt_t> colliding{ 1, 252, 11389, 12874, 17547, 21064, 37127, 40541, 41546 };
+
+        for (uint32_t felts_per_item : { 1U, 2U }) {
+            PSIParams params = make_tag_params(felts_per_item);
+            CryptoContext context(params);
+            context.set_evaluator();
+
+            size_t label_size = tag_part_count + 1;
+            auto make_bundle = [&] {
+                return BinBundle(
+                    context,
+                    label_size,
+                    50,
+                    0,
+                    params.bins_per_bundle(),
+                    true,
+                    false,
+                    tag_part_count);
+            };
+            BinBundle source = make_bundle();
+            BinBundle destination = make_bundle();
+
+            uint64_t id = 1;
+            for (felt_t value : colliding) {
+                vector<felt_t> felts(felts_per_item, value);
+                ASSERT_LT(
+                    0,
+                    source.multi_insert_for_real(
+                        make_tagged_item(id++, felts, label_size, 100), 0));
+                ASSERT_LT(
+                    0,
+                    destination.multi_insert_for_real(
+                        make_tagged_item(id++, felts, label_size, 200), 0));
+            }
+            vector<felt_t> moved_felts(felts_per_item, 7);
+            vector<felt_t> new_felts(felts_per_item, 9);
+            TaggedAlgItemLabel moved = make_tagged_item(id++, moved_felts, label_size, 300);
+            TaggedAlgItemLabel new_item = make_tagged_item(id++, new_felts, label_size, 400);
+            size_t pos = colliding.size();
+            auto bin_size = static_cast<int32_t>(pos + 1);
+            ASSERT_EQ(bin_size, source.multi_insert_for_real(moved, 0));
+
+            RefusalLogThrows log;
+
+            // The move as SenderDB makes it: both steps are checked first, then taken
+            ASSERT_EQ(bin_size, destination.multi_insert_dry_run(moved, 0));
+            ASSERT_TRUE(source.try_multi_replace(moved.item, pos, new_item, 0, true));
+            ASSERT_EQ(0, log.refusal_count());
+            int32_t inserted = -1;
+            ASSERT_NO_THROW(inserted = destination.multi_insert_for_real(moved, 0));
+            ASSERT_EQ(bin_size, inserted);
+            ASSERT_EQ(1, log.refusal_count());
+            bool replaced = false;
+            ASSERT_NO_THROW(
+                replaced = source.try_multi_replace(moved.item, pos, new_item, 0, false));
+            ASSERT_TRUE(replaced);
+            ASSERT_EQ(2, log.refusal_count());
+
+            // The moved item is stored once, in the destination, and the new item has taken its
+            // place in the source, with every label part
+            for (size_t s = 0; s < felts_per_item; s++) {
+                const vector<HashedItem> &in_source = source.get_hashed_item_bins()[s];
+                const vector<HashedItem> &in_destination = destination.get_hashed_item_bins()[s];
+                ASSERT_EQ(0, count(in_source.begin(), in_source.end(), moved.item));
+                ASSERT_EQ(1, count(in_destination.begin(), in_destination.end(), moved.item));
+                ASSERT_EQ(1, count(in_source.begin(), in_source.end(), new_item.item));
+                ASSERT_EQ(pos + 1, source.get_item_bins()[s].size());
+                ASSERT_EQ(pos + 1, destination.get_item_bins()[s].size());
+                for (size_t p = 0; p < label_size; p++) {
+                    ASSERT_EQ(pos + 1, source.get_label_bins()[p][s].size());
+                    ASSERT_EQ(pos + 1, destination.get_label_bins()[p][s].size());
+                }
+            }
+            vector<felt_t> labels;
+            ASSERT_TRUE(destination.try_get_multi_label(moved_felts, moved.item, 0, labels));
+            ASSERT_EQ(labels_of(moved), labels);
+            ASSERT_TRUE(source.try_get_multi_label(new_felts, new_item.item, 0, labels));
+            ASSERT_EQ(labels_of(new_item), labels);
+            ASSERT_FALSE(source.multi_contains(moved, 0));
+            ASSERT_TRUE(source.cache_invalid());
+            ASSERT_TRUE(destination.cache_invalid());
+        }
+    }
+
     TEST(BinBundleTests, AnInsertionCompletesWhenLoggingThrows)
     {
         // Without match tags, an insertion also logs that a cuckoo filter refused the item only
@@ -1958,6 +2148,7 @@ namespace APSITests {
             ASSERT_THROW(static_cast<void>(bb->multi_contains(item, 0)), logic_error);
             ASSERT_THROW(static_cast<void>(bb->multi_contains(felts, item.item, 0)), logic_error);
             ASSERT_THROW(bb->try_multi_remove(felts, item.item, 0), logic_error);
+            ASSERT_THROW(bb->try_multi_replace(item.item, 0, item, 0, true), logic_error);
             ASSERT_THROW(
                 static_cast<void>(bb->try_get_multi_label(felts, item.item, 0, labels)),
                 logic_error);
@@ -1972,6 +2163,13 @@ namespace APSITests {
             tagged.multi_insert_for_real(make_tagged_item(1, { 5 }, label_size + 1, 100), 0),
             invalid_argument);
         ASSERT_TRUE(tagged.empty());
+        ASSERT_LT(0, tagged.multi_insert_for_real(item, 0));
+        ASSERT_THROW(
+            tagged.try_multi_replace(
+                item.item, 0, make_tagged_item(2, { 6 }, label_size - 1, 100), 0, false),
+            invalid_argument);
+        ASSERT_TRUE(tagged.try_multi_remove(felts, item.item, 0));
+        ASSERT_TRUE(tagged.empty());
 
         // Nothing changes a stripped BinBundle
         ASSERT_LT(0, tagged.multi_insert_for_real(item, 0));
@@ -1980,6 +2178,7 @@ namespace APSITests {
         ASSERT_THROW(tagged.try_multi_overwrite(item, 0), logic_error);
         ASSERT_THROW(static_cast<void>(tagged.multi_contains(item, 0)), logic_error);
         ASSERT_THROW(tagged.try_multi_remove(felts, item.item, 0), logic_error);
+        ASSERT_THROW(tagged.try_multi_replace(item.item, 0, item, 0, true), logic_error);
         ASSERT_THROW(
             static_cast<void>(tagged.try_get_multi_label(felts, item.item, 0, labels)),
             logic_error);

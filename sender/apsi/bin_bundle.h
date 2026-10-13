@@ -407,6 +407,26 @@ namespace apsi::sender {
             const apsi::util::TaggedAlgItemLabel &item, std::size_t start_bin_idx);
 
         /**
+        Replaces the item with the given HashedItem, stored at position pos of sequential bins of
+        a BinBundle that uses match tags, beginning at start_bin_idx, with the given item: its
+        field elements, its label parts and its HashedItem take the stored item's places, so that
+        the bins hold as many items as before. This fails if the stored item is not at position
+        pos of every one of the bins, or if one of the new item's field elements is already in
+        its bin other than in the place it would take, since the label polynomials need distinct
+        points. If dry_run is specified, no change is made to the BinBundle. Returns true on
+        success; on failure, no change is made to the BinBundle. Unlike multi_insert, this
+        allocates no memory, and once it has begun to change the BinBundle it throws nothing, so
+        a replacement that a dry run has shown to succeed succeeds if the BinBundle has not
+        changed since. Throws std::logic_error if the BinBundle does not use match tags.
+        */
+        bool try_multi_replace(
+            const HashedItem &stored_item,
+            std::size_t pos,
+            const apsi::util::TaggedAlgItemLabel &item,
+            std::size_t start_bin_idx,
+            bool dry_run);
+
+        /**
         Returns whether the given items are stored in sequential bins, beginning at
         start_bin_idx, found exactly as try_multi_overwrite and try_multi_remove find them. Any
         labels given are ignored. Unlike those functions, this never changes the BinBundle, so it
