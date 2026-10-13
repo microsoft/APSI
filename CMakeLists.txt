@@ -123,8 +123,9 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 # SameMinorVersion config file that would reject any minor version other than its own. Bit-packed
 # serialization (seal::compr_mode_type::bitpack), which APSI uses for the plaintexts of a compressed
 # SenderDB and by default for queries and results, is new in 4.6.0; 4.6.1 fixes the 64-bit
-# multiplication of MSVC builds for ARM64, and 4.6.2 fixes configuring with an installed GSL 5.
-set(APSI_SEAL_MINIMUM_VERSION 4.6.2)
+# multiplication of MSVC builds for ARM64, 4.6.2 fixes configuring with an installed GSL 5, and
+# 4.7.0 makes the NTT, BFV multiplication and key switching, which a query uses throughout, faster.
+set(APSI_SEAL_MINIMUM_VERSION 4.7.0)
 set(APSI_SEAL_MAXIMUM_VERSION_EXCLUSIVE 5.0.0)
 find_package(SEAL CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)

@@ -13,7 +13,7 @@
         "zstd",
         "no-throw-tran"
       ],
-      "version>=": "4.6.2"
+      "version>=": "4.7.0"
     },
     "ms-gsl",
     "kuku",

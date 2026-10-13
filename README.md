@@ -71,7 +71,7 @@ The second uses *match tags*, pseudorandom values that the receiver computes for
 Match tags, introduced in APSI 2.0, can make queries and responses smaller, but they are an alternative, not a replacement.
 [Choosing a Method](#choosing-a-method) explains how to choose between them.
 
-APSI 2.0 also bit-packs queries by default, sends a fingerprint of the parameters with every query, and requires Microsoft SEAL 4.6.2.
+APSI 2.0 also bit-packs queries by default, sends a fingerprint of the parameters with every query, and requires Microsoft SEAL 4.7.0.
 [Upgrading from APSI 1.x](#upgrading-from-apsi-1x) explains what this means for an existing deployment.
 
 ## How APSI Works
@@ -943,7 +943,7 @@ To query such a sender, use `seal::compr_mode_type::zstd`.
 The in-memory compression of a `SenderDB` is a separate feature.
 It bit-packs each plaintext the sender computes with when that saves at least an eighth of its size, and otherwise, as with primes of 56 bits or more, keeps it uncompressed.
 The sender reads the coefficients of an uncompressed plaintext in place rather than loading it, in a compressed `SenderDB` as in an uncompressed one.
-APSI 1.x used Zstandard, which takes several times longer to load, so with the shipped parameter sets of up to a million items other than `1M-256-288`, a query against a compressed `SenderDB` takes 8% to 76% less of the sender's CPU time than with Zstandard, for about the same memory.
+APSI 1.x used Zstandard, which takes several times longer to load, so with the shipped parameter sets of up to a million items other than `1M-256-288`, a query against a compressed `SenderDB` takes 8% to 76% less of the sender's CPU time than with Zstandard, for about the same memory, as measured with Microsoft SEAL 4.6.1.
 A `SenderDB` loads plaintexts in any mode, but software built with Microsoft SEAL 4.0, 4.4 or 4.5, as APSI 1.x usually is, cannot use a compressed `SenderDB` that APSI 2.0 saves with its plaintexts as it holds them.
 It reads the plaintexts only to answer a query, so it loads such a `SenderDB` without complaint and then fails every query against it, or may even crash.
 To write a `SenderDB` that APSI 1.x can serve, see [With Matching Polynomials](#with-matching-polynomials).
@@ -1454,7 +1454,7 @@ A parameter request carries nothing to route by, so receivers of a shared endpoi
 
 ### Building and Interfaces
 
-- APSI 2.0 requires Microsoft SEAL 4.6.2 or a later 4.x release; see [Microsoft SEAL 4.6.2](#microsoft-seal-462).
+- APSI 2.0 requires Microsoft SEAL 4.7.0 or a later 4.x release; see [Microsoft SEAL 4.7.0](#microsoft-seal-470).
 - `network::Channel` has a new virtual function, `receive_result_for`, with a default implementation, but code built against the headers of APSI 1.x must be recompiled.
 - Code that loads result packages itself should use `network::Channel::receive_result_for`, or the overload of `network::ResultPackage::load` that takes the `PSIParams`.
 The overload without the `PSIParams` no longer refuses a package without a `psi_result`, since a result with match tags has none.
@@ -1482,7 +1482,7 @@ APSI is C++17. Only static builds are supported; the build configuration fails f
 ### Installing APSI with vcpkg
 
 The easiest way to obtain APSI for downstream use is via [vcpkg](https://github.com/microsoft/vcpkg).
-Installing APSI 2.0 with vcpkg needs Microsoft SEAL 4.6.2 in the vcpkg registry; where the registry does not have it, [build APSI from source](#building-apsi-from-source).
+Installing APSI 2.0 with vcpkg needs Microsoft SEAL 4.7.0 in the vcpkg registry; where the registry does not have it, [build APSI from source](#building-apsi-from-source).
 
 On Linux and macOS, first follow [Quick Start on Unix](https://github.com/microsoft/vcpkg#quick-start-unix), and then run:
 ```sh
@@ -1506,16 +1506,16 @@ There is no separate "install dependencies" step.
 - A C++17 toolchain (see [Requirements](#requirements) above).
 - CMake ≥ 3.25.
 - A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path.
-- If the vcpkg registry does not have Microsoft SEAL 4.6.2, a vcpkg overlay port for it, as the next section describes.
+- If the vcpkg registry does not have Microsoft SEAL 4.7.0, a vcpkg overlay port for it, as the next section describes.
 
-#### Microsoft SEAL 4.6.2
+#### Microsoft SEAL 4.7.0
 
-`CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.6.2 or a later 4.x release.
-Bit-packed serialization (see [Compression](#compression)) is new in Microsoft SEAL 4.6.0, 4.6.1 corrects the 64-bit multiplication with which 4.3.0 to 4.6.0 compute wrong results when built with MSVC for ARM64, and 4.6.2 can be configured with an installed Microsoft GSL 5 (`SEAL_BUILD_DEPS=OFF`, as vcpkg builds it).
+`CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.7.0 or a later 4.x release.
+Bit-packed serialization (see [Compression](#compression)) is new in Microsoft SEAL 4.6.0, 4.6.1 corrects the 64-bit multiplication with which 4.3.0 to 4.6.0 compute wrong results when built with MSVC for ARM64, 4.6.2 can be configured with an installed Microsoft GSL 5 (`SEAL_BUILD_DEPS=OFF`, as vcpkg builds it), and 4.7.0 makes the NTT, BFV multiplication and key switching, which a query uses throughout, faster.
 `vcpkg.json` asks for it with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query uses.
 
-If the vcpkg registry does not have Microsoft SEAL 4.6.2, configuring stops with `error: no version database entry for seal at 4.6.2`.
-Supply the port through a vcpkg *overlay*: a directory, not part of this repository, whose `seal` subdirectory is a vcpkg port for Microsoft SEAL 4.6.2.
+If the vcpkg registry does not have Microsoft SEAL 4.7.0, configuring stops with `error: no version database entry for seal at 4.7.0`.
+Supply the port through a vcpkg *overlay*: a directory, not part of this repository, whose `seal` subdirectory is a vcpkg port for Microsoft SEAL 4.7.0.
 Pass the directory to the configure step, either as a CMake variable or in the environment:
 ```sh
 cmake --preset linux-release -DVCPKG_OVERLAY_PORTS=/path/to/overlay
@@ -1523,8 +1523,8 @@ cmake --preset linux-release -DVCPKG_OVERLAY_PORTS=/path/to/overlay
 export VCPKG_OVERLAY_PORTS=/path/to/overlay
 cmake --preset linux-release
 ```
-The configure step then reports `Microsoft SEAL: found (4.6.2; zlib: ON, Zstandard: ON)`.
-No overlay is needed when the vcpkg registry has Microsoft SEAL 4.6.2.
+The configure step then reports `Microsoft SEAL: found (4.7.0; zlib: ON, Zstandard: ON)`.
+No overlay is needed when the vcpkg registry has Microsoft SEAL 4.7.0.
 
 #### Configuring and building with CMake presets
 
