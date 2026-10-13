@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <numeric>
+#include <random>
 #include <set>
 #include <sstream>
 #include <string>
@@ -2526,6 +2527,16 @@ namespace APSITests {
                     }));
             }
 
+            [[nodiscard]] const vector<string> &messages() const
+            {
+                return messages_;
+            }
+
+            [[nodiscard]] const vector<string> &warnings() const
+            {
+                return warnings_;
+            }
+
         private:
             LogLevel saved_level_;
 
@@ -2750,7 +2761,11 @@ namespace APSITests {
             }
 
             {
-                ThrowingLog log({ "finished processing bundle index", "preprocessing", "caches" });
+                ThrowingLog log(
+                    { "finished processing bundle index",
+                      "preprocessing",
+                      "caches",
+                      "polynomials" });
                 ASSERT_NO_THROW(sender_db->set_data(data));
                 ASSERT_NO_THROW(sender_db->insert_or_assign(update));
                 ASSERT_NO_THROW(sender_db->remove(removed));
@@ -3633,5 +3648,343 @@ namespace APSITests {
         auto loaded = make_shared<SenderDB>(SenderDB::Load(ss).first);
         ASSERT_TRUE(loaded->is_stripped());
         ASSERT_NO_FATAL_FAILURE(query(loaded));
+    }
+
+    namespace {
+        /**
+        Checks that every bin bundle of a SenderDB that is not stripped holds the cache it would
+        generate from nothing: each bin bundle the SenderDB saves is read back, its cache is
+        cleared and generated again, and it is saved again, which must give the same bytes. The
+        SenderDB then saves exactly what it would save had every bin bundle generated its cache
+        from nothing, holding the same items in the same places.
+        */
+        void check_caches_as_from_scratch(const SenderDB &sender_db)
+        {
+            const PSIParams &params = sender_db.get_params();
+            stringstream ss;
+            sender_db.save(ss);
+            string bytes = ss.str();
+
+            CryptoContext crypto_context(params);
+            crypto_context.set_evaluator();
+            size_t label_part_count = params.tag_part_count();
+            if (sender_db.is_labeled()) {
+                size_t label_bit_count =
+                    (sender_db.get_nonce_byte_count() + sender_db.get_label_byte_count()) * 8;
+                label_part_count +=
+                    (label_bit_count + params.item_bit_count() - 1) / params.item_bit_count();
+            }
+
+            // A saved SenderDB is a size-prefixed header followed by the size-prefixed bin bundles
+            size_t offset = prefixed_size_at(bytes, 0);
+            string rebuilt = bytes.substr(0, offset);
+            size_t bundle_count = 0;
+            while (offset < bytes.size()) {
+                string saved = bytes.substr(offset, prefixed_size_at(bytes, offset));
+                offset += saved.size();
+                BinBundle bundle(
+                    crypto_context,
+                    label_part_count,
+                    params.table_params().max_items_per_bin,
+                    params.query_params().ps_low_degree,
+                    params.bins_per_bundle(),
+                    sender_db.is_compressed(),
+                    false,
+                    params.tag_part_count());
+                stringstream in(saved);
+                uint32_t bundle_idx = bundle.load(in).first;
+                ASSERT_FALSE(bundle.cache_invalid());
+
+                bundle.clear_cache();
+                bundle.regen_cache();
+
+                stringstream out;
+                bundle.save(out, bundle_idx);
+                ASSERT_TRUE(saved == out.str())
+                    << "bin bundle " << bundle_count << " at bundle index " << bundle_idx
+                    << " differs from the one generated from nothing";
+                rebuilt += out.str();
+                bundle_count++;
+            }
+            ASSERT_EQ(sender_db.get_bin_bundle_count(), bundle_count);
+            ASSERT_TRUE(rebuilt == bytes);
+        }
+
+        /**
+        Returns how many of the BinBundles whose caches were regenerated, by the given debug
+        messages, computed the polynomials of some of their bins but not of all of them.
+        */
+        size_t partial_regen_count(const vector<string> &messages)
+        {
+            const string text = "Computing the polynomials of ";
+            size_t count = 0;
+            for (const auto &msg : messages) {
+                if (msg.rfind(text, 0) != 0) {
+                    continue;
+                }
+                size_t computed = static_cast<size_t>(stoull(msg.substr(text.size())));
+                size_t total = static_cast<size_t>(
+                    stoull(msg.substr(msg.find(" of ", text.size()) + string(" of ").size())));
+                count += (computed < total) ? 1 : 0;
+            }
+            return count;
+        }
+
+        /**
+        What run_random_updates saw happen: how many bin bundles regenerated their caches
+        computing the polynomials of some of their bins only, and how many items were moved
+        */
+        struct UpdateCounts {
+            size_t partial_regens = 0;
+
+            size_t moves = 0;
+        };
+
+        /**
+        Updates a SenderDB at random, starting from initial_count items, with every kind of update:
+        insertions of batches of new items, from one to batch_size_max of them, the first of them
+        of batch_size_max; label updates of stored items, alone or with new items, which without
+        labels change nothing; removals; removals followed by as many insertions; and saving and
+        loading. After every fourth update, checks that every bin bundle holds the cache it would
+        generate from nothing, and that a query finds the stored items with their labels and no
+        other. Finally strips the SenderDB, saves and loads it, and queries it again.
+
+        Checking after every fourth update rather than after each keeps the test fast, and loses
+        little. A bin bundle whose cache has polynomials that do not fit its bins, as a change
+        that was not marked leaves them, warns as it regenerates the cache, and any warning fails
+        the test. A label polynomial that is stale but fits stays so until the next check, unless
+        a later update changes its bin again.
+        */
+        void run_random_updates(
+            const PSIParams &params,
+            size_t label_byte_count,
+            bool compressed,
+            size_t initial_count,
+            size_t batch_size_max,
+            uint64_t seed,
+            size_t rounds,
+            UpdateCounts &counts)
+        {
+            oprf::OPRFKey key = fixed_oprf_key();
+            auto sender_db = make_shared<SenderDB>(params, key, label_byte_count, 16, compressed);
+            mt19937_64 rng(seed);
+            auto uniform = [&](uint64_t bound) {
+                return uniform_int_distribution<uint64_t>(0, bound - 1)(rng);
+            };
+
+            // The items stored, with their labels
+            unordered_map<Item, Label> stored;
+            uint64_t next_item = 1;
+
+            auto new_items = [&](size_t count) {
+                vector<Item> items;
+                for (size_t i = 0; i < count; i++) {
+                    items.emplace_back(next_item++, 0xd1d1);
+                }
+                return items;
+            };
+
+            auto stored_items = [&](size_t count) {
+                vector<Item> items;
+                for (const auto &item_label : stored) {
+                    items.push_back(item_label.first);
+                }
+                sort(items.begin(), items.end(), [](const Item &a, const Item &b) {
+                    return a.value() < b.value();
+                });
+                shuffle(items.begin(), items.end(), rng);
+                items.resize(min(count, items.size()));
+                return items;
+            };
+
+            auto batch_size = [&] {
+                // From one item to batch_size_max, about evenly in orders of magnitude
+                size_t size = 1;
+                for (uint64_t steps = uniform(5); steps && (size < batch_size_max); steps--) {
+                    size = min(size * 10, batch_size_max);
+                }
+                return size;
+            };
+
+            auto store = [&](const vector<Item> &items) {
+                if (!label_byte_count) {
+                    sender_db->insert_or_assign(items);
+                    for (const auto &item : items) {
+                        stored[item] = {};
+                    }
+                    return;
+                }
+
+                vector<pair<Item, Label>> data;
+                for (const auto &item : items) {
+                    Label label(label_byte_count);
+                    for (auto &byte : label) {
+                        byte = static_cast<unsigned char>(uniform(256));
+                    }
+                    data.emplace_back(item, std::move(label));
+                }
+                sender_db->insert_or_assign(data);
+                for (auto &item_label : data) {
+                    stored[item_label.first] = std::move(item_label.second);
+                }
+            };
+
+            auto remove = [&](const vector<Item> &items) {
+                if (items.empty()) {
+                    return;
+                }
+                sender_db->remove(items);
+                for (const auto &item : items) {
+                    stored.erase(item);
+                }
+            };
+
+            auto query = [&] {
+                vector<Item> queried = stored_items(30);
+                size_t stored_count = queried.size();
+                vector<Item> absent = new_items(10);
+                queried.insert(queried.end(), absent.begin(), absent.end());
+
+                vector<vector<Label>> results = query_labels(sender_db, key, queried);
+                for (size_t i = 0; i < queried.size(); i++) {
+                    if (i < stored_count) {
+                        ASSERT_EQ(vector<Label>{ stored.at(queried[i]) }, results[i])
+                            << "item " << i;
+                    } else {
+                        ASSERT_TRUE(results[i].empty()) << "item " << i;
+                    }
+                }
+            };
+
+            LogCapture capture;
+            store(new_items(initial_count));
+            ASSERT_NO_FATAL_FAILURE(check_caches_as_from_scratch(*sender_db));
+            ASSERT_NO_FATAL_FAILURE(query());
+
+            for (size_t round = 0; round < rounds; round++) {
+                bool check = (round % 4 == 3);
+
+                // The first update inserts as many new items as a batch can have, which into a
+                // full SenderDB is what makes room by moving items
+                switch (round ? uniform(5) : 0) {
+                case 0:
+                    store(new_items(round ? batch_size() : batch_size_max));
+                    break;
+
+                case 1: {
+                    vector<Item> items = stored_items(batch_size());
+                    if (uniform(2)) {
+                        vector<Item> fresh = new_items(batch_size());
+                        items.insert(items.end(), fresh.begin(), fresh.end());
+                    }
+                    store(items);
+                    break;
+                }
+
+                case 2:
+                    remove(stored_items(batch_size()));
+                    break;
+
+                case 3: {
+                    // The insertions could change again the bins the removals changed, so the
+                    // removals are checked on their own
+                    vector<Item> items = stored_items(batch_size());
+                    remove(items);
+                    if (check) {
+                        ASSERT_NO_FATAL_FAILURE(check_caches_as_from_scratch(*sender_db));
+                    }
+                    store(new_items(items.size()));
+                    break;
+                }
+
+                default: {
+                    stringstream ss;
+                    sender_db->save(ss);
+                    sender_db = make_shared<SenderDB>(SenderDB::Load(ss).first);
+                    break;
+                }
+                }
+
+                ASSERT_EQ(stored.size(), sender_db->get_item_count());
+                if (check) {
+                    ASSERT_NO_FATAL_FAILURE(check_caches_as_from_scratch(*sender_db));
+                    ASSERT_NO_FATAL_FAILURE(query());
+                }
+            }
+            counts.partial_regens = partial_regen_count(capture.messages());
+            counts.moves = capture.sum(moved_text);
+
+            // No bin bundle found polynomials it could not keep, which would mean that a change
+            // did not mark the bins it changed
+            for (const auto &warning : capture.warnings()) {
+                ASSERT_NE(0, warning.rfind("The cache of a BinBundle", 0)) << warning;
+            }
+
+            sender_db->strip();
+            stringstream ss;
+            sender_db->save(ss);
+            sender_db = make_shared<SenderDB>(SenderDB::Load(ss).first);
+            ASSERT_NO_FATAL_FAILURE(query());
+        }
+    } // namespace
+
+    TEST(SenderDBTests, UpdatesRegenerateCachesAsFromScratch)
+    {
+        // Without match tags, labeled and not, compressed and not. After every fourth update,
+        // every bin bundle holds the cache it would generate from nothing, and some of them
+        // computed the polynomials of only the bins the updates changed.
+        uint64_t seed = 1;
+        for (size_t label_byte_count : { 0U, 20U }) {
+            for (bool compressed : { true, false }) {
+                SCOPED_TRACE(
+                    "label_byte_count " + to_string(label_byte_count) + ", compressed " +
+                    to_string(compressed));
+                UpdateCounts counts;
+                ASSERT_NO_FATAL_FAILURE(run_random_updates(
+                    with_shallow_bins(*get_params1(), 3),
+                    label_byte_count,
+                    compressed,
+                    300,
+                    50,
+                    seed++,
+                    12,
+                    counts));
+                ASSERT_LT(0, counts.partial_regens);
+            }
+        }
+    }
+
+    TEST(SenderDBTagTests, UpdatesRegenerateCachesAsFromScratch)
+    {
+        // With match tags, labeled and not, with items of one field element, which a SenderDB
+        // packs into as few bin bundles as possible when it is empty, and of four, where batches
+        // move items between bin bundles to make room for others, as do bulk insertions. Items of
+        // four field elements are moved only once the SenderDB is fairly full, so there are 9000
+        // of them to begin with, and 4500 of one field element, which are packed instead.
+        uint64_t seed = 100;
+        for (uint32_t felts_per_item : { 1U, 4U }) {
+            PSIParams params =
+                create_queryable_tag_params(felts_per_item, 4 / felts_per_item, 3, 32);
+            size_t initial_count = (felts_per_item == 1) ? 4500 : 9000;
+            for (size_t label_byte_count : { 0U, 8U }) {
+                SCOPED_TRACE(
+                    "felts_per_item " + to_string(felts_per_item) + ", label_byte_count " +
+                    to_string(label_byte_count));
+                UpdateCounts counts;
+                ASSERT_NO_FATAL_FAILURE(run_random_updates(
+                    params,
+                    label_byte_count,
+                    label_byte_count == 0,
+                    initial_count,
+                    initial_count / 3,
+                    seed++,
+                    12,
+                    counts));
+                ASSERT_LT(0, counts.partial_regens);
+                if (felts_per_item > 1) {
+                    ASSERT_LT(0, counts.moves);
+                }
+            }
+        }
     }
 } // namespace APSITests

@@ -73,8 +73,11 @@ namespace apsi::sender {
     writer lock for the whole of their work, including the OPRF hashing they begin with, while
     answering a query holds a reader lock for as long as the answer takes. An embedder that
     updates a SenderDB while it serves queries therefore stalls every query for the duration of
-    the update, which for a large batch is not brief. Where that matters, build the new state
-    separately and direct later queries at it, or update while the sender is not serving.
+    the update, which for a large batch is not brief. An update regenerates the cache of every
+    bin bundle it changes: it computes the polynomials of the bins it changed again, and makes
+    every plaintext of the bin bundle again, as each holds coefficients of all its bins. Where
+    that matters, build the new state separately and direct later queries at it, or update while
+    the sender is not serving.
     */
     class SenderDB {
     public:

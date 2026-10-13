@@ -1477,6 +1477,8 @@ namespace apsi {
             log_noexcept([] { APSI_LOG_INFO("Start generating bin bundle caches"); });
 
             // Only the bin bundles changed since their caches were last generated are regenerated.
+            // Each computes the polynomials of its changed bins again and makes all its plaintexts
+            // again, so the cost of an update depends mostly on how many bin bundles it changes.
             size_t regen_count = 0;
             size_t bundle_count = 0;
             for (auto &bundle_idx : bin_bundles_) {

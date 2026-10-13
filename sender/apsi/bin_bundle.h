@@ -271,15 +271,37 @@ namespace apsi::sender {
         BinBundleCache cache_;
 
         /**
+        For each bin, whether it is dirty; see get_dirty_bins. The polynomials of a bin that is not
+        dirty are in the cache and are exactly what computing them again would give.
+        */
+        std::vector<bool> dirty_bins_;
+
+        /**
         Returns the modulus that defines the finite field that we're working in
         */
         [[nodiscard]] const seal::Modulus &field_mod() const;
 
         /**
-        Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is
-        just the "matching" polynomial. For labeled PSI, this is the "matching" polynomial and
-        the Newton interpolation polynomial. With match tags, this is only the Newton
-        interpolation polynomials. Resulting values are stored in cache_.
+        Marks the count bins beginning at start_bin_idx as dirty, and the cache as invalid. A
+        function that changes a bin marks it before it next does anything that can throw, so that no
+        bin is ever left changed but not marked. This allocates nothing. A range that does not lie
+        within the BinBundle marks every bin.
+        */
+        void mark_bins_dirty(std::size_t start_bin_idx, std::size_t count) noexcept;
+
+        /**
+        Returns whether some bin is not dirty and the cache holds the polynomials of every such
+        bin, each with as many coefficients as the bin's items give it, so that regen_cache can
+        keep them and interpolate only the dirty bins.
+        */
+        [[nodiscard]] bool polyns_reusable() const;
+
+        /**
+        Computes and caches the appropriate polynomials of each dirty bin, keeping those of the
+        other bins. For unlabeled PSI, this is just the "matching" polynomial. For labeled PSI,
+        this is the "matching" polynomial and the Newton interpolation polynomial. With match
+        tags, this is only the Newton interpolation polynomials. Resulting values are stored in
+        cache_.
         */
         void regen_polyns();
 
@@ -508,7 +530,8 @@ namespace apsi::sender {
         void clear(bool stripped = false);
 
         /**
-        Wipes out the cache of the BinBundle
+        Wipes out the cache of the BinBundle, so that every bin is interpolated again when the
+        cache is next generated.
         */
         void clear_cache();
 
@@ -521,13 +544,28 @@ namespace apsi::sender {
         }
 
         /**
+        Returns, for each bin, whether it is dirty: whether it has changed since its polynomials
+        were last computed, or the cache does not hold them, as before the cache is first
+        generated and after it has been cleared or stripped. regen_cache computes the polynomials
+        of the dirty bins again and keeps those of the others.
+        */
+        [[nodiscard]] const std::vector<bool> &get_dirty_bins() const noexcept
+        {
+            return dirty_bins_;
+        }
+
+        /**
         Gets a constant reference to this BinBundle's cache. This will throw an exception if the
         cache is invalid. Check the cache before you wreck the cache.
         */
         [[nodiscard]] const BinBundleCache &get_cache() const;
 
         /**
-        Generates and caches all the polynomials and plaintexts that this BinBundle requires
+        Generates and caches all the polynomials and plaintexts that this BinBundle requires.
+        Only the bins that have changed since the cache was last generated are interpolated
+        again; the polynomials of the others are kept. Every plaintext holds a coefficient of
+        every bin, so all of them are encoded again. The cache is then exactly what generating
+        it from nothing would give.
         */
         void regen_cache();
 

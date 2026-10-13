@@ -622,8 +622,8 @@ namespace apsi {
                 curr_bin_idx++;
             }
 
-            // Indicate that the polynomials need to be recomputed
-            cache_invalid_ = true;
+            // Indicate that the polynomials of these bins need to be recomputed
+            mark_bins_dirty(start_bin_idx, items.size());
 
             if (refused_count) {
                 log_filter_refusals(refused_count, start_bin_idx);
@@ -743,8 +743,8 @@ namespace apsi {
                 curr_bin_idx++;
             }
 
-            // Indicate that the polynomials need to be recomputed
-            cache_invalid_ = true;
+            // Indicate that the polynomials of these bins need to be recomputed
+            mark_bins_dirty(start_bin_idx, item_labels.size());
 
             if (refused_count) {
                 log_filter_refusals(refused_count, start_bin_idx);
@@ -799,8 +799,8 @@ namespace apsi {
                 curr_bin_idx++;
             }
 
-            // Nothing was done, but mark the cache as dirty anyway
-            cache_invalid_ = true;
+            // Nothing was done, but mark every bin as dirty anyway
+            mark_bins_dirty(0, get_num_bins());
 
             return true;
         }
@@ -882,15 +882,15 @@ namespace apsi {
                 // Compute the location in the curr_bin so we know how to index into the label bins
                 auto item_idx_in_bin = static_cast<size_t>(distance(curr_bin.begin(), found_pos));
 
+                // Indicate that the polynomials of this bin need to be recomputed
+                mark_bins_dirty(curr_bin_idx, 1);
+
                 // Write the new label; loop over each label part
                 for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
                     // Overwrite this label part in the matching bin
                     felt_t curr_label = curr_item_label.second[label_idx];
                     label_bins_[label_idx][curr_bin_idx][item_idx_in_bin] = curr_label;
                 }
-
-                // Indicate that the polynomials need to be recomputed
-                cache_invalid_ = true;
 
                 curr_bin_idx++;
             }
@@ -1005,6 +1005,9 @@ namespace apsi {
             // We got to this point, so all of the items were found. Now just erase them.
             curr_bin_idx = start_bin_idx;
             for (auto to_remove_item_it : to_remove_item_its) {
+                // Indicate that the polynomials of this bin need to be recomputed
+                mark_bins_dirty(curr_bin_idx, 1);
+
                 // Remove the item. A filter that has refused something holds no tag for what it
                 // refused, so finding nothing to remove is expected there and nothing is wrong.
                 // A filter that has refused nothing holds a tag for every item in its bin, so
@@ -1021,9 +1024,6 @@ namespace apsi {
                     });
                 }
                 item_bins_[curr_bin_idx].erase(to_remove_item_it);
-
-                // Indicate that the polynomials need to be recomputed
-                cache_invalid_ = true;
 
                 curr_bin_idx++;
             }
@@ -1197,8 +1197,8 @@ namespace apsi {
                 curr_bin_idx++;
             }
 
-            // Indicate that the polynomials need to be recomputed
-            cache_invalid_ = true;
+            // Indicate that the polynomials of these bins need to be recomputed
+            mark_bins_dirty(start_bin_idx, item_labels.size());
 
             if (refused_count) {
                 log_filter_refusals(refused_count, start_bin_idx);
@@ -1308,8 +1308,8 @@ namespace apsi {
                 }
             }
 
-            // Indicate that the polynomials need to be recomputed
-            cache_invalid_ = true;
+            // Indicate that the polynomials of these bins need to be recomputed
+            mark_bins_dirty(start_bin_idx, item_labels.size());
 
             if (refused_count) {
                 log_filter_refusals(refused_count, start_bin_idx);
@@ -1374,6 +1374,9 @@ namespace apsi {
                 return false;
             }
 
+            // Indicate that the polynomials of these bins need to be recomputed
+            mark_bins_dirty(start_bin_idx, item_labels.size());
+
             // The tag parts are the same as before, as the tag depends only on the item, but
             // writing every label part keeps this simple
             for (size_t item_idx = 0; item_idx < item_labels.size(); item_idx++) {
@@ -1382,9 +1385,6 @@ namespace apsi {
                         item_labels[item_idx].second[label_idx];
                 }
             }
-
-            // Indicate that the polynomials need to be recomputed
-            cache_invalid_ = true;
 
             return true;
         }
@@ -1464,6 +1464,9 @@ namespace apsi {
                 return false;
             }
 
+            // Indicate that the polynomials of these bins need to be recomputed
+            mark_bins_dirty(start_bin_idx, items.size());
+
             for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
                 size_t curr_bin_idx = start_bin_idx + item_idx;
                 auto pos = static_cast<ptrdiff_t>(positions[item_idx]);
@@ -1490,9 +1493,6 @@ namespace apsi {
                     label_bin.erase(label_bin.begin() + pos);
                 }
             }
-
-            // Indicate that the polynomials need to be recomputed
-            cache_invalid_ = true;
 
             return true;
         }
@@ -1596,7 +1596,73 @@ namespace apsi {
             cache_.felt_interp_polyns.clear();
             cache_.batched_interp_polyns.clear();
 
+            // The polynomials of the bins are gone, so every bin is to be interpolated again
+            dirty_bins_.assign(num_bins_, true);
             cache_invalid_ = true;
+        }
+
+        void BinBundle::mark_bins_dirty(size_t start_bin_idx, size_t count) noexcept
+        {
+            cache_invalid_ = true;
+
+            // The callers have checked the range. Should it nevertheless not lie within the
+            // BinBundle, marking every bin is safe where marking too few is not.
+            size_t bin_count = dirty_bins_.size();
+            if ((start_bin_idx > bin_count) || (count > bin_count - start_bin_idx)) {
+                fill(dirty_bins_.begin(), dirty_bins_.end(), true);
+                return;
+            }
+
+            fill_n(dirty_bins_.begin() + static_cast<ptrdiff_t>(start_bin_idx), count, true);
+        }
+
+        bool BinBundle::polyns_reusable() const
+        {
+            // There is nothing to keep unless some bin is not dirty
+            if (find(dirty_bins_.begin(), dirty_bins_.end(), false) == dirty_bins_.end()) {
+                return false;
+            }
+
+            // Otherwise the cache must hold the polynomials of every bin: a matching polynomial,
+            // unless there are match tags, and a label polynomial for each label part
+            size_t num_bins = get_num_bins();
+            size_t label_size = get_label_size();
+            bool reusable = (dirty_bins_.size() == num_bins) && (item_bins_.size() == num_bins) &&
+                            (cache_.felt_matching_polyns.size() == (uses_tags() ? 0 : num_bins)) &&
+                            (cache_.felt_interp_polyns.size() == label_size);
+            for (const auto &fips : cache_.felt_interp_polyns) {
+                reusable = reusable && (fips.size() == num_bins);
+            }
+
+            // A bin of n items that is not dirty must have polynomials of the sizes regen_polyns
+            // computes: n + 1 coefficients for its matching polynomial and max(n, 1) for its label
+            // polynomials. This costs little to check, and refuses the polynomials of a bin changed
+            // without being marked dirty.
+            for (size_t bin_idx = 0; reusable && (bin_idx < num_bins); bin_idx++) {
+                if (dirty_bins_[bin_idx]) {
+                    continue;
+                }
+
+                size_t item_count = item_bins_[bin_idx].size();
+                if (!uses_tags()) {
+                    reusable = (cache_.felt_matching_polyns[bin_idx].size() == item_count + 1);
+                }
+
+                size_t label_coeff_count = max<size_t>(item_count, 1);
+                for (const auto &fips : cache_.felt_interp_polyns) {
+                    reusable = reusable && (fips[bin_idx].size() == label_coeff_count);
+                }
+            }
+
+            if (!reusable) {
+                log_noexcept([] {
+                    APSI_LOG_WARNING(
+                        "The cache of a BinBundle does not hold the polynomials of the bins that "
+                        "have not changed; the polynomials of every bin will be computed again");
+                });
+            }
+
+            return reusable;
         }
 
         const BinBundleCache &BinBundle::get_cache() const
@@ -1610,8 +1676,10 @@ namespace apsi {
 
         void BinBundle::regen_plaintexts()
         {
-            // This function assumes that BinBundle::clear_cache and BinBundle::regen_polyns have
-            // been called and the polynomials have not been modified since then.
+            // This function assumes that BinBundle::regen_polyns has been called and the
+            // polynomials have not been modified since then. Each plaintext holds the coefficients
+            // of one degree of every bin, so all of them are made from the polynomials of all the
+            // bins, and how many there are follows from the largest of those polynomials.
 
             // Allocate memory for the batched "label polynomials"
             cache_.batched_interp_polyns.resize(get_label_size());
@@ -1652,13 +1720,15 @@ namespace apsi {
 
         void BinBundle::regen_polyns()
         {
-            // This function assumes that BinBundle::clear_cache has been called and the polynomials
-            // have not been modified since then. Specifically, it assumes that item_bins_ is empty
-            // and and label_bins_ is set to the correct size.
+            // This function assumes that the cache holds the polynomials of every bin that is not
+            // dirty, as polyns_reusable checks, or that it has been cleared, which makes every bin
+            // dirty. It computes the polynomials of the dirty bins and keeps those of the others.
 
             // Get the field modulus. We need this for polynomial calculations
             const Modulus &mod = field_mod();
 
+            // Make room for the polynomials of every bin. Resizing keeps those of the bins that are
+            // not dirty.
             size_t num_bins = get_num_bins();
             size_t label_size = get_label_size();
             if (!uses_tags()) {
@@ -1669,14 +1739,29 @@ namespace apsi {
                 fips.resize(num_bins);
             }
 
+            auto dirty_count =
+                static_cast<size_t>(count(dirty_bins_.begin(), dirty_bins_.end(), true));
+            log_noexcept([&] {
+                APSI_LOG_DEBUG(
+                    "Computing the polynomials of " << dirty_count << " of " << num_bins
+                                                    << " bins of a BinBundle");
+            });
+
             ThreadPoolMgr tpm;
 
             TaskGroup tasks(tpm.thread_pool());
-            tasks.reserve(num_bins);
+            tasks.reserve(dirty_count);
+
+            // The dirty bins are read only here, as the tasks are added, and are not changed until
+            // the tasks have finished
             if (!label_size) {
-                // For each bin in the bundle, compute and cache the corresponding "matching
+                // For each dirty bin in the bundle, compute and cache the corresponding "matching
                 // polynomial"
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
+                    if (!dirty_bins_[bin_idx]) {
+                        continue;
+                    }
+
                     tasks.add([&, bin_idx] {
                         // Compute and cache the matching polynomial
                         FEltPolyn fmp = polyn_with_roots(item_bins_[bin_idx], mod);
@@ -1684,12 +1769,16 @@ namespace apsi {
                     });
                 }
             } else {
-                // For each bin in the bundle, compute and cache the corresponding "matching
+                // For each dirty bin in the bundle, compute and cache the corresponding "matching
                 // polynomial" and "label polynomials". They have the same roots and interpolation
                 // points, so computing them together shares most of the work. With match tags no
                 // matching polynomial is kept: the tag parts, which are label parts, decide
                 // whether an item matches.
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
+                    if (!dirty_bins_[bin_idx]) {
+                        continue;
+                    }
+
                     tasks.add([&, bin_idx] {
                         vector<gsl::span<const felt_t>> label_values;
                         label_values.reserve(label_size);
@@ -1720,9 +1809,22 @@ namespace apsi {
         {
             // Only recompute the cache if it needs to be recomputed
             if (cache_invalid_) {
-                clear_cache();
+                // Keep the polynomials of the bins that are not dirty if the cache holds them, and
+                // otherwise clear the cache, which makes every bin dirty. Either way, free the
+                // plaintexts before making new ones: each holds coefficients of every bin.
+                if (polyns_reusable()) {
+                    cache_.batched_matching_polyn = crypto_context_;
+                    cache_.batched_interp_polyns.clear();
+                } else {
+                    clear_cache();
+                }
+
                 regen_polyns();
                 regen_plaintexts();
+
+                // The polynomials of every bin are now those of its items. Had anything above
+                // thrown, the dirty bins would have stayed dirty, and the cache invalid.
+                fill(dirty_bins_.begin(), dirty_bins_.end(), false);
                 cache_invalid_ = false;
             }
         }
@@ -1746,6 +1848,9 @@ namespace apsi {
 
             cache_.felt_matching_polyns.clear();
             cache_.felt_interp_polyns.clear();
+
+            // The cache no longer holds the polynomials of the bins
+            fill(dirty_bins_.begin(), dirty_bins_.end(), true);
         }
 
         namespace {
@@ -2417,6 +2522,14 @@ namespace apsi {
 
                 // Mark the cache as valid
                 cache_invalid_ = false;
+
+                // Unless the BinBundle is stripped, the cache holds the polynomials of every bin,
+                // so a change to a bin needs only that bin interpolated again. Like the rest of a
+                // saved SenderDB, they are trusted to be those of the loaded items; regen_cache
+                // checks that their sizes fit the bins before keeping any.
+                if (!stripped_) {
+                    fill(dirty_bins_.begin(), dirty_bins_.end(), false);
+                }
             }
 
             return { bundle_idx, in.size() };

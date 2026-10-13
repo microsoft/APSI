@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <memory>
 #include <numeric>
+#include <random>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -1418,6 +1420,8 @@ namespace APSITests {
 
             bool drop_matching_polyns = false;
 
+            bool shorten_first_matching_polyn = false;
+
             bool drop_last_interp_polyns = false;
 
             bool shorten_first_felt_interp_polyn = false;
@@ -1515,7 +1519,10 @@ namespace APSITests {
                 if (c.felt_matching_polyns() && !changes.drop_matching_polyns) {
                     felt_matching = changes.empty_felt_polyns
                                         ? empty_felt_matrix(builder, c.felt_matching_polyns())
-                                        : copy_felt_matrix(builder, c.felt_matching_polyns());
+                                        : copy_felt_matrix(
+                                              builder,
+                                              c.felt_matching_polyns(),
+                                              changes.shorten_first_matching_polyn);
                     const auto &polyn = *c.batched_matching_polyn();
                     batched_matching = copy_batched_polyn(
                         builder,
@@ -2655,5 +2662,895 @@ namespace APSITests {
         ASSERT_THROW(static_cast<void>(empty.eval(powers, pool)), invalid_argument);
         ASSERT_THROW(
             static_cast<void>(empty.eval_patstock(context, powers, 2, pool)), invalid_argument);
+    }
+
+    namespace {
+        /**
+        Collects what is logged while it exists about regenerating caches: for how many bins
+        polynomials were computed, and the warnings that the polynomials a cache held could not be
+        kept. Restores the global logger and log level when it is destroyed.
+        */
+        class RegenLog {
+        public:
+            RegenLog() : saved_level_(GetLogLevel())
+            {
+                array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+                log_handlers[static_cast<size_t>(LogLevel::debug)] = [this](const string &msg) {
+                    const string text = "Computing the polynomials of ";
+                    if (msg.rfind(text, 0) == 0) {
+                        computed_bin_counts_.push_back(
+                            static_cast<size_t>(stoull(msg.substr(text.size()))));
+                    }
+                };
+                log_handlers[static_cast<size_t>(LogLevel::warning)] = [this](const string &msg) {
+                    if (msg.rfind("The cache of a BinBundle", 0) == 0) {
+                        cache_warnings_.push_back(msg);
+                    }
+                };
+                SetLogger(Logger::Create(std::move(log_handlers), {}, {}));
+                SetLogLevel(LogLevel::debug);
+            }
+
+            ~RegenLog()
+            {
+                CloseLogger();
+                SetLogLevel(saved_level_);
+            }
+
+            RegenLog(const RegenLog &) = delete;
+
+            RegenLog &operator=(const RegenLog &) = delete;
+
+            /**
+            Runs f, and returns, for each cache regenerated meanwhile, for how many bins
+            polynomials were computed.
+            */
+            template <typename F>
+            vector<size_t> computed_while(F &&f)
+            {
+                computed_bin_counts_.clear();
+                f();
+                return exchange(computed_bin_counts_, {});
+            }
+
+            /**
+            Regenerates the cache of the BinBundle, and returns what computed_while returns.
+            */
+            vector<size_t> regen(BinBundle &bb)
+            {
+                return computed_while([&] { bb.regen_cache(); });
+            }
+
+            /**
+            Returns the warnings that the polynomials a cache held could not be kept.
+            */
+            [[nodiscard]] const vector<string> &cache_warnings() const
+            {
+                return cache_warnings_;
+            }
+
+        private:
+            LogLevel saved_level_;
+
+            vector<size_t> computed_bin_counts_;
+
+            vector<string> cache_warnings_;
+        };
+
+        /**
+        What a BinBundle is made with, so that another like it can be made.
+        */
+        struct BundleShape {
+            size_t label_size;
+
+            size_t tag_part_count;
+
+            size_t felts_per_item;
+
+            size_t max_bin_size;
+
+            size_t ps_low_degree;
+
+            size_t num_bins;
+
+            bool compressed;
+        };
+
+        BinBundle make_bundle(const CryptoContext &context, const BundleShape &shape)
+        {
+            return BinBundle(
+                context,
+                shape.label_size,
+                shape.max_bin_size,
+                shape.ps_low_degree,
+                shape.num_bins,
+                shape.compressed,
+                false,
+                shape.tag_part_count);
+        }
+
+        vector<size_t> dirty_bins_of(const BinBundle &bb)
+        {
+            vector<size_t> dirty;
+            for (size_t bin = 0; bin < bb.get_dirty_bins().size(); bin++) {
+                if (bb.get_dirty_bins()[bin]) {
+                    dirty.push_back(bin);
+                }
+            }
+            return dirty;
+        }
+
+        vector<size_t> bin_range(size_t first, size_t count)
+        {
+            vector<size_t> bins(count);
+            iota(bins.begin(), bins.end(), first);
+            return bins;
+        }
+
+        /**
+        Checks that the cache of a BinBundle, generated after any changes to it, is the cache that
+        a BinBundle holding the same items generates from nothing: the same polynomials for every
+        bin, and the same plaintexts byte for byte, so that the two save the same bytes. Also
+        checks that the label polynomials take the label parts of the items at their field
+        elements and, without match tags, that the matching polynomials vanish there.
+        */
+        void check_cache_as_from_scratch(
+            const BinBundle &bb, const CryptoContext &context, const BundleShape &shape)
+        {
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(dirty_bins_of(bb).empty());
+            string bytes = save_to_string(bb);
+
+            BinBundle scratch = make_bundle(context, shape);
+            load_from_string(scratch, bytes);
+            scratch.clear_cache();
+            scratch.regen_cache();
+
+            const BinBundleCache &cache = bb.get_cache();
+            const BinBundleCache &expected = scratch.get_cache();
+            ASSERT_EQ(expected.felt_matching_polyns, cache.felt_matching_polyns);
+            ASSERT_EQ(expected.felt_interp_polyns, cache.felt_interp_polyns);
+            ASSERT_EQ(
+                expected.batched_matching_polyn.batched_coeffs,
+                cache.batched_matching_polyn.batched_coeffs);
+            ASSERT_EQ(expected.batched_interp_polyns.size(), cache.batched_interp_polyns.size());
+            for (size_t p = 0; p < expected.batched_interp_polyns.size(); p++) {
+                ASSERT_EQ(
+                    expected.batched_interp_polyns[p].batched_coeffs,
+                    cache.batched_interp_polyns[p].batched_coeffs)
+                    << "label part " << p;
+            }
+            ASSERT_TRUE(save_to_string(scratch) == bytes) << "the saved BinBundles differ";
+
+            const Modulus &mod =
+                context.seal_context()->first_context_data()->parms().plain_modulus();
+            const auto &item_bins = bb.get_item_bins();
+            for (size_t bin = 0; bin < item_bins.size(); bin++) {
+                for (size_t i = 0; i < item_bins[bin].size(); i++) {
+                    felt_t x = item_bins[bin][i];
+                    if (!bb.uses_tags()) {
+                        ASSERT_EQ(0, evaluate(cache.felt_matching_polyns[bin], x, mod));
+                    }
+                    for (size_t p = 0; p < shape.label_size; p++) {
+                        ASSERT_EQ(
+                            bb.get_label_bins()[p][bin][i],
+                            evaluate(cache.felt_interp_polyns[p][bin], x, mod));
+                    }
+                }
+            }
+        }
+
+        /**
+        What a BinBundle holds, bin by bin, and which of its bins are dirty
+        */
+        struct BundleState {
+            vector<vector<felt_t>> item_bins;
+
+            vector<vector<vector<felt_t>>> label_bins;
+
+            vector<vector<HashedItem>> hashed_item_bins;
+
+            vector<bool> dirty_bins;
+
+            bool cache_invalid;
+
+            explicit BundleState(const BinBundle &bb)
+                : item_bins(bb.get_item_bins()), label_bins(bb.get_label_bins()),
+                  hashed_item_bins(bb.get_hashed_item_bins()), dirty_bins(bb.get_dirty_bins()),
+                  cache_invalid(bb.cache_invalid())
+            {}
+
+            [[nodiscard]] bool same_bin(const BundleState &other, size_t bin) const
+            {
+                if (item_bins[bin] != other.item_bins[bin]) {
+                    return false;
+                }
+                for (size_t p = 0; p < label_bins.size(); p++) {
+                    if (label_bins[p][bin] != other.label_bins[p][bin]) {
+                        return false;
+                    }
+                }
+                return hashed_item_bins.empty() ||
+                       (hashed_item_bins[bin] == other.hashed_item_bins[bin]);
+            }
+        };
+
+        /**
+        Checks what an operation did to a BinBundle that was in the given state before it. One
+        that failed, or was a dry run, changed nothing and marked nothing. One that succeeded
+        changed no bin outside the bin_count bins beginning at first_bin, marked exactly those
+        dirty, and invalidated the cache.
+        */
+        void check_marked(
+            const BundleState &before,
+            const BinBundle &bb,
+            bool succeeded,
+            size_t first_bin,
+            size_t bin_count)
+        {
+            BundleState after(bb);
+            ASSERT_EQ(before.item_bins.size(), after.item_bins.size());
+            for (size_t bin = 0; bin < before.item_bins.size(); bin++) {
+                bool marked = succeeded && (bin >= first_bin) && (bin - first_bin < bin_count);
+                if (!marked) {
+                    ASSERT_TRUE(before.same_bin(after, bin)) << "bin " << bin;
+                }
+                ASSERT_EQ(before.dirty_bins[bin] || marked, after.dirty_bins[bin]) << "bin " << bin;
+            }
+            ASSERT_EQ(before.cache_invalid || succeeded, after.cache_invalid);
+        }
+
+        /**
+        Changes a BinBundle at random, with match tags if shape has tag parts and otherwise
+        without, labeled if it has label parts, and checks after every change that exactly the
+        bins it changed were marked dirty, and after about a third of them that regenerating the
+        cache computes the polynomials of the dirty bins only, and gives what generating it from
+        nothing gives. Most changes go to a few locations, so that their bins fill up to
+        max_bin_size and empty again, and the field elements are few, so that insertions and
+        replacements often fail; the sequence alternates between phases that favor insertions,
+        changes and removals. The BinBundle is saved and loaded, with and without its cache, its
+        cache is cleared now and then, and in the end it is changed and stripped.
+        */
+        void run_random_changes(
+            const CryptoContext &context, const BundleShape &shape, uint64_t seed, size_t steps)
+        {
+            const bool tagged = shape.tag_part_count > 0;
+            const bool labeled = shape.label_size > 0;
+            const size_t f = shape.felts_per_item;
+            const size_t num_bins = shape.num_bins;
+            const size_t location_count = num_bins / f;
+            const uint64_t mod =
+                context.seal_context()->first_context_data()->parms().plain_modulus().value();
+            const felt_t felt_range = 2 * shape.max_bin_size;
+            const vector<size_t> hot_locations{ 0, 1, 2, location_count - 1 };
+
+            // As in a SenderDB, a bin holds max_bin_size items with match tags, and fewer without
+            const size_t bin_capacity = tagged ? shape.max_bin_size : shape.max_bin_size - 1;
+
+            mt19937_64 rng(seed);
+            auto uniform = [&](uint64_t bound) {
+                return uniform_int_distribution<uint64_t>(0, bound - 1)(rng);
+            };
+
+            auto new_felts = [&] {
+                vector<felt_t> felts(f);
+                for (auto &felt : felts) {
+                    felt = 1 + uniform(felt_range);
+                }
+                return felts;
+            };
+
+            auto new_parts = [&] {
+                vector<felt_t> parts(shape.label_size);
+                for (auto &part : parts) {
+                    part = (uniform(4) == 0) ? 0 : 1 + uniform(mod - 1);
+                }
+                return parts;
+            };
+
+            uint64_t next_id = 1;
+            auto tagged_item = [&](const vector<felt_t> &felts, HashedItem id) {
+                TaggedAlgItemLabel item;
+                item.item = id;
+                for (felt_t felt : felts) {
+                    item.alg_item_label.emplace_back(felt, new_parts());
+                }
+                return item;
+            };
+
+            auto labeled_item = [&](const vector<felt_t> &felts) {
+                AlgItemLabel item;
+                for (felt_t felt : felts) {
+                    item.emplace_back(felt, new_parts());
+                }
+                return item;
+            };
+
+            BinBundle bb = make_bundle(context, shape);
+            RegenLog log;
+
+            // The locations that have held items, and the stored item at a given place
+            set<size_t> used_locations(hot_locations.begin(), hot_locations.end());
+
+            auto stored_felts = [&](size_t start, size_t pos) {
+                vector<felt_t> felts;
+                for (size_t s = 0; s < f; s++) {
+                    felts.push_back(bb.get_item_bins()[start + s][pos]);
+                }
+                return felts;
+            };
+
+            auto pick_stored = [&](size_t &start, size_t &pos) {
+                vector<size_t> starts;
+                for (size_t location : used_locations) {
+                    if (!bb.get_item_bins()[location * f].empty()) {
+                        starts.push_back(location * f);
+                    }
+                }
+                if (starts.empty()) {
+                    return false;
+                }
+                start = starts[uniform(starts.size())];
+                pos = uniform(bb.get_item_bins()[start].size());
+                return true;
+            };
+
+            auto pick_start = [&] {
+                size_t location = (uniform(100) < 85) ? hot_locations[uniform(hot_locations.size())]
+                                                      : uniform(location_count);
+                used_locations.insert(location);
+                return location * f;
+            };
+
+            // What the sequence has covered, counted where the cache is regenerated
+            size_t incremental_count = 0;
+            size_t full_count = 0;
+            size_t grew_count = 0;
+            size_t shrank_count = 0;
+            size_t filled_count = 0;
+            size_t emptied_count = 0;
+            size_t last_max_size = 0;
+            vector<bool> last_nonempty(num_bins, false);
+
+            auto regen_and_check = [&] {
+                // The cache is invalid exactly when some bin is dirty, and regenerating it
+                // computes the polynomials of the dirty bins and of no other
+                bool invalid = bb.cache_invalid();
+                size_t dirty_count = dirty_bins_of(bb).size();
+                ASSERT_EQ(invalid, dirty_count > 0);
+                ASSERT_EQ(
+                    invalid ? vector<size_t>{ dirty_count } : vector<size_t>{}, log.regen(bb));
+                if (invalid) {
+                    ((dirty_count < num_bins) ? incremental_count : full_count)++;
+                }
+
+                ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+
+                size_t max_size = 0;
+                for (size_t bin = 0; bin < num_bins; bin++) {
+                    bool nonempty = !bb.get_item_bins()[bin].empty();
+                    filled_count += (nonempty && !last_nonempty[bin]) ? 1 : 0;
+                    emptied_count += (!nonempty && last_nonempty[bin]) ? 1 : 0;
+                    last_nonempty[bin] = nonempty;
+                    max_size = max(max_size, bb.get_item_bins()[bin].size());
+                }
+                grew_count += (max_size > last_max_size) ? 1 : 0;
+                shrank_count += (max_size < last_max_size) ? 1 : 0;
+                last_max_size = max_size;
+            };
+
+            // Saves and loads the BinBundle, with the cache if it is valid
+            auto save_and_load = [&] {
+                bool with_cache = !bb.cache_invalid();
+                BinBundle loaded = make_bundle(context, shape);
+                load_from_string(loaded, save_to_string(bb));
+                ASSERT_EQ(with_cache, !loaded.cache_invalid());
+                ASSERT_EQ(
+                    with_cache ? vector<size_t>{} : bin_range(0, num_bins), dirty_bins_of(loaded));
+                bb = std::move(loaded);
+            };
+
+            // Operations that fail, and dry runs, which change nothing
+            auto fail = [&](const BundleState &before) {
+                size_t start = pick_start();
+                switch (uniform(4)) {
+                case 0:
+                    if (tagged) {
+                        ASSERT_LE(
+                            -1,
+                            bb.multi_insert_dry_run(
+                                tagged_item(new_felts(), HashedItem(next_id, 0)), start));
+                    } else if (labeled) {
+                        ASSERT_LE(-1, bb.multi_insert_dry_run(labeled_item(new_felts()), start));
+                    } else {
+                        ASSERT_LT(0, bb.multi_insert_dry_run(new_felts(), start));
+                    }
+                    break;
+
+                case 1: {
+                    // Field elements that are never inserted
+                    vector<felt_t> absent(f, felt_range + 1);
+                    if (tagged) {
+                        ASSERT_FALSE(bb.try_multi_remove(absent, HashedItem(0, 0), start));
+                        ASSERT_FALSE(
+                            bb.try_multi_overwrite(tagged_item(absent, HashedItem(0, 0)), start));
+                    } else {
+                        ASSERT_FALSE(bb.try_multi_remove(absent, start));
+                        if (labeled) {
+                            ASSERT_FALSE(bb.try_multi_overwrite(labeled_item(absent), start));
+                        } else {
+                            ASSERT_FALSE(bb.try_multi_overwrite(absent, start));
+                        }
+                    }
+                    break;
+                }
+
+                case 2:
+                    // Where the item does not fit
+                    if (tagged) {
+                        ASSERT_EQ(
+                            -1,
+                            bb.multi_insert_for_real(
+                                tagged_item(new_felts(), HashedItem(next_id, 0)),
+                                num_bins - f + 1));
+                    } else if (labeled) {
+                        ASSERT_EQ(
+                            -1,
+                            bb.multi_insert_for_real(labeled_item(new_felts()), num_bins - f + 1));
+                    } else {
+                        ASSERT_EQ(-1, bb.multi_insert_for_real(new_felts(), num_bins - f + 1));
+                    }
+                    break;
+
+                default: {
+                    // An item whose field element is already in its bin, which fails with labels
+                    // or match tags, or the replacement of an item that is not where it is
+                    // looked for
+                    size_t pos = 0;
+                    if (!pick_stored(start, pos)) {
+                        break;
+                    }
+
+                    vector<felt_t> felts = stored_felts(start, pos);
+                    if (tagged) {
+                        ASSERT_EQ(
+                            -1,
+                            bb.multi_insert_for_real(
+                                tagged_item(felts, HashedItem(next_id, 0)), start));
+                        TaggedAlgItemLabel item = tagged_item(new_felts(), HashedItem(next_id, 0));
+                        ASSERT_FALSE(
+                            bb.try_multi_replace(HashedItem(0, 0), pos, item, start, false));
+                        ASSERT_FALSE(bb.try_multi_replace(
+                            bb.get_hashed_item_bins()[start][pos],
+                            bb.get_item_bins()[start].size(),
+                            item,
+                            start,
+                            false));
+                    } else if (labeled) {
+                        ASSERT_EQ(-1, bb.multi_insert_for_real(labeled_item(felts), start));
+                    }
+                    break;
+                }
+                }
+
+                ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, false, 0, 0));
+            };
+
+            // Inserts a new item where it fits, as a SenderDB would, which can fail
+            auto insert = [&](const BundleState &before) {
+                size_t start = pick_start();
+                bool inserted = false;
+                if (tagged) {
+                    TaggedAlgItemLabel item = tagged_item(new_felts(), HashedItem(next_id, 0));
+                    int32_t size = bb.multi_insert_dry_run(item, start);
+                    if ((size > 0) && (static_cast<size_t>(size) <= bin_capacity)) {
+                        ASSERT_EQ(size, bb.multi_insert_for_real(item, start));
+                        next_id++;
+                        inserted = true;
+                    }
+                } else if (labeled) {
+                    AlgItemLabel item = labeled_item(new_felts());
+                    int32_t size = bb.multi_insert_dry_run(item, start);
+                    if ((size > 0) && (static_cast<size_t>(size) <= bin_capacity)) {
+                        ASSERT_EQ(size, bb.multi_insert_for_real(item, start));
+                        inserted = true;
+                    }
+                } else {
+                    vector<felt_t> item = new_felts();
+                    int32_t size = bb.multi_insert_dry_run(item, start);
+                    if ((size > 0) && (static_cast<size_t>(size) <= bin_capacity)) {
+                        ASSERT_EQ(size, bb.multi_insert_for_real(item, start));
+                        inserted = true;
+                    }
+                }
+
+                ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, inserted, start, f));
+            };
+
+            // Changes the stored item at the given place: its label parts, or, with match tags,
+            // replaces it with another item, which can fail. Without labels, an overwrite changes
+            // nothing but marks every bin.
+            auto change = [&](const BundleState &before, size_t start, size_t pos) {
+                vector<felt_t> felts = stored_felts(start, pos);
+                if (tagged) {
+                    HashedItem id = bb.get_hashed_item_bins()[start][pos];
+                    if (uniform(2)) {
+                        ASSERT_TRUE(bb.try_multi_overwrite(tagged_item(felts, id), start));
+                        ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, true, start, f));
+                        return;
+                    }
+
+                    // A new item, or the same item with new label parts
+                    TaggedAlgItemLabel item =
+                        uniform(4) ? tagged_item(new_felts(), HashedItem(next_id++, 0))
+                                   : tagged_item(felts, id);
+                    bool replaceable = bb.try_multi_replace(id, pos, item, start, true);
+                    ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, false, 0, 0));
+                    ASSERT_EQ(replaceable, bb.try_multi_replace(id, pos, item, start, false));
+                    ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, replaceable, start, f));
+                } else if (labeled) {
+                    ASSERT_TRUE(bb.try_multi_overwrite(labeled_item(felts), start));
+                    ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, true, start, f));
+                } else if (uniform(4) == 0) {
+                    ASSERT_TRUE(bb.try_multi_overwrite(felts, start));
+                    ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, true, 0, num_bins));
+                }
+            };
+
+            // Removes the stored item at the given place
+            auto remove = [&](const BundleState &before, size_t start, size_t pos) {
+                vector<felt_t> felts = stored_felts(start, pos);
+                if (tagged) {
+                    ASSERT_TRUE(
+                        bb.try_multi_remove(felts, bb.get_hashed_item_bins()[start][pos], start));
+                } else {
+                    ASSERT_TRUE(bb.try_multi_remove(felts, start));
+                }
+
+                ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, true, start, f));
+            };
+
+            for (size_t step = 0; step < steps; step++) {
+                // Out of 100: saving and loading, clearing the cache, operations that fail, and
+                // by phase, insertions and changes, the rest being removals
+                static const array<array<uint64_t, 2>, 3> weights{
+                    { { 60, 20 }, { 35, 25 }, { 5, 15 } }
+                };
+                const auto &w = weights[(step / 40) % 3];
+                uint64_t roll = uniform(100);
+                BundleState before(bb);
+
+                if (roll < 3) {
+                    ASSERT_NO_FATAL_FAILURE(save_and_load());
+                } else if (roll < 5) {
+                    bb.clear_cache();
+                    ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+                } else if (roll < 15) {
+                    ASSERT_NO_FATAL_FAILURE(fail(before));
+                } else if (roll < 15 + w[0]) {
+                    ASSERT_NO_FATAL_FAILURE(insert(before));
+                } else {
+                    // A change or a removal, of a stored item if there is one
+                    size_t start = 0;
+                    size_t pos = 0;
+                    if (!pick_stored(start, pos)) {
+                        continue;
+                    }
+
+                    if (roll < 15 + w[0] + w[1]) {
+                        ASSERT_NO_FATAL_FAILURE(change(before, start, pos));
+                    } else {
+                        ASSERT_NO_FATAL_FAILURE(remove(before, start, pos));
+                    }
+                }
+
+                if (uniform(3) == 0) {
+                    ASSERT_NO_FATAL_FAILURE(regen_and_check());
+                }
+            }
+
+            ASSERT_NO_FATAL_FAILURE(regen_and_check());
+            ASSERT_TRUE(log.cache_warnings().empty());
+
+            // The sequence regenerated the cache both ways, saw bins fill and empty, and saw the
+            // largest bin, which decides how many plaintexts there are, grow and shrink
+            ASSERT_LT(0, incremental_count);
+            ASSERT_LT(0, full_count);
+            ASSERT_LT(0, filled_count);
+            ASSERT_LT(0, emptied_count);
+            ASSERT_LT(0, grew_count);
+            ASSERT_LT(0, shrank_count);
+
+            // A change, and then stripping, which regenerates the cache first, gives what
+            // stripping a BinBundle that generated its cache from nothing gives
+            size_t start = hot_locations[0] * f;
+            BundleState before(bb);
+            bool changed = false;
+            size_t pos = 0;
+            if (pick_stored(start, pos)) {
+                vector<felt_t> felts = stored_felts(start, pos);
+                changed =
+                    tagged
+                        ? bb.try_multi_remove(felts, bb.get_hashed_item_bins()[start][pos], start)
+                        : bb.try_multi_remove(felts, start);
+            }
+            ASSERT_NO_FATAL_FAILURE(check_marked(before, bb, changed, start, f));
+            BinBundle scratch = make_bundle(context, shape);
+            load_from_string(scratch, save_to_string(bb));
+            scratch.clear_cache();
+            scratch.strip();
+            bb.strip();
+            ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+            ASSERT_TRUE(save_to_string(scratch) == save_to_string(bb))
+                << "the saved stripped BinBundles differ";
+        }
+    } // namespace
+
+    TEST(BinBundleTests, ChangesMarkTheBinsTheyChange)
+    {
+        // A change to a BinBundle marks the bins it changes, and regenerating the cache then
+        // computes the polynomials of those bins only. A dry run, or a change that fails, marks
+        // nothing. Items here have two field elements, so each takes two bins.
+        PSIParams params = make_tag_params(1);
+        CryptoContext context(params);
+        context.set_evaluator();
+        size_t num_bins = params.bins_per_bundle();
+        BundleShape shape{ 2, 0, 2, tag_max_bin_size, 0, num_bins, true };
+        BinBundle bb = make_bundle(context, shape);
+        RegenLog log;
+
+        // A new BinBundle holds no polynomials, so every bin is dirty
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ num_bins }, log.regen(bb));
+        ASSERT_TRUE(dirty_bins_of(bb).empty());
+
+        AlgItemLabel a{ { 5, { 1, 2 } }, { 6, { 3, 4 } } };
+        AlgItemLabel b{ { 7, { 5, 6 } }, { 8, { 7, 8 } } };
+        ASSERT_EQ(1, bb.multi_insert_dry_run(a, 4));
+        ASSERT_TRUE(dirty_bins_of(bb).empty());
+        ASSERT_EQ(1, bb.multi_insert_for_real(a, 4));
+        ASSERT_EQ(bin_range(4, 2), dirty_bins_of(bb));
+        ASSERT_EQ(1, bb.multi_insert_for_real(b, 10));
+        ASSERT_EQ((vector<size_t>{ 4, 5, 10, 11 }), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 4 }, log.regen(bb));
+        ASSERT_TRUE(dirty_bins_of(bb).empty());
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+
+        // Changes that fail mark nothing
+        ASSERT_EQ(-1, bb.multi_insert_for_real(a, 4));
+        ASSERT_EQ(-1, bb.multi_insert_for_real(a, num_bins - 1));
+        ASSERT_FALSE(bb.try_multi_overwrite(AlgItemLabel{ { 9, { 0, 0 } }, { 9, { 0, 0 } } }, 4));
+        ASSERT_FALSE(bb.try_multi_remove({ 5, 9 }, 4));
+        ASSERT_FALSE(bb.cache_invalid());
+        ASSERT_TRUE(dirty_bins_of(bb).empty());
+
+        // Overwriting and removing mark the item's bins
+        ASSERT_TRUE(bb.try_multi_overwrite(AlgItemLabel{ { 7, { 9, 9 } }, { 8, { 9, 9 } } }, 10));
+        ASSERT_EQ(bin_range(10, 2), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+        ASSERT_TRUE(bb.try_multi_remove({ 5, 6 }, 4));
+        ASSERT_EQ(bin_range(4, 2), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+
+        // A BinBundle loaded with its cache keeps the polynomials of its bins; one loaded without
+        // it, or whose cache is cleared, has none, and every bin is dirty
+        BinBundle loaded = make_bundle(context, shape);
+        load_from_string(loaded, save_to_string(bb));
+        ASSERT_FALSE(loaded.cache_invalid());
+        ASSERT_TRUE(dirty_bins_of(loaded).empty());
+        ASSERT_EQ(1, loaded.multi_insert_for_real(a, 20));
+        ASSERT_EQ(bin_range(20, 2), dirty_bins_of(loaded));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(loaded));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(loaded, context, shape));
+        ASSERT_EQ(1, bb.multi_insert_for_real(a, 30));
+        load_from_string(loaded, save_to_string(bb));
+        ASSERT_TRUE(loaded.cache_invalid());
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(loaded));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(bb));
+        bb.clear_cache();
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ num_bins }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+
+        // A stripped BinBundle holds no polynomials either
+        bb.strip();
+        ASSERT_FALSE(bb.cache_invalid());
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+        ASSERT_TRUE(log.cache_warnings().empty());
+
+        // Without labels, an overwrite changes nothing, but marks every bin, so that the whole
+        // cache is generated again, as in APSI 1.x
+        BinBundle unlabeled =
+            make_bundle(context, { 0, 0, 2, tag_max_bin_size, 0, num_bins, true });
+        ASSERT_EQ(1, unlabeled.multi_insert_for_real(vector<felt_t>{ 5, 6 }, 4));
+        ASSERT_EQ(vector<size_t>{ num_bins }, log.regen(unlabeled));
+        ASSERT_FALSE(unlabeled.try_multi_overwrite(vector<felt_t>{ 5, 7 }, 4));
+        ASSERT_TRUE(dirty_bins_of(unlabeled).empty());
+        ASSERT_TRUE(unlabeled.try_multi_overwrite(vector<felt_t>{ 5, 6 }, 4));
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(unlabeled));
+        ASSERT_EQ(vector<size_t>{ num_bins }, log.regen(unlabeled));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(
+            unlabeled, context, { 0, 0, 2, tag_max_bin_size, 0, num_bins, true }));
+    }
+
+    TEST(BinBundleTagTests, ChangesMarkTheBinsTheyChange)
+    {
+        // As without match tags, and replacing an item marks its bins as well. Items here have
+        // two field elements.
+        PSIParams params = make_tag_params(2);
+        CryptoContext context(params);
+        context.set_evaluator();
+        size_t num_bins = params.bins_per_bundle();
+        size_t label_size = tag_part_count + 1;
+        BundleShape shape{ label_size, tag_part_count, 2, tag_max_bin_size, 0, num_bins, true };
+        BinBundle bb = make_bundle(context, shape);
+        RegenLog log;
+
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ num_bins }, log.regen(bb));
+
+        TaggedAlgItemLabel a = make_tagged_item(1, { 5, 6 }, label_size, 100);
+        TaggedAlgItemLabel b = make_tagged_item(2, { 7, 8 }, label_size, 200);
+        TaggedAlgItemLabel c = make_tagged_item(3, { 9, 10 }, label_size, 300);
+        ASSERT_EQ(1, bb.multi_insert_dry_run(a, 4));
+        ASSERT_TRUE(dirty_bins_of(bb).empty());
+        ASSERT_EQ(1, bb.multi_insert_for_real(a, 4));
+        ASSERT_EQ(1, bb.multi_insert_for_real(b, 10));
+        ASSERT_EQ((vector<size_t>{ 4, 5, 10, 11 }), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 4 }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+
+        // Changes that fail, and dry runs, mark nothing
+        HashedItem stranger(9, 9);
+        ASSERT_EQ(-1, bb.multi_insert_for_real(make_tagged_item(4, { 5, 1 }, label_size, 0), 4));
+        ASSERT_FALSE(bb.try_multi_overwrite(make_tagged_item(9, { 5, 6 }, label_size, 0), 4));
+        ASSERT_FALSE(bb.try_multi_remove({ 5, 6 }, stranger, 4));
+        ASSERT_FALSE(bb.try_multi_replace(stranger, 0, c, 4, false));
+        ASSERT_FALSE(bb.try_multi_replace(a.item, 1, c, 4, false));
+        ASSERT_FALSE(bb.try_multi_replace(a.item, 0, c, 10, false));
+        ASSERT_TRUE(bb.try_multi_replace(a.item, 0, c, 4, true));
+        ASSERT_FALSE(bb.cache_invalid());
+        ASSERT_TRUE(dirty_bins_of(bb).empty());
+
+        // Overwriting, replacing and removing mark the item's bins
+        ASSERT_TRUE(bb.try_multi_overwrite(make_tagged_item(1, { 5, 6 }, label_size, 900), 4));
+        ASSERT_EQ(bin_range(4, 2), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+        ASSERT_TRUE(bb.try_multi_replace(a.item, 0, c, 4, false));
+        ASSERT_EQ(bin_range(4, 2), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+        ASSERT_TRUE(bb.try_multi_remove({ 7, 8 }, b.item, 10));
+        ASSERT_EQ(bin_range(10, 2), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(bb));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(bb, context, shape));
+
+        // Loading, clearing and stripping, as without match tags
+        BinBundle loaded = make_bundle(context, shape);
+        load_from_string(loaded, save_to_string(bb));
+        ASSERT_TRUE(dirty_bins_of(loaded).empty());
+        ASSERT_EQ(1, loaded.multi_insert_for_real(b, 20));
+        ASSERT_EQ(bin_range(20, 2), dirty_bins_of(loaded));
+        ASSERT_EQ(vector<size_t>{ 2 }, log.regen(loaded));
+        ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(loaded, context, shape));
+        ASSERT_EQ(1, bb.multi_insert_for_real(b, 30));
+        load_from_string(loaded, save_to_string(bb));
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(loaded));
+        bb.clear_cache();
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+        ASSERT_EQ(vector<size_t>{ num_bins }, log.computed_while([&] { bb.strip(); }));
+        ASSERT_FALSE(bb.cache_invalid());
+        ASSERT_EQ(bin_range(0, num_bins), dirty_bins_of(bb));
+        ASSERT_TRUE(log.cache_warnings().empty());
+    }
+
+    TEST(BinBundleTests, PolynomialsThatDoNotFitTheirBinsAreComputedAgain)
+    {
+        // A loaded BinBundle keeps the polynomials it was saved with, which are trusted as the rest
+        // of a saved SenderDB is. Should a bin that has not changed have a matching polynomial
+        // without one more coefficient than the bin has items, regenerating the cache computes the
+        // polynomials of every bin again, with a warning, rather than keep any. The data here has
+        // a matching polynomial, and without match tags label polynomials, one coefficient short
+        // in bin 0, which loading cannot tell from right; bin 1 holds as many items, so that the
+        // number of plaintexts still fits them.
+        PSIParams params = make_tag_params(1);
+        CryptoContext context(params);
+        context.set_evaluator();
+        size_t num_bins = params.bins_per_bundle();
+
+        for (size_t label_size : { 0U, 1U }) {
+            BundleShape shape{ label_size, 0, 1, tag_max_bin_size, 0, num_bins, true };
+            auto insert = [&](BinBundle &bb, felt_t x, size_t bin) {
+                if (label_size) {
+                    return bb.multi_insert_for_real(AlgItemLabel{ { x, { x + 10 } } }, bin);
+                }
+                return bb.multi_insert_for_real(vector<felt_t>{ x }, bin);
+            };
+            BinBundle bb = make_bundle(context, shape);
+            for (felt_t x : { 5U, 6U, 7U }) {
+                ASSERT_LT(0, insert(bb, x, 0));
+                ASSERT_LT(0, insert(bb, x, 1));
+            }
+            bb.regen_cache();
+            BinBundleChanges c;
+            c.shorten_first_matching_polyn = true;
+            c.shorten_first_felt_interp_polyn = true;
+            string bytes = rebuild_bin_bundle(save_to_string(bb), c);
+
+            RegenLog log;
+            for (size_t changed_bin : { 0U, 2U }) {
+                BinBundle loaded = make_bundle(context, shape);
+                load_from_string(loaded, bytes);
+                ASSERT_TRUE(dirty_bins_of(loaded).empty());
+                ASSERT_EQ(3, loaded.get_cache().felt_matching_polyns[0].size());
+                ASSERT_LT(0, insert(loaded, 8, changed_bin));
+
+                // Once bin 0 has changed, its polynomials are computed again anyway
+                if (changed_bin == 0) {
+                    ASSERT_EQ(vector<size_t>{ 1 }, log.regen(loaded));
+                    ASSERT_TRUE(log.cache_warnings().empty());
+                } else {
+                    ASSERT_EQ(vector<size_t>{ num_bins }, log.regen(loaded));
+                    ASSERT_EQ(1, log.cache_warnings().size());
+                }
+                ASSERT_NO_FATAL_FAILURE(check_cache_as_from_scratch(loaded, context, shape));
+            }
+        }
+    }
+
+    TEST(BinBundleTests, RegeneratingAfterChangesGivesTheCacheFromScratch)
+    {
+        // Without match tags, labeled and not, with items of one and of three field elements,
+        // compressed, or uncompressed and with Paterson-Stockmeyer. The BinBundles have 256 bins,
+        // fewer than the plaintexts have slots, which are padded with zeros, so that they cost
+        // less to generate from nothing after every few changes. For the same reason the
+        // plaintexts have 2048 slots, modulo a single prime: every regeneration makes all of
+        // them, and nothing else a BinBundle does depends on their size. Each sequence of
+        // changes goes twice through the phases that favor insertions, changes and removals.
+        PSIParams params = make_tag_params(1, 2048);
+        CryptoContext context(params);
+        context.set_evaluator();
+
+        uint64_t seed = 1;
+        for (size_t label_size : { 0U, 2U }) {
+            for (size_t felts_per_item : { 1U, 3U }) {
+                for (bool compressed : { true, false }) {
+                    BundleShape shape{ label_size,           0,   felts_per_item, tag_max_bin_size,
+                                       compressed ? 0U : 3U, 256, compressed };
+                    SCOPED_TRACE(
+                        "label_size " + to_string(label_size) + ", felts_per_item " +
+                        to_string(felts_per_item) + ", compressed " + to_string(compressed));
+                    ASSERT_NO_FATAL_FAILURE(run_random_changes(context, shape, seed++, 240));
+                }
+            }
+        }
+    }
+
+    TEST(BinBundleTagTests, RegeneratingAfterChangesGivesTheCacheFromScratch)
+    {
+        // With match tags, labeled and not, with items of one and of two field elements,
+        // compressed, or uncompressed and with Paterson-Stockmeyer, in 256 bins and with
+        // plaintexts of 2048 slots, as without match tags
+        PSIParams params = make_tag_params(1, 2048);
+        CryptoContext context(params);
+        context.set_evaluator();
+
+        uint64_t seed = 100;
+        for (size_t label_size : { tag_part_count, tag_part_count + 2 }) {
+            for (size_t felts_per_item : { 1U, 2U }) {
+                for (bool compressed : { true, false }) {
+                    BundleShape shape{ label_size,       tag_part_count,       felts_per_item,
+                                       tag_max_bin_size, compressed ? 0U : 3U, 256,
+                                       compressed };
+                    SCOPED_TRACE(
+                        "label_size " + to_string(label_size) + ", felts_per_item " +
+                        to_string(felts_per_item) + ", compressed " + to_string(compressed));
+                    ASSERT_NO_FATAL_FAILURE(run_random_changes(context, shape, seed++, 240));
+                }
+            }
+        }
     }
 } // namespace APSITests
