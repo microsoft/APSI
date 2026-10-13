@@ -79,6 +79,12 @@ namespace apsi::sender {
     that matters, build the new state separately and direct later queries at it, or update while
     the sender is not serving.
 
+    In many cases the SenderDB does not need to be modified after having been constructed, or
+    loaded from disk. The function SenderDB::strip can be called to remove all data that is not
+    strictly needed to serve query requests. A SenderDB that has been stripped cannot be modified,
+    cannot be checked for the presence of specific items, and labels cannot be retrieved from it.
+    A stripped SenderDB can be serialized and deserialized.
+
     SenderDB::Load reads the header and each bin bundle as one buffer of at most about 2 GiB, and
     the header of a SenderDB that is not stripped holds a 16-byte HashedItem for each item, which
     limits it to about 134 million items. SenderDB::save refuses, with std::length_error and before
@@ -89,6 +95,9 @@ namespace apsi::sender {
     long labels. How large a full bin bundle is depends on the parameters, through the number of
     bins, max_items_per_bin and the coefficient modulus, and on the label size, but not on how many
     items are inserted, which only add bin bundles.
+
+    A saved SenderDB is trusted input. SenderDB::Load checks its structure, but a crafted file can
+    still make queries fail or answer wrongly, so load only a SenderDB you saved yourself.
     */
     class SenderDB {
     public:
