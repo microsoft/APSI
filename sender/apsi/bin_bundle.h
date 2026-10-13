@@ -715,6 +715,13 @@ namespace apsi::sender {
         polynomials, and, unless it is stripped, writes the HashedItems of its items. A BinBundle
         without match tags writes the fields APSI 1.x writes, though a compressed one bit-packs its
         plaintexts, or keeps them uncompressed, where APSI 1.x used Zstandard.
+
+        The BinBundle is written as one buffer, which SenderDB::Load reads only if it is at most
+        apsi::util::max_buffer_size bytes, just under 2 GiB. Throws std::length_error, giving the
+        size, for a BinBundle that might take more, and writes nothing then. The check is
+        conservative, so it may also refuse a BinBundle somewhat below the limit: by a fraction of
+        a percent of it with large bins, and by up to about a tenth with very small bins and long
+        labels.
         */
         std::size_t save(std::ostream &out, std::uint32_t bundle_idx) const;
 
@@ -724,7 +731,12 @@ namespace apsi::sender {
         rather than written as the BinBundle holds it. With seal::compr_mode_type::zstd, a
         compressed BinBundle without match tags is thus written as APSI 1.x writes it. The
         BinBundle does not change. Throws std::invalid_argument if Microsoft SEAL does not support
-        the compression mode.
+        the compression mode, and std::length_error if the BinBundle might take more than
+        SenderDB::Load reads, as the overload without a compression mode does; nothing is written
+        then. The check takes each plaintext saved again to be as large as Microsoft SEAL
+        estimates it may be in the compression mode, from its size uncompressed, which a plaintext
+        held uncompressed or bit-packed gives; one held compressed with Zstandard or zlib is taken
+        to be as large as the largest plaintext Microsoft SEAL loads.
         */
         std::size_t save(
             std::ostream &out,

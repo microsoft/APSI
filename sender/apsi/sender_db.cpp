@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <functional>
@@ -12,6 +13,7 @@
 #include <optional>
 #include <shared_mutex>
 #include <sstream>
+#include <stdexcept>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -25,6 +27,7 @@
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/log_noexcept.h"
+#include "apsi/util/save_size.h"
 #include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
@@ -1247,6 +1250,40 @@ namespace apsi {
             }
         } // namespace
 
+        namespace util {
+            SaveSizeBounds sender_db_header_save_size_bounds(
+                size_t params_byte_count,
+                size_t oprf_key_byte_count,
+                size_t hashed_item_count,
+                size_t bin_bundle_count)
+            {
+                // This mirrors SenderDB::save, and must be kept in step with it
+                FlatBufferSizeBounds sizer;
+                sizer.add_vector(
+                    params_byte_count, sizeof(uint8_t), flatbuffers::AlignOf<uint8_t>());
+                sizer.add_vector(
+                    oprf_key_byte_count, sizeof(uint8_t), flatbuffers::AlignOf<uint8_t>());
+                sizer.add_vector(
+                    hashed_item_count,
+                    sizeof(fbs::HashedItem),
+                    flatbuffers::AlignOf<fbs::HashedItem>());
+
+                // A bin bundle count of zero, its default, is not written
+                array<FlatBufferField, 5> fields{
+                    offset_field(fbs::SenderDB::VT_PARAMS),
+                    struct_field<fbs::SenderDBInfo>(fbs::SenderDB::VT_INFO),
+                    offset_field(fbs::SenderDB::VT_OPRF_KEY),
+                    offset_field(fbs::SenderDB::VT_HASHED_ITEMS),
+                    scalar_field<uint32_t>(fbs::SenderDB::VT_BIN_BUNDLE_COUNT)
+                };
+                sizer.add_table(
+                    fields.data(), bin_bundle_count ? fields.size() : fields.size() - 1);
+
+                sizer.finish_size_prefixed();
+                return sizer.bounds();
+            }
+        } // namespace util
+
         SenderDB::SenderDB(
             const PSIParams &params,
             size_t label_byte_count,
@@ -2202,6 +2239,61 @@ namespace apsi {
             stringstream ss;
             params_.save(ss);
             string params_str = ss.str();
+            auto oprf_key_span = oprf_key_.key_span();
+            auto bin_bundle_count = get_bin_bundle_count_unlocked();
+
+            // SenderDB::Load reads what precedes the BinBundles, and then each BinBundle, as a
+            // buffer of at most max_size bytes. A SenderDB with a buffer that might be larger is
+            // refused before anything is written, so that no file is left that cannot be loaded,
+            // not even in part. What decides is an upper bound on the size of each buffer.
+            size_t max_size = util::save_size_limit();
+            size_t hashed_item_count = get_hashed_items().size();
+            util::SaveSizeBounds header_bounds = util::sender_db_header_save_size_bounds(
+                params_str.size(), oprf_key_span.size(), hashed_item_count, bin_bundle_count);
+            if (header_bounds.upper > max_size) {
+                // The header holds the HashedItem of every item unless the SenderDB is stripped,
+                // and without them it takes a few hundred bytes
+                util::SaveSizeBounds stripped_bounds = util::sender_db_header_save_size_bounds(
+                    params_str.size(), oprf_key_span.size(), 0, bin_bundle_count);
+                stringstream msg;
+                if (hashed_item_count && (stripped_bounds.upper <= max_size)) {
+                    msg << "its " << hashed_item_count
+                        << " items are too many to save unstripped, as its header, which holds "
+                           "their HashedItems, "
+                        << util::refusal_reason(header_bounds, max_size)
+                        << "; SenderDB::strip() removes them";
+                } else {
+                    msg << "its header " << util::refusal_reason(header_bounds, max_size);
+                }
+                APSI_LOG_ERROR("Cannot save SenderDB: " << msg.str());
+                throw length_error("failed to save SenderDB: " + msg.str());
+            }
+
+            auto seal_context = crypto_context_.seal_context();
+            for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++) {
+                const auto &bundles = bin_bundles_[bundle_idx];
+                for (size_t i = 0; i < bundles.size(); i++) {
+                    util::SaveSizeBounds bounds = util::bin_bundle_save_size_bounds(
+                        bundles[i],
+                        static_cast<uint32_t>(bundle_idx),
+                        plaintext_compr_mode,
+                        *seal_context);
+                    if (bounds.upper <= max_size) {
+                        continue;
+                    }
+
+                    stringstream msg;
+                    if (bundles.size() > 1) {
+                        msg << "BinBundle " << i + 1 << " of " << bundles.size()
+                            << " at bundle index " << bundle_idx;
+                    } else {
+                        msg << "the BinBundle at bundle index " << bundle_idx;
+                    }
+                    msg << " " << util::refusal_reason(bounds, max_size);
+                    APSI_LOG_ERROR("Cannot save SenderDB: " << msg.str());
+                    throw length_error("failed to save SenderDB: " + msg.str());
+                }
+            }
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
@@ -2213,7 +2305,6 @@ namespace apsi {
                 safe_cast<uint32_t>(item_count_),
                 compressed_,
                 stripped_);
-            auto oprf_key_span = oprf_key_.key_span();
             auto oprf_key = fbs_builder.CreateVector(oprf_key_span.data(), oprf_key_span.size());
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&] {
                 // The HashedItems vector is populated with an immediately-invoked lambda
@@ -2231,8 +2322,6 @@ namespace apsi {
                 return ret;
             }());
 
-            auto bin_bundle_count = get_bin_bundle_count_unlocked();
-
             fbs::SenderDBBuilder sender_db_builder(fbs_builder);
             sender_db_builder.add_params(params);
             sender_db_builder.add_info(&info);
@@ -2241,6 +2330,16 @@ namespace apsi {
             sender_db_builder.add_bin_bundle_count(safe_cast<uint32_t>(bin_bundle_count));
             auto sdb = sender_db_builder.Finish();
             fbs_builder.FinishSizePrefixed(sdb);
+
+            // The bounds keep the header from being any larger, but should they ever fail to, a
+            // header that SenderDB::Load cannot read is still not written
+            if (fbs_builder.GetSize() > max_size) {
+                stringstream msg;
+                msg << "its header takes " << fbs_builder.GetSize() << " bytes, more than the "
+                    << max_size << " bytes SenderDB::Load reads";
+                APSI_LOG_ERROR("Cannot save SenderDB: " << msg.str());
+                throw length_error("failed to save SenderDB: " + msg.str());
+            }
 
             out.write(
                 reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),

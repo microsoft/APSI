@@ -5,9 +5,11 @@
 set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/cuckoo_filter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/cuckoo_filter_table.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/save_size.cpp
 )
 
-# Add header files for installation; log_noexcept.h is internal to APSI and is not installed
+# Add header files for installation; log_noexcept.h and save_size.h are internal to APSI and are
+# not installed
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/cuckoo_filter.h

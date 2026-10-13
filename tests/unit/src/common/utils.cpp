@@ -242,10 +242,11 @@ namespace APSITests {
 
     TEST(UtilsTests, ReadFromStreamSizePrefixedRefusesTooLargeASize)
     {
-        // A size prefix is accepted only if the buffer it announces, with the prefix, is smaller
-        // than FLATBUFFERS_MAX_BUFFER_SIZE, which is INT32_MAX, so that a peer cannot make the
-        // receiver allocate more. The stream ends right after the prefix, so that a size that is
-        // accepted fails as soon as its bytes are read, having allocated only the first 1 KiB.
+        // A size prefix is accepted only if the buffer it announces, with the prefix, is at most
+        // max_buffer_size bytes, one less than FLATBUFFERS_MAX_BUFFER_SIZE, which is INT32_MAX, so
+        // that a peer cannot make the receiver allocate more. The stream ends right after the
+        // prefix, so that a size that is accepted fails as soon as its bytes are read, having
+        // allocated only the first 1 KiB.
         auto read_error = [](uint32_t size) {
             stringstream ss(string(reinterpret_cast<const char *>(&size), sizeof(size)));
             try {
@@ -257,6 +258,7 @@ namespace APSITests {
         };
 
         auto int32_max = static_cast<uint32_t>(numeric_limits<int32_t>::max());
+        ASSERT_EQ(static_cast<size_t>(int32_max) - 1, max_buffer_size);
         ASSERT_EQ(string("read_from_stream: truncated input"), read_error(int32_max - 5));
         for (uint32_t size : { int32_max - 4, int32_max, numeric_limits<uint32_t>::max() }) {
             SCOPED_TRACE(size);

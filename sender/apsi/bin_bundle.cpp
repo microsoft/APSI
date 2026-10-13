@@ -3,10 +3,12 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstring>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 
 // APSI
@@ -15,6 +17,7 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/interpolate.h"
 #include "apsi/util/log_noexcept.h"
+#include "apsi/util/save_size.h"
 #include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
@@ -2314,7 +2317,213 @@ namespace apsi {
                 }());
                 return fbs::CreateBatchedPlaintextPolyn(fbs_builder, polyn_data);
             }
+
+            /**
+            Helper function. Returns the size of the members of the largest plaintext that
+            Microsoft SEAL loads for the given parameters, one in NTT form at the key level, with a
+            coefficient for every prime there in every slot, and the size of that plaintext saved in
+            the given compression mode.
+            */
+            pair<size_t, size_t> largest_plaintext_save_sizes(
+                const SEALContext &seal_context, compr_mode_type compr_mode)
+            {
+                const EncryptionParameters &parms = seal_context.key_context_data()->parms();
+                Plaintext pt(
+                    mul_safe(parms.poly_modulus_degree(), parms.coeff_modulus().size()),
+                    MemoryManager::GetPool(mm_prof_opt::mm_force_new));
+                size_t members_size = safe_cast<size_t>(pt.save_size(compr_mode_type::none)) -
+                                      sizeof(Serialization::SEALHeader);
+                return { members_size, safe_cast<size_t>(pt.save_size(compr_mode)) };
+            }
+
+            /**
+            Helper function. Returns the size of the members of the plaintext that data holds the
+            whole of bit-packed, which the bit-packed data records in 8 bytes, little-endian, right
+            after the SEALHeader. Returns nothing if data does not hold the whole of a bit-packed
+            plaintext.
+            */
+            optional<uint64_t> bit_packed_members_size(const vector<unsigned char> &data)
+            {
+                constexpr size_t header_size = sizeof(Serialization::SEALHeader);
+                if (data.size() < header_size + sizeof(uint64_t)) {
+                    return nullopt;
+                }
+
+                Serialization::SEALHeader header;
+                Serialization::LoadHeader(
+                    reinterpret_cast<const seal_byte *>(data.data()), data.size(), header);
+                if (!Serialization::IsValidHeader(header) ||
+                    (header.compr_mode != compr_mode_type::bitpack) ||
+                    (header.size != data.size())) {
+                    return nullopt;
+                }
+
+                uint64_t members_size = 0;
+                for (size_t i = 0; i < sizeof(uint64_t); i++) {
+                    members_size |= uint64_t{ data[header_size + i] } << (8 * i);
+                }
+                return members_size;
+            }
         } // namespace
+
+        namespace util {
+            SaveSizeBounds bin_bundle_save_size_bounds(
+                const BinBundle &bb,
+                uint32_t bundle_idx,
+                optional<compr_mode_type> plaintext_compr_mode,
+                const SEALContext &seal_context)
+            {
+                // Saved again uncompressed, a plaintext saved uncompressed is as large as it was.
+                // In another mode, it is at most as large as Microsoft SEAL estimates for its
+                // members, which are as large as it less its header. A bit-packed plaintext records
+                // the size of its members, and Microsoft SEAL loads no more than that. Any other
+                // plaintext, such as one compressed with Zstandard, is at most as large as the
+                // largest one Microsoft SEAL loads, which is found only if needed; so is a
+                // bit-packed one that records more than the members of that one, or too little for
+                // the bytes it holds.
+                //
+                // This assumes plaintexts as Microsoft SEAL writes them. A crafted SenderDB can
+                // defeat these bounds, as it can defeat other checks of a file that is trusted
+                // input, and the check of the size of the built buffer in save_internal then
+                // catches only a buffer under 4 GiB, where the size of the FlatBufferBuilder wraps.
+                optional<pair<size_t, size_t>> largest;
+                auto plaintext_size = [&](const vector<unsigned char> &data) -> SaveSizeBounds {
+                    if (!plaintext_compr_mode) {
+                        return { data.size(), data.size() };
+                    }
+
+                    constexpr size_t header_size = sizeof(Serialization::SEALHeader);
+                    auto saved_size = [&](size_t members_size) {
+                        return add_safe(
+                            header_size,
+                            Serialization::ComprSizeEstimate(members_size, *plaintext_compr_mode));
+                    };
+
+                    if (is_saved_uncompressed(data)) {
+                        if (*plaintext_compr_mode == compr_mode_type::none) {
+                            return { data.size(), data.size() };
+                        }
+                        return { 0, saved_size(data.size() - header_size) };
+                    }
+
+                    if (!largest) {
+                        largest = largest_plaintext_save_sizes(seal_context, *plaintext_compr_mode);
+                    }
+
+                    optional<uint64_t> recorded_size = bit_packed_members_size(data);
+                    if (recorded_size && (*recorded_size <= largest->first)) {
+                        auto members_size = static_cast<size_t>(*recorded_size);
+                        if (Serialization::ComprSizeEstimate(
+                                members_size, compr_mode_type::bitpack) >=
+                            data.size() - header_size) {
+                            return { 0, min(largest->second, saved_size(members_size)) };
+                        }
+                    }
+                    return { 0, largest->second };
+                };
+
+                // The vectors and tables that save_internal builds the FlatBuffer from. This
+                // mirrors save_internal, and must be kept in step with it.
+                FlatBufferSizeBounds sizer;
+                auto add_offset_vector = [&](size_t count) {
+                    sizer.add_vector(
+                        count, sizeof(flatbuffers::uoffset_t), sizeof(flatbuffers::uoffset_t));
+                };
+
+                auto add_felt_matrix = [&](const vector<vector<felt_t>> &rows) {
+                    for (const auto &row : rows) {
+                        sizer.add_vector(
+                            row.size(), sizeof(felt_t), flatbuffers::AlignOf<felt_t>());
+                        sizer.add_table({ offset_field(fbs::FEltArray::VT_FELTS) });
+                    }
+                    add_offset_vector(rows.size());
+                    sizer.add_table({ offset_field(fbs::FEltMatrix::VT_ROWS) });
+                };
+
+                auto add_batched_plaintext_polyn = [&](const vector<vector<unsigned char>> &polyn) {
+                    for (const auto &coeff : polyn) {
+                        sizer.add_vector(
+                            plaintext_size(coeff),
+                            sizeof(uint8_t),
+                            flatbuffers::AlignOf<uint8_t>());
+                        sizer.add_table({ offset_field(fbs::Plaintext::VT_DATA) });
+                    }
+                    add_offset_vector(polyn.size());
+                    sizer.add_table({ offset_field(fbs::BatchedPlaintextPolyn::VT_COEFFS) });
+                };
+
+                add_felt_matrix(bb.get_item_bins());
+                for (const auto &bins : bb.get_label_bins()) {
+                    add_felt_matrix(bins);
+                }
+                add_offset_vector(bb.get_label_bins().size());
+
+                bool has_cache = !bb.cache_invalid();
+                if (has_cache) {
+                    const BinBundleCache &cache = bb.get_cache();
+                    if (!bb.uses_tags()) {
+                        add_felt_matrix(cache.felt_matching_polyns);
+                        add_batched_plaintext_polyn(cache.batched_matching_polyn.batched_coeffs);
+                    }
+                    for (const auto &polyns : cache.felt_interp_polyns) {
+                        add_felt_matrix(polyns);
+                    }
+                    add_offset_vector(cache.felt_interp_polyns.size());
+                    for (const auto &polyn : cache.batched_interp_polyns) {
+                        add_batched_plaintext_polyn(polyn.batched_coeffs);
+                    }
+                    add_offset_vector(cache.batched_interp_polyns.size());
+
+                    if (bb.uses_tags()) {
+                        sizer.add_table(
+                            { offset_field(fbs::BinBundleCache::VT_FELT_INTERP_POLYNS),
+                              offset_field(fbs::BinBundleCache::VT_BATCHED_INTERP_POLYNS) });
+                    } else {
+                        sizer.add_table(
+                            { offset_field(fbs::BinBundleCache::VT_FELT_MATCHING_POLYNS),
+                              offset_field(fbs::BinBundleCache::VT_BATCHED_MATCHING_POLYN),
+                              offset_field(fbs::BinBundleCache::VT_FELT_INTERP_POLYNS),
+                              offset_field(fbs::BinBundleCache::VT_BATCHED_INTERP_POLYNS) });
+                    }
+                }
+
+                bool has_hashed_items = bb.uses_tags() && !bb.is_stripped();
+                if (has_hashed_items) {
+                    size_t hashed_item_count = 0;
+                    for (const auto &hashed_item_bin : bb.get_hashed_item_bins()) {
+                        hashed_item_count += hashed_item_bin.size();
+                    }
+                    sizer.add_vector(
+                        hashed_item_count,
+                        sizeof(fbs::ItemHash),
+                        flatbuffers::AlignOf<fbs::ItemHash>());
+                }
+
+                // A scalar field equal to its default is not written. The field modulus, the plain
+                // modulus, is never zero.
+                array<FlatBufferField, 7> fields{};
+                size_t field_count = 0;
+                if (bundle_idx) {
+                    fields[field_count++] = scalar_field<uint32_t>(fbs::BinBundle::VT_BUNDLE_IDX);
+                }
+                fields[field_count++] = scalar_field<uint64_t>(fbs::BinBundle::VT_MOD);
+                fields[field_count++] = offset_field(fbs::BinBundle::VT_ITEM_BINS);
+                fields[field_count++] = offset_field(fbs::BinBundle::VT_LABEL_BINS);
+                if (has_cache) {
+                    fields[field_count++] = offset_field(fbs::BinBundle::VT_CACHE);
+                }
+                if (bb.is_stripped()) {
+                    fields[field_count++] = scalar_field<uint8_t>(fbs::BinBundle::VT_STRIPPED);
+                }
+                if (has_hashed_items) {
+                    fields[field_count++] = offset_field(fbs::BinBundle::VT_HASHED_ITEMS);
+                }
+                sizer.add_table(fields.data(), field_count);
+
+                sizer.finish_size_prefixed();
+                return sizer.bounds();
+            }
+        } // namespace util
 
         size_t BinBundle::save(ostream &out, uint32_t bundle_idx) const
         {
@@ -2337,8 +2546,25 @@ namespace apsi {
         size_t BinBundle::save_internal(
             ostream &out, uint32_t bundle_idx, optional<compr_mode_type> plaintext_compr_mode) const
         {
-            flatbuffers::FlatBufferBuilder fbs_builder(1024);
             auto seal_context = crypto_context_.seal_context();
+
+            // Refuse, before building anything, a BinBundle that might take more than
+            // SenderDB::Load reads: what decides is an upper bound on its size
+            size_t max_size = util::save_size_limit();
+            util::SaveSizeBounds bounds = util::bin_bundle_save_size_bounds(
+                *this, bundle_idx, plaintext_compr_mode, *seal_context);
+            if (bounds.upper > max_size) {
+                string reason = util::refusal_reason(bounds, max_size);
+                APSI_LOG_ERROR(
+                    "Cannot save the BinBundle at bundle index " << bundle_idx << ": it "
+                                                                 << reason);
+                stringstream ss;
+                ss << "failed to save BinBundle: at bundle index " << bundle_idx << ", it "
+                   << reason;
+                throw length_error(ss.str());
+            }
+
+            flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             // Write the items and labels
             auto item_bins = fbs_create_felt_matrix(fbs_builder, item_bins_);
@@ -2431,6 +2657,22 @@ namespace apsi {
 
             auto bb = bin_bundle_builder.Finish();
             fbs_builder.FinishSizePrefixed(bb);
+
+            // The bounds keep the buffer from being any larger, but should they ever fail to, a
+            // buffer that SenderDB::Load cannot read is still not written, unless it reaches
+            // 4 GiB, where the size of the FlatBufferBuilder wraps
+            if (fbs_builder.GetSize() > max_size) {
+                stringstream reason;
+                reason << "takes " << fbs_builder.GetSize() << " bytes, more than the " << max_size
+                       << " bytes SenderDB::Load reads";
+                APSI_LOG_ERROR(
+                    "Cannot save the BinBundle at bundle index " << bundle_idx << ": it "
+                                                                 << reason.str());
+                stringstream ss;
+                ss << "failed to save BinBundle: at bundle index " << bundle_idx << ", it "
+                   << reason.str();
+                throw length_error(ss.str());
+            }
 
             out.write(
                 reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),

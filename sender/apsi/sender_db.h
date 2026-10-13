@@ -78,6 +78,17 @@ namespace apsi::sender {
     every plaintext of the bin bundle again, as each holds coefficients of all its bins. Where
     that matters, build the new state separately and direct later queries at it, or update while
     the sender is not serving.
+
+    SenderDB::Load reads the header and each bin bundle as one buffer of at most about 2 GiB, and
+    the header of a SenderDB that is not stripped holds a 16-byte HashedItem for each item, which
+    limits it to about 134 million items. SenderDB::save refuses, with std::length_error and before
+    it writes anything, a SenderDB that SenderDB::Load might not read, so a SenderDB of more items,
+    such as 256 million, can be saved only once SenderDB::strip has removed its HashedItems. The
+    check is conservative, so it may also refuse a bin bundle somewhat below the limit: by a
+    fraction of a percent of it with large bins, and by up to about a tenth with very small bins and
+    long labels. How large a full bin bundle is depends on the parameters, through the number of
+    bins, max_items_per_bin and the coefficient modulus, and on the label size, but not on how many
+    items are inserted, which only add bin bundles.
     */
     class SenderDB {
     public:
@@ -386,7 +397,8 @@ namespace apsi::sender {
 
         /**
         Writes the SenderDB to a stream, with its plaintexts as it holds them; see
-        PlaintextSaveMode.
+        PlaintextSaveMode. Throws std::length_error, and writes nothing, if SenderDB::Load might
+        not read what this would write; see the overload taking a PlaintextSaveMode.
         */
         std::size_t save(std::ostream &out) const;
 
@@ -403,6 +415,14 @@ namespace apsi::sender {
         which APSI 1.x cannot use, and std::invalid_argument if the SenderDB is compressed and
         Microsoft SEAL was built without Zstandard, or if the mode is not a PlaintextSaveMode.
         Nothing is written then.
+
+        SenderDB::Load reads the header, and then each bin bundle, as one buffer of at most
+        apsi::util::max_buffer_size bytes, just under 2 GiB. Throws std::length_error, giving the
+        size, and writes nothing, if either might take more: a bin bundle, named by its bundle
+        index, or the header, which holds the 16-byte HashedItem of every item until SenderDB::strip
+        removes them, and so is too large for more than about 134 million items. The check is
+        conservative (see BinBundle::save), more so with PlaintextSaveMode::apsi_1x for a compressed
+        SenderDB, as each plaintext is then taken to be as large as Zstandard could make it.
         */
         std::size_t save(std::ostream &out, PlaintextSaveMode mode) const;
 

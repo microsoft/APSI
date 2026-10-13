@@ -9,12 +9,14 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <memory>
 #include <numeric>
 #include <random>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -39,6 +41,7 @@
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/match_tag.h"
+#include "apsi/util/save_size.h"
 #include "apsi/util/utils.h"
 
 // Kuku
@@ -56,6 +59,8 @@ using namespace std;
 using namespace apsi;
 using namespace apsi::sender;
 using namespace seal;
+using apsi::sender::util::ScopedSaveSizeLimit;
+using apsi::sender::util::sender_db_header_save_size_bounds;
 
 namespace APSITests {
     namespace {
@@ -1075,6 +1080,124 @@ namespace APSITests {
         string data = header_declaring(ss.str(), 1) + string(sizeof(uint32_t), '\xFF');
 
         ASSERT_EQ(string("failed to load SenderDB"), load_error(data));
+    }
+
+    TEST(SenderDBTests, SaveRefusesWhatLoadCannotRead)
+    {
+        // SenderDB::Load reads the header of a saved SenderDB, and then each of its BinBundles, as
+        // a buffer of at most apsi::util::max_buffer_size bytes, and SenderDB::save refuses a
+        // SenderDB that might have any larger before it writes anything, with both overloads and
+        // in both plaintext save modes. The limit is lowered on this thread so that a small
+        // SenderDB can stand for one of gigabytes; nothing else changes.
+        PSIParams params = with_shallow_bins(*get_params1(), 3);
+        ASSERT_EQ(uint32_t(1), params.bundle_idx_count());
+        SenderDB sender_db(params, fixed_oprf_key(), 20, 16, true);
+        vector<pair<Item, Label>> data;
+        for (uint64_t val = 0; sender_db.get_bin_bundle_count() < 3; val++) {
+            data.emplace_back(Item(val, ~val), create_label(static_cast<unsigned char>(val), 20));
+            sender_db.insert_or_assign(data.back());
+        }
+
+        // The header holds the HashedItem of every item unless the SenderDB is stripped. What save
+        // writes of it is within the bounds on its size.
+        stringstream params_ss;
+        size_t params_byte_count = sender_db.get_params().save(params_ss);
+        auto header_bounds = [&](size_t hashed_item_count) {
+            return sender_db_header_save_size_bounds(
+                params_byte_count, oprf::oprf_key_size, hashed_item_count, 3);
+        };
+        auto check_header_size = [&](const string &saved, size_t hashed_item_count) {
+            size_t header_size = prefixed_size_at(saved, 0);
+            ASSERT_LE(header_bounds(hashed_item_count).lower, header_size);
+            ASSERT_GE(header_bounds(hashed_item_count).upper, header_size);
+        };
+        size_t unstripped_header_upper = header_bounds(data.size()).upper;
+
+        // Returns the message with which save refuses the SenderDB under the limit, having
+        // written nothing
+        auto refusal = [&](const function<size_t(ostream &)> &save, size_t limit) {
+            ScopedSaveSizeLimit scoped_limit(limit);
+            stringstream ss;
+            string what;
+            try {
+                save(ss);
+                ADD_FAILURE() << "the SenderDB was saved";
+            } catch (const length_error &ex) {
+                what = ex.what();
+            }
+            EXPECT_TRUE(ss.str().empty());
+            return what;
+        };
+        auto more_than = [](size_t limit) {
+            return " bytes, more than the " + to_string(limit) + " bytes SenderDB::Load reads";
+        };
+
+        vector<pair<string, function<size_t(ostream &)>>> saves{
+            { "save", [&](ostream &out) { return sender_db.save(out); } },
+            { "as_stored",
+              [&](ostream &out) {
+                  return sender_db.save(out, SenderDB::PlaintextSaveMode::as_stored);
+              } },
+            { "apsi_1x",
+              [&](ostream &out) {
+                  return sender_db.save(out, SenderDB::PlaintextSaveMode::apsi_1x);
+              } }
+        };
+        for (const auto &[save_name, save] : saves) {
+            SCOPED_TRACE(save_name);
+            stringstream ss;
+            size_t size = save(ss);
+            ASSERT_EQ(ss.str().size(), size);
+            ASSERT_NO_FATAL_FAILURE(check_header_size(ss.str(), data.size()));
+            auto [loaded, loaded_size] = SenderDB::Load(ss);
+            ASSERT_EQ(size, loaded_size);
+            ASSERT_EQ(data.size(), loaded.get_item_count());
+            for (const auto &[item, label] : data) {
+                ASSERT_EQ(label, loaded.get_label(item));
+            }
+
+            // Under a limit that the header fits, the first BinBundle, with the labels and cache
+            // of its items, takes more; under one that the header might not fit, it is refused for
+            // the items
+            size_t limit = unstripped_header_upper;
+            string what = refusal(save, limit);
+            ASSERT_EQ(
+                size_t(0),
+                what.find(
+                    "failed to save SenderDB: BinBundle 1 of 3 at bundle index 0 takes at "
+                    "least "));
+            ASSERT_NE(string::npos, what.find(more_than(limit)));
+            ASSERT_EQ(
+                "failed to save SenderDB: its " + to_string(data.size()) +
+                    " items are too many to save unstripped, as its header, which holds their "
+                    "HashedItems, takes up to " +
+                    to_string(limit) + more_than(limit - 1) + "; SenderDB::strip() removes them",
+                refusal(save, limit - 1));
+        }
+
+        // Stripped, the SenderDB saves no HashedItems, so that under the same limit the first
+        // BinBundle is refused instead. Under a limit that even a stripped header might not fit,
+        // which no real limit is, the items are not blamed.
+        sender_db.strip();
+        auto save = [&](ostream &out) {
+            return sender_db.save(out);
+        };
+        string what = refusal(save, unstripped_header_upper - 1);
+        ASSERT_EQ(
+            size_t(0), what.find("failed to save SenderDB: BinBundle 1 of 3 at bundle index 0 "));
+        size_t stripped_header_upper = header_bounds(0).upper;
+        ASSERT_EQ(
+            "failed to save SenderDB: its header takes up to " + to_string(stripped_header_upper) +
+                more_than(stripped_header_upper - 1),
+            refusal(save, stripped_header_upper - 1));
+
+        stringstream stripped_ss;
+        size_t stripped_size = save(stripped_ss);
+        ASSERT_NO_FATAL_FAILURE(check_header_size(stripped_ss.str(), 0));
+        auto [loaded, loaded_size] = SenderDB::Load(stripped_ss);
+        ASSERT_TRUE(loaded.is_stripped());
+        ASSERT_EQ(stripped_size, loaded_size);
+        ASSERT_EQ(data.size(), loaded.get_item_count());
     }
 
     TEST(SenderDBTests, SaveLoadUnlabeled)

@@ -6,8 +6,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <set>
 #include <sstream>
@@ -23,6 +25,7 @@
 #include "apsi/bin_bundle_generated.h"
 #include "apsi/log.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/save_size.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -4720,6 +4723,386 @@ namespace APSITests {
                         to_string(felts_per_item) + ", compressed " + to_string(compressed));
                     ASSERT_NO_FATAL_FAILURE(run_random_changes(context, shape, seed++, 240));
                 }
+            }
+        }
+    }
+
+    namespace {
+        using apsi::sender::util::bin_bundle_save_size_bounds;
+        using apsi::sender::util::SaveSizeBounds;
+        using apsi::sender::util::ScopedSaveSizeLimit;
+
+        /**
+        Compression modes for a BinBundle to save its plaintexts again in, and nothing, for saving
+        them as it holds them. Zstandard stands for zlib as well, whose sizes are found alike.
+        */
+        vector<optional<compr_mode_type>> plaintext_save_modes()
+        {
+            vector<optional<compr_mode_type>> modes{ nullopt,
+                                                     compr_mode_type::none,
+                                                     compr_mode_type::bitpack };
+#ifdef SEAL_USE_ZSTD
+            modes.emplace_back(compr_mode_type::zstd);
+#endif
+            return modes;
+        }
+
+        size_t save_in_mode(
+            const BinBundle &bb, ostream &out, uint32_t bundle_idx, optional<compr_mode_type> mode)
+        {
+            return mode ? bb.save(out, bundle_idx, *mode) : bb.save(out, bundle_idx);
+        }
+
+        /**
+        Inserts count items of item_size field elements each at random places of a BinBundle,
+        with match tags or without, as the BinBundle has them. Those that do not fit are left out.
+        */
+        void insert_at_random(BinBundle &bb, size_t count, size_t item_size, mt19937_64 &rng)
+        {
+            size_t label_size = bb.get_label_size();
+            auto felt = [&] {
+                return static_cast<felt_t>(1 + rng() % 1000);
+            };
+            for (uint64_t i = 0; i < count; i++) {
+                size_t start = rng() % (bb.get_num_bins() - item_size + 1);
+                if (bb.uses_tags()) {
+                    vector<felt_t> felts(item_size);
+                    generate(felts.begin(), felts.end(), felt);
+                    bb.multi_insert_for_real(
+                        make_tagged_item(i + 1, felts, label_size, felt()), start);
+                } else if (label_size) {
+                    AlgItemLabel item;
+                    for (size_t s = 0; s < item_size; s++) {
+                        item.emplace_back(felt(), create_label(label_size, felt()));
+                    }
+                    bb.multi_insert_for_real(item, start);
+                } else {
+                    AlgItem item(item_size);
+                    generate(item.begin(), item.end(), felt);
+                    bb.multi_insert_for_real(item, start);
+                }
+            }
+        }
+
+        /**
+        Returns the size of a saved BinBundle without its padding and vtables, from what the buffer
+        holds: its size prefix and root offset, every vector with its length, and every table with
+        its offset to its vtable and the fields it has. This is what the lower bound on the size
+        counts. Every table must have no field but those listed for it here, so that a field that
+        is added to the schema, and written, fails the comparison until it is counted.
+        */
+        size_t saved_content_size(const string &saved)
+        {
+            constexpr size_t offset_size = sizeof(flatbuffers::uoffset_t);
+            auto vector_size = [](size_t count, size_t elem_size) {
+                return offset_size + count * elem_size;
+            };
+            auto table_size = [](const void *table,
+                                 initializer_list<pair<flatbuffers::voffset_t, size_t>> fields) {
+                const auto *t = static_cast<const flatbuffers::Table *>(table);
+                size_t size = sizeof(flatbuffers::soffset_t);
+                flatbuffers::voffset_t last_voffset = 0;
+                for (const auto &[voffset, field_size] : fields) {
+                    if (t->CheckField(voffset)) {
+                        size += field_size;
+                    }
+                    last_voffset = max(last_voffset, voffset);
+                }
+
+                // The vtable, which begins with its size, has no slot past the last field listed
+                EXPECT_LE(
+                    size_t{ flatbuffers::ReadScalar<flatbuffers::voffset_t>(t->GetVTable()) },
+                    last_voffset + sizeof(flatbuffers::voffset_t));
+                return size;
+            };
+            auto felt_matrix_size = [&](const fbs::FEltMatrix &matrix) {
+                size_t size = table_size(&matrix, { { fbs::FEltMatrix::VT_ROWS, offset_size } }) +
+                              vector_size(matrix.rows()->size(), offset_size);
+                for (const auto *row : *matrix.rows()) {
+                    size += table_size(row, { { fbs::FEltArray::VT_FELTS, offset_size } }) +
+                            vector_size(row->felts()->size(), sizeof(felt_t));
+                }
+                return size;
+            };
+            auto plaintext_polyn_size = [&](const fbs::BatchedPlaintextPolyn &polyn) {
+                size_t size =
+                    table_size(&polyn, { { fbs::BatchedPlaintextPolyn::VT_COEFFS, offset_size } }) +
+                    vector_size(polyn.coeffs()->size(), offset_size);
+                for (const auto *coeff : *polyn.coeffs()) {
+                    size += table_size(coeff, { { fbs::Plaintext::VT_DATA, offset_size } }) +
+                            vector_size(coeff->data()->size(), sizeof(uint8_t));
+                }
+                return size;
+            };
+
+            const fbs::BinBundle &bb = *fbs::GetSizePrefixedBinBundle(saved.data());
+            size_t size = 2 * offset_size + felt_matrix_size(*bb.item_bins()) +
+                          table_size(
+                              &bb,
+                              { { fbs::BinBundle::VT_BUNDLE_IDX, sizeof(uint32_t) },
+                                { fbs::BinBundle::VT_MOD, sizeof(uint64_t) },
+                                { fbs::BinBundle::VT_ITEM_BINS, offset_size },
+                                { fbs::BinBundle::VT_LABEL_BINS, offset_size },
+                                { fbs::BinBundle::VT_CACHE, offset_size },
+                                { fbs::BinBundle::VT_STRIPPED, sizeof(uint8_t) },
+                                { fbs::BinBundle::VT_HASHED_ITEMS, offset_size } });
+
+            if (const auto *label_bins = bb.label_bins()) {
+                size += vector_size(label_bins->size(), offset_size);
+                for (const auto *matrix : *label_bins) {
+                    size += felt_matrix_size(*matrix);
+                }
+            }
+
+            if (const auto *cache = bb.cache()) {
+                size += table_size(
+                    cache,
+                    { { fbs::BinBundleCache::VT_FELT_MATCHING_POLYNS, offset_size },
+                      { fbs::BinBundleCache::VT_BATCHED_MATCHING_POLYN, offset_size },
+                      { fbs::BinBundleCache::VT_FELT_INTERP_POLYNS, offset_size },
+                      { fbs::BinBundleCache::VT_BATCHED_INTERP_POLYNS, offset_size } });
+                if (const auto *polyns = cache->felt_matching_polyns()) {
+                    size += felt_matrix_size(*polyns);
+                }
+                if (const auto *polyn = cache->batched_matching_polyn()) {
+                    size += plaintext_polyn_size(*polyn);
+                }
+                if (const auto *polyns = cache->felt_interp_polyns()) {
+                    size += vector_size(polyns->size(), offset_size);
+                    for (const auto *matrix : *polyns) {
+                        size += felt_matrix_size(*matrix);
+                    }
+                }
+                if (const auto *polyns = cache->batched_interp_polyns()) {
+                    size += vector_size(polyns->size(), offset_size);
+                    for (const auto *polyn : *polyns) {
+                        size += plaintext_polyn_size(*polyn);
+                    }
+                }
+            }
+
+            if (const auto *hashed_items = bb.hashed_items()) {
+                size += vector_size(hashed_items->size(), sizeof(fbs::ItemHash));
+            }
+            return size;
+        }
+
+        /**
+        Checks that the bounds on the size of a saved BinBundle are on either side of what save
+        writes, in every plaintext save mode, and that, saved as held, where the size of every
+        plaintext is known, the lower bound is exactly what the buffer holds but padding and
+        vtables.
+        */
+        void check_save_size_bounds(
+            const BinBundle &bb, const CryptoContext &context, uint32_t bundle_idx)
+        {
+            for (const auto &mode : plaintext_save_modes()) {
+                SCOPED_TRACE(
+                    mode ? "saved again in mode " + to_string(static_cast<int>(*mode))
+                         : string("saved as held"));
+                stringstream ss;
+                size_t saved = save_in_mode(bb, ss, bundle_idx, mode);
+                ASSERT_EQ(saved, ss.str().size());
+
+                SaveSizeBounds bounds =
+                    bin_bundle_save_size_bounds(bb, bundle_idx, mode, *context.seal_context());
+                ASSERT_LE(bounds.lower, saved);
+                ASSERT_GE(bounds.upper, saved);
+                if (!mode) {
+                    ASSERT_EQ(saved_content_size(ss.str()), bounds.lower);
+                }
+            }
+        }
+    } // namespace
+
+    TEST(BinBundleTests, SaveSizeBoundsBracketTheSavedSize)
+    {
+        // The size of a saved BinBundle is bounded on both sides without building it: empty and
+        // with items, with and without labels, match tags, Paterson-Stockmeyer and in-memory
+        // compression, with plaintexts modulo a prime of 60 bits, which are held uncompressed,
+        // with and without its cache, stripped, and at bundle index 0, which FlatBuffers leaves
+        // out as the default, and at another
+        mt19937_64 rng(0x5A5E);
+        auto test_fun = [&](BinBundle bb, const CryptoContext &context, size_t item_size) {
+            for (uint32_t bundle_idx : { 0U, 7U }) {
+                SCOPED_TRACE("bundle index " + to_string(bundle_idx));
+                ASSERT_NO_FATAL_FAILURE(check_save_size_bounds(bb, context, bundle_idx));
+            }
+            bb.regen_cache();
+            ASSERT_NO_FATAL_FAILURE(check_save_size_bounds(bb, context, 0));
+
+            insert_at_random(bb, 100, item_size, rng);
+            ASSERT_FALSE(bb.empty());
+            ASSERT_NO_FATAL_FAILURE(check_save_size_bounds(bb, context, 3));
+            bb.regen_cache();
+            ASSERT_NO_FATAL_FAILURE(check_save_size_bounds(bb, context, 7));
+
+            bb.strip();
+            ASSERT_NO_FATAL_FAILURE(check_save_size_bounds(bb, context, 0));
+        };
+
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+        auto params_60 = get_params_with_data_prime(60);
+        CryptoContext context_60(*params_60);
+        context_60.set_evaluator();
+        for (size_t label_size : { 0U, 2U }) {
+            for (size_t ps_low_degree : { 0U, 3U }) {
+                for (bool compressed : { true, false }) {
+                    SCOPED_TRACE(
+                        "label_size " + to_string(label_size) + ", ps_low_degree " +
+                        to_string(ps_low_degree) + ", compressed " + to_string(compressed));
+                    ASSERT_NO_FATAL_FAILURE(test_fun(
+                        BinBundle(
+                            context,
+                            label_size,
+                            params->table_params().max_items_per_bin,
+                            ps_low_degree,
+                            params->bins_per_bundle(),
+                            compressed,
+                            false),
+                        context,
+                        params->item_params().felts_per_item));
+                }
+
+                // A compressed BinBundle holds plaintexts modulo a prime of 60 bits uncompressed
+                SCOPED_TRACE(
+                    "60-bit prime, label_size " + to_string(label_size) + ", ps_low_degree " +
+                    to_string(ps_low_degree));
+                ASSERT_NO_FATAL_FAILURE(test_fun(
+                    BinBundle(
+                        context_60,
+                        label_size,
+                        params_60->table_params().max_items_per_bin,
+                        ps_low_degree,
+                        params_60->bins_per_bundle(),
+                        true,
+                        false),
+                    context_60,
+                    params_60->item_params().felts_per_item));
+            }
+        }
+
+        for (uint32_t felts_per_item : { 1U, 2U }) {
+            PSIParams tag_params = make_tag_params(felts_per_item);
+            CryptoContext tag_context(tag_params);
+            tag_context.set_evaluator();
+            for (size_t label_size : { tag_part_count, tag_part_count + 2 }) {
+                for (bool compressed : { true, false }) {
+                    SCOPED_TRACE(
+                        "match tags, felts_per_item " + to_string(felts_per_item) +
+                        ", label_size " + to_string(label_size) + ", compressed " +
+                        to_string(compressed));
+                    ASSERT_NO_FATAL_FAILURE(test_fun(
+                        BinBundle(
+                            tag_context,
+                            label_size,
+                            tag_max_bin_size,
+                            0,
+                            tag_params.bins_per_bundle(),
+                            compressed,
+                            false,
+                            tag_part_count),
+                        tag_context,
+                        felts_per_item));
+                }
+            }
+        }
+    }
+
+    TEST(BinBundleTests, BoundOnSavingBitPackedPlaintextsUncompressedIsTight)
+    {
+        // A compressed BinBundle holds its plaintexts bit-packed, at the level they are encoded at,
+        // below the largest that Microsoft SEAL loads. Each records the size it unpacks to, so that
+        // the bound on what it is saved again as uncompressed is close to that. With few bins, the
+        // plaintexts are nearly all of the BinBundle.
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+        BinBundle bb(context, 0, params->table_params().max_items_per_bin, 0, 64, true, false);
+        mt19937_64 rng(0x5A5E);
+        insert_at_random(bb, 200, params->item_params().felts_per_item, rng);
+        bb.regen_cache();
+        const BatchedPlaintextPolyn &polyn = bb.get_cache().batched_matching_polyn;
+        ASSERT_EQ(
+            vector<compr_mode_type>(polyn.batched_coeffs.size(), compr_mode_type::bitpack),
+            stored_compr_modes(polyn));
+
+        stringstream ss;
+        size_t saved = bb.save(ss, 0, compr_mode_type::none);
+        SaveSizeBounds bounds =
+            bin_bundle_save_size_bounds(bb, 0, compr_mode_type::none, *context.seal_context());
+        ASSERT_LE(saved, bounds.upper);
+        ASSERT_LT(20 * bounds.upper, 21 * saved);
+    }
+
+    TEST(BinBundleTests, SaveRefusesWhatSenderDBLoadCannotRead)
+    {
+        // A BinBundle that might take more than SenderDB::Load reads is refused before anything
+        // is built or written, by both overloads of save, with a message that gives its bundle
+        // index and its size. The limit is lowered on this thread so that a small BinBundle can
+        // stand for one of gigabytes; nothing else changes.
+        auto params = get_params1();
+        CryptoContext context(*params);
+        context.set_evaluator();
+        auto new_bundle = [&] {
+            return BinBundle(
+                context,
+                2,
+                params->table_params().max_items_per_bin,
+                params->query_params().ps_low_degree,
+                params->bins_per_bundle(),
+                true,
+                false);
+        };
+        BinBundle bb = new_bundle();
+        mt19937_64 rng(0x5A5E);
+        insert_at_random(bb, 100, params->item_params().felts_per_item, rng);
+        bb.regen_cache();
+
+        const uint32_t bundle_idx = 7;
+        for (const auto &mode : plaintext_save_modes()) {
+            SCOPED_TRACE(
+                mode ? "saved again in mode " + to_string(static_cast<int>(*mode))
+                     : string("saved as held"));
+            stringstream expected_ss;
+            size_t size = save_in_mode(bb, expected_ss, bundle_idx, mode);
+            string expected = expected_ss.str();
+            SaveSizeBounds bounds =
+                bin_bundle_save_size_bounds(bb, bundle_idx, mode, *context.seal_context());
+
+            // At the upper bound on its size, it is saved as without the limit, and loads
+            {
+                ScopedSaveSizeLimit limit(bounds.upper);
+                stringstream ss;
+                ASSERT_EQ(size, save_in_mode(bb, ss, bundle_idx, mode));
+                ASSERT_TRUE(ss.str() == expected);
+
+                BinBundle loaded = new_bundle();
+                ASSERT_EQ(make_pair(bundle_idx, size), loaded.load(ss));
+                ASSERT_EQ(bb.get_item_bins(), loaded.get_item_bins());
+                ASSERT_EQ(bb.get_label_bins(), loaded.get_label_bins());
+            }
+
+            // Under the upper bound, it might take more than the limit; under the lower bound, it
+            // takes more
+            for (const auto &[max_size, size_string] :
+                 { make_pair(bounds.upper - 1, "up to " + to_string(bounds.upper)),
+                   make_pair(bounds.lower - 1, "at least " + to_string(bounds.lower)) }) {
+                ScopedSaveSizeLimit limit(max_size);
+                stringstream ss;
+                try {
+                    save_in_mode(bb, ss, bundle_idx, mode);
+                    FAIL() << "the BinBundle was saved";
+                } catch (const length_error &ex) {
+                    ASSERT_EQ(
+                        "failed to save BinBundle: at bundle index 7, it takes " + size_string +
+                            " bytes, more than the " + to_string(max_size) +
+                            " bytes SenderDB::Load reads",
+                        ex.what());
+                }
+                ASSERT_TRUE(ss.str().empty());
             }
         }
     }

@@ -35,6 +35,11 @@ using namespace seal::util;
 #endif
 
 namespace apsi::util {
+    // A buffer that read_from_stream reads must pass the FlatBuffers verifier
+    static_assert(
+        max_buffer_size == static_cast<size_t>(FLATBUFFERS_MAX_BUFFER_SIZE) - 1,
+        "max_buffer_size must be one byte less than FLATBUFFERS_MAX_BUFFER_SIZE");
+
     vector<uint64_t> conversion_to_digits(const uint64_t input, const uint64_t base)
     {
         vector<uint64_t> result;
@@ -113,10 +118,9 @@ namespace apsi::util {
         // Cap the size accepted from the wire: a malicious peer could otherwise send a size prefix
         // of UINT32_MAX (~4 GiB) and force a comparable allocation. The FlatBuffers verifier
         // accepts only a buffer smaller than FLATBUFFERS_MAX_BUFFER_SIZE, and asserts that it is in
-        // debug builds, so a size that would make the buffer, with its size prefix, any larger is
-        // refused here.
-        constexpr auto max_byte_count =
-            static_cast<uint32_t>(FLATBUFFERS_MAX_BUFFER_SIZE - sizeof(uint32_t) - 1);
+        // debug builds, so a size that would make the buffer, with its size prefix, larger than
+        // max_buffer_size is refused here.
+        constexpr auto max_byte_count = static_cast<uint32_t>(max_buffer_size - sizeof(uint32_t));
         if (size > max_byte_count) {
             throw runtime_error("read_from_stream: size prefix exceeds maximum allowed");
         }
