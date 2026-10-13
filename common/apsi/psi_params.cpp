@@ -36,7 +36,7 @@ using namespace seal::util;
 
 #ifndef APSI_DISABLE_JSON
 namespace {
-    const Json::Value &get_non_null_json_value(const Json::Value &parent, const string &name)
+    const Json::Value &get_non_null_json_value(const Json::Value &parent, const char *name)
     {
         const auto &value = parent[name];
         if (value.isNull()) {
@@ -59,13 +59,13 @@ namespace {
         return value.asUInt();
     }
 
-    uint32_t json_value_ui32(const Json::Value &parent, const string &name)
+    uint32_t json_value_ui32(const Json::Value &parent, const char *name)
     {
         const auto &value = get_non_null_json_value(parent, name);
         return json_value_ui32(value);
     }
 
-    uint64_t json_value_ui64(const Json::Value &parent, const string &name)
+    uint64_t json_value_ui64(const Json::Value &parent, const char *name)
     {
         const auto &value = get_non_null_json_value(parent, name);
 
@@ -89,7 +89,7 @@ namespace {
         return value.asInt();
     }
 
-    int json_value_int(const Json::Value &parent, const string &name)
+    int json_value_int(const Json::Value &parent, const char *name)
     {
         const auto &value = get_non_null_json_value(parent, name);
         return json_value_int(value);
