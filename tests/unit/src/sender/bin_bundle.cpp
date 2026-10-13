@@ -21,6 +21,7 @@
 #include "apsi/bin_bundle_generated.h"
 #include "apsi/log.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/keygenerator.h"
@@ -2864,6 +2865,151 @@ namespace APSITests {
         ASSERT_THROW(static_cast<void>(empty.eval(powers, pool)), invalid_argument);
         ASSERT_THROW(
             static_cast<void>(empty.eval_patstock(context, powers, 2, pool)), invalid_argument);
+    }
+
+    TEST(BinBundleTests, BatchedPlaintextPolynEvalIsExact)
+    {
+        // eval sums the products of the powers and the plaintexts in 128 bits, and reduces the sum
+        // only when another product could overflow it, so it must give exactly the ciphertext that
+        // multiply_plain and add_inplace give. The last prime has 29 bits, too few for eval to
+        // clear any of them from the result, so the reference below has no such step.
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 8;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 300;
+        table_params.table_size = 512;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers = { 1, 3, 5 };
+
+        size_t pmd = 4096;
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(pmd);
+        seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 29, 60, 20 }));
+        seal_params.set_plain_modulus(65537);
+        PSIParams params(item_params, table_params, query_params, seal_params);
+        uint64_t plain_modulus = params.seal_params().plain_modulus().value();
+
+        CryptoContext context(params);
+        KeyGenerator keygen(*context.seal_context());
+        context.set_secret(keygen.secret_key());
+        context.set_evaluator();
+        const SEALContext &seal_context = *context.seal_context();
+        Evaluator &evaluator = *context.evaluator();
+        MemoryPoolHandle pool = MemoryManager::GetPool();
+
+        // The plaintexts are encoded at the first data level, of a 29-bit and a 60-bit prime
+        parms_id_type encode_parms_id = get_parms_id_for_chain_idx(seal_context, 1);
+        const auto &coeff_modulus =
+            seal_context.get_context_data(encode_parms_id)->parms().coeff_modulus();
+        ASSERT_EQ(size_t(2), coeff_modulus.size());
+
+        // Evaluates polyn on powers with multiply_plain and add_inplace, and checks that eval
+        // gives exactly that
+        auto check = [&](const BatchedPlaintextPolyn &polyn, const vector<Ciphertext> &powers) {
+            auto load = [&](size_t deg) {
+                Plaintext coeff;
+                coeff.unsafe_load(
+                    seal_context,
+                    reinterpret_cast<const seal_byte *>(polyn.batched_coeffs[deg].data()),
+                    polyn.batched_coeffs[deg].size());
+                return coeff;
+            };
+
+            Ciphertext expected;
+            expected.resize(seal_context, encode_parms_id, 2);
+            expected.is_ntt_form() = true;
+            Ciphertext product;
+            for (size_t deg = 1; deg < polyn.batched_coeffs.size(); deg++) {
+                evaluator.multiply_plain(powers[deg], load(deg), product);
+                evaluator.add_inplace(expected, product);
+            }
+            evaluator.transform_from_ntt_inplace(expected);
+            evaluator.add_plain_inplace(expected, load(0));
+            evaluator.mod_switch_to_inplace(expected, seal_context.last_parms_id());
+
+            Ciphertext result = polyn.eval(powers, pool);
+            ASSERT_EQ(expected.parms_id(), result.parms_id());
+            ASSERT_EQ(expected.size(), result.size());
+            ASSERT_FALSE(result.is_ntt_form());
+            ASSERT_TRUE(equal(
+                expected.data(), expected.data() + expected.dyn_array().size(), result.data()));
+        };
+
+        // Every coefficient at its largest. A product modulo the 60-bit prime is then just below
+        // 2^120, so the sum of 300 of them overflows 128 bits, and a polynomial of degree 300
+        // comes out right only if its sum is reduced along the way, as it is after every 255
+        // products.
+        size_t degree = 300;
+        vector<Ciphertext> largest_powers(degree + 1);
+        for (size_t deg = 1; deg <= degree; deg++) {
+            Ciphertext &power = largest_powers[deg];
+            power.resize(seal_context, encode_parms_id, 2);
+            power.is_ntt_form() = true;
+            for (size_t poly_index = 0; poly_index < 2; poly_index++) {
+                for (size_t i = 0; i < coeff_modulus.size(); i++) {
+                    fill_n(power.data(poly_index) + i * pmd, pmd, coeff_modulus[i].value() - 1);
+                }
+            }
+        }
+
+        for (compr_mode_type compr_mode : { compr_mode_type::none, compr_mode_type::bitpack }) {
+            SCOPED_TRACE(compr_mode == compr_mode_type::none ? "uncompressed" : "bit-packed");
+            auto save = [&](const Plaintext &pt) {
+                vector<unsigned char> bytes(static_cast<size_t>(pt.save_size(compr_mode)));
+                bytes.resize(
+                    static_cast<size_t>(pt.save(
+                        reinterpret_cast<seal_byte *>(bytes.data()), bytes.size(), compr_mode)));
+                return bytes;
+            };
+
+            BatchedPlaintextPolyn largest(context);
+            Plaintext constant(pmd);
+            fill_n(constant.data(), pmd, plain_modulus - 1);
+            largest.batched_coeffs.push_back(save(constant));
+            for (size_t deg = 1; deg <= degree; deg++) {
+                Plaintext coeff(pmd * coeff_modulus.size());
+                for (size_t i = 0; i < coeff_modulus.size(); i++) {
+                    fill_n(coeff.data() + i * pmd, pmd, coeff_modulus[i].value() - 1);
+                }
+                coeff.parms_id() = encode_parms_id;
+                largest.batched_coeffs.push_back(save(coeff));
+            }
+            ASSERT_NO_FATAL_FAILURE(check(largest, largest_powers));
+        }
+
+        // Random polynomials in a few bins, and zero in the others, encoded by the constructor in
+        // both of its storage modes, evaluated on encryptions of random values
+        mt19937_64 rng(1);
+        uniform_int_distribution<felt_t> random_felt(0, plain_modulus - 1);
+        vector<FEltPolyn> polyns(64, FEltPolyn(41));
+        for (auto &polyn : polyns) {
+            for (auto &coeff : polyn) {
+                coeff = random_felt(rng);
+            }
+        }
+
+        vector<Ciphertext> powers(41);
+        for (size_t deg = 1; deg < powers.size(); deg++) {
+            vector<uint64_t> values(context.encoder()->slot_count());
+            for (auto &value : values) {
+                value = random_felt(rng);
+            }
+            Plaintext pt;
+            context.encoder()->encode(values, pt);
+            context.encryptor()->encrypt_symmetric(pt, powers[deg]);
+            evaluator.mod_switch_to_inplace(powers[deg], encode_parms_id);
+            evaluator.transform_to_ntt_inplace(powers[deg]);
+        }
+
+        for (bool compressed : { false, true }) {
+            SCOPED_TRACE(compressed ? "compressed" : "uncompressed");
+            BatchedPlaintextPolyn polyn(polyns, context, 0, compressed);
+            ASSERT_EQ(size_t(41), polyn.batched_coeffs.size());
+            ASSERT_NO_FATAL_FAILURE(check(polyn, powers));
+        }
     }
 
     namespace {

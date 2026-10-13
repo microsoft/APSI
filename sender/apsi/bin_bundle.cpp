@@ -17,7 +17,11 @@
 #include "apsi/util/utils.h"
 
 // SEAL
+#include "seal/util/common.h"
 #include "seal/util/defines.h"
+#include "seal/util/uintarith.h"
+#include "seal/util/uintarithsmallmod.h"
+#include "seal/util/uintcore.h"
 
 // The polynomial evaluations below deliberately produce ciphertexts that Microsoft SEAL considers
 // transparent, as the comments on each explain, so SEAL has to be built to return one rather than
@@ -221,6 +225,162 @@ namespace apsi {
                            ? packed
                            : uncompressed;
             }
+
+            /**
+            Helper function. Adds a * b to the 128-bit value whose low word is sum[0] and whose
+            high word is sum[1]. Microsoft SEAL declares uint128_t only for GCC and Clang, not for
+            clang-cl, which takes the path of MSVC.
+            */
+            inline void add_product(uint64_t a, uint64_t b, uint64_t *sum)
+            {
+#if defined(SEAL_USE___INT128) && (SEAL_COMPILER != SEAL_COMPILER_MSVC)
+                uint128_t value = (static_cast<uint128_t>(sum[1]) << 64) | sum[0];
+                value += static_cast<uint128_t>(a) * b;
+                sum[0] = static_cast<uint64_t>(value);
+                sum[1] = static_cast<uint64_t>(value >> 64);
+#else
+                unsigned long long product[2];
+                multiply_uint64(a, b, product);
+                uint64_t low = sum[0] + product[0];
+                sum[1] += product[1] + static_cast<uint64_t>(low < product[0]);
+                sum[0] = low;
+#endif
+            }
+
+            /**
+            Sums the products of ciphertexts of size 2 and plaintexts, all in NTT form at one level
+            of the modulus chain, and gives exactly the sum that multiply_plain and add_inplace
+            give. Those take three passes over each term, multiplying into a copy of the
+            ciphertext and then adding, and reduce after every product and every addition. This
+            takes one pass, keeps every coefficient of the sum in 128 bits, and reduces only when
+            another product could overflow it, and at the end. A query spends most of its time
+            here.
+
+            The 128 bits are sized for coefficients below their primes, as those of the plaintexts
+            of a SenderDB, which is trusted, and of the ciphertexts the sender computes are. A
+            larger one, which multiply_plain would still reduce correctly, could overflow the sum.
+            */
+            class ProductSum {
+            public:
+                ProductSum(
+                    const SEALContext &seal_context,
+                    const parms_id_type &parms_id,
+                    MemoryPoolHandle pool)
+                    : parms_id_(parms_id)
+                {
+                    auto context_data = seal_context.get_context_data(parms_id);
+                    if (!context_data) {
+                        throw invalid_argument(
+                            "parms_id is not valid for the encryption parameters");
+                    }
+
+                    coeff_modulus_ = context_data->parms().coeff_modulus();
+                    coeff_count_ = context_data->parms().poly_modulus_degree();
+                    poly_uint64_count_ = mul_safe(coeff_count_, coeff_modulus_.size());
+                    sum_ = allocate_zero_uint(
+                        mul_safe(poly_uint64_count_, static_cast<size_t>(4)), pool);
+
+                    // A product is below 2^(2b) for primes of at most b bits, and a reduced sum
+                    // below 2^b, so 2^(128 - 2b) - 1 products can be added to a reduced sum. Primes
+                    // have at most 61 bits, which leaves at least 63. Capping the exponent at 31
+                    // keeps the shift defined for small primes and a 32-bit size_t, and costs
+                    // nothing, as no polynomial has 2^31 terms.
+                    int bit_count = 0;
+                    for (const auto &mod : coeff_modulus_) {
+                        bit_count = max(bit_count, mod.bit_count());
+                    }
+                    int headroom = min(128 - 2 * bit_count, 31);
+                    max_unreduced_term_count_ = (static_cast<size_t>(1) << headroom) - 1;
+                }
+
+                /**
+                Adds encrypted * plain to the sum. Throws std::invalid_argument unless both are at
+                the level of the sum and in NTT form, and encrypted has size 2.
+                */
+                void add(const Ciphertext &encrypted, const Plaintext &plain)
+                {
+                    if (encrypted.parms_id() != parms_id_ || !encrypted.is_ntt_form() ||
+                        encrypted.size() != 2 ||
+                        encrypted.dyn_array().size() != 2 * poly_uint64_count_) {
+                        throw invalid_argument("encrypted does not match the sum");
+                    }
+                    if (plain.parms_id() != parms_id_ ||
+                        plain.coeff_count() != poly_uint64_count_) {
+                        throw invalid_argument("plain does not match the sum");
+                    }
+
+                    // Both components at once, so that each coefficient of plain is read once
+                    const uint64_t *plain_data = plain.data();
+                    const uint64_t *encrypted0 = encrypted.data(0);
+                    const uint64_t *encrypted1 = encrypted.data(1);
+                    uint64_t *sum0 = sum_.get();
+                    uint64_t *sum1 = sum_.get() + 2 * poly_uint64_count_;
+                    for (size_t i = 0; i < poly_uint64_count_; i++) {
+                        add_product(plain_data[i], encrypted0[i], sum0 + 2 * i);
+                        add_product(plain_data[i], encrypted1[i], sum1 + 2 * i);
+                    }
+
+                    if (++unreduced_term_count_ == max_unreduced_term_count_) {
+                        reduce();
+                    }
+                }
+
+                /**
+                Writes the sum to destination as a ciphertext of size 2 in NTT form, and clears
+                the sum.
+                */
+                void write(const SEALContext &seal_context, Ciphertext &destination)
+                {
+                    destination.resize(seal_context, parms_id_, 2);
+                    destination.is_ntt_form() = true;
+                    for (size_t poly_index = 0; poly_index < 2; poly_index++) {
+                        const uint64_t *sum = sum_.get() + 2 * poly_index * poly_uint64_count_;
+                        uint64_t *dest = destination.data(poly_index);
+                        for (size_t j = 0; j < coeff_modulus_.size(); j++) {
+                            const Modulus &mod = coeff_modulus_[j];
+                            for (size_t i = j * coeff_count_; i < (j + 1) * coeff_count_; i++) {
+                                dest[i] = barrett_reduce_128(sum + 2 * i, mod);
+                            }
+                        }
+                    }
+
+                    fill_n(sum_.get(), 4 * poly_uint64_count_, static_cast<uint64_t>(0));
+                    unreduced_term_count_ = 0;
+                }
+
+            private:
+                void reduce()
+                {
+                    for (size_t poly_index = 0; poly_index < 2; poly_index++) {
+                        uint64_t *sum = sum_.get() + 2 * poly_index * poly_uint64_count_;
+                        for (size_t j = 0; j < coeff_modulus_.size(); j++) {
+                            const Modulus &mod = coeff_modulus_[j];
+                            for (size_t i = j * coeff_count_; i < (j + 1) * coeff_count_; i++) {
+                                sum[2 * i] = barrett_reduce_128(sum + 2 * i, mod);
+                                sum[2 * i + 1] = 0;
+                            }
+                        }
+                    }
+                    unreduced_term_count_ = 0;
+                }
+
+                parms_id_type parms_id_;
+
+                vector<Modulus> coeff_modulus_;
+
+                size_t coeff_count_ = 0;
+
+                // The number of 64-bit words in one component of a ciphertext at this level
+                size_t poly_uint64_count_ = 0;
+
+                // A 128-bit sum, as two 64-bit words with the low word first, for each of these
+                // words in each of the two components
+                Pointer<uint64_t> sum_;
+
+                size_t unreduced_term_count_ = 0;
+
+                size_t max_unreduced_term_count_ = 0;
+            };
         } // namespace
 
         /**
@@ -254,22 +414,20 @@ namespace apsi {
             // batched_coeffs[0] is the constant coefficient.
             //
             // Because the plaintexts in batched_coeffs can be identically zero, SEAL should be
-            // built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. We create a result ciphertext
-            // that is identically zero and set its NTT form flag to true so the additions below
-            // will work.
-            Ciphertext result(pool);
-            result.resize(*seal_context, encode_parms_id, 2);
-            result.is_ntt_form() = true;
-            Ciphertext temp(pool);
+            // built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. The sum of the terms is a
+            // ciphertext in NTT form that is identically zero if they all are.
+            ProductSum sum(*seal_context, encode_parms_id, pool);
             Plaintext coeff(pool);
             for (size_t deg = 1; deg < batched_coeffs.size(); deg++) {
                 coeff.unsafe_load(
                     *seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[deg].data()),
                     batched_coeffs[deg].size());
-                evaluator->multiply_plain(ciphertext_powers[deg], coeff, temp, pool);
-                evaluator->add_inplace(result, temp);
+                sum.add(ciphertext_powers[deg], coeff);
             }
+
+            Ciphertext result(pool);
+            sum.write(*seal_context, result);
 
             // Need to transform back from NTT form before we can add the constant coefficient. The
             // constant coefficient is specifically not in NTT form so this can work.
@@ -357,10 +515,12 @@ namespace apsi {
             result.resize(*seal_context, high_powers_parms_id, 3);
             result.is_ntt_form() = false;
 
-            // Temporary variables
+            // Temporary variables. The inner polynomials are sums of products of the low powers,
+            // which are in NTT form at their own level, with plaintexts.
             Ciphertext temp(pool);
             Ciphertext temp_in(pool);
             Plaintext coeff(pool);
+            ProductSum inner_sum(*seal_context, ciphertext_powers[1].parms_id(), pool);
 
             // Calculate polynomial for i=1,...,ps_high_degree_powers-1
             for (size_t i = 1; i < ps_high_degree_powers; i++) {
@@ -372,15 +532,9 @@ namespace apsi {
                         reinterpret_cast<const seal_byte *>(
                             batched_coeffs[(i * ps_high_degree) + j].data()),
                         batched_coeffs[(i * ps_high_degree) + j].size());
-
-                    evaluator->multiply_plain(ciphertext_powers[j], coeff, temp, pool);
-
-                    if (j == 1) {
-                        temp_in = temp;
-                    } else {
-                        evaluator->add_inplace(temp_in, temp);
-                    }
+                    inner_sum.add(ciphertext_powers[j], coeff);
                 }
+                inner_sum.write(*seal_context, temp_in);
 
                 // Transform inner polynomial to coefficient form
                 evaluator->transform_from_ntt_inplace(temp_in);
@@ -401,15 +555,9 @@ namespace apsi {
                         reinterpret_cast<const seal_byte *>(
                             batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].data()),
                         batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].size());
-
-                    evaluator->multiply_plain(ciphertext_powers[j], coeff, temp, pool);
-
-                    if (j == 1) {
-                        temp_in = temp;
-                    } else {
-                        evaluator->add_inplace(temp_in, temp);
-                    }
+                    inner_sum.add(ciphertext_powers[j], coeff);
                 }
+                inner_sum.write(*seal_context, temp_in);
 
                 // Transform inner polynomial to coefficient form
                 evaluator->transform_from_ntt_inplace(temp_in);
