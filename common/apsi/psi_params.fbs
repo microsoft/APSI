@@ -22,12 +22,17 @@ table SEALParams {
     data:[ubyte] (required);
 }
 
+// version is apsi_serialization_version for parameters without match tags, which leave out
+// tag_part_count, and PSIParams::tag_serialization_version for parameters with match tags, which
+// set it. ItemParams and TableParams are structs with a fixed layout, so the tag part count is a
+// field of this table instead; a new field must go at the end to keep the layout of older ones.
 table PSIParams {
     version:uint32;
     item_params:ItemParams (required);
     table_params:TableParams (required);
     query_params:QueryParams (required);
     seal_params:SEALParams (required);
+    tag_part_count:uint32;
 }
 
 root_type PSIParams;

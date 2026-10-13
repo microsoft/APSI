@@ -5,9 +5,11 @@
 
 // STD
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -20,6 +22,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/oprf/oprf_common.h"
+#include "apsi/util/db_encoding.h"
 #include "apsi/util/utils.h"
 
 // GSL
@@ -104,5 +107,43 @@ namespace apsi::oprf {
             const OPRFKey &oprf_key,
             std::size_t label_byte_count,
             std::size_t nonce_byte_count);
+
+        /**
+        Computes the OPRF hashes of the given items, as ComputeHashes does, together with the
+        match tag of each item: tag_felt_count field elements of bits_per_felt bits each, derived
+        from the item's label key as util::compute_match_tag describes. The label keys
+        themselves are wiped rather than returned. A SenderDB whose parameters use match tags
+        stores these tags with its items; see PSIParams::uses_tags.
+
+        Throws std::invalid_argument if util::compute_match_tag rejects tag_felt_count or
+        bits_per_felt, unless oprf_items is empty.
+        */
+        static std::vector<std::pair<HashedItem, std::vector<util::felt_t>>>
+        ComputeHashesAndMatchTags(
+            const gsl::span<const Item> &oprf_items,
+            const OPRFKey &oprf_key,
+            std::size_t tag_felt_count,
+            std::uint32_t bits_per_felt);
+
+        /**
+        Computes the OPRF hashes of the given items and encrypts their labels, as ComputeHashes
+        does for item-label pairs, together with the match tag of each item: tag_felt_count field
+        elements of bits_per_felt bits each, derived from the item's label key as
+        util::compute_match_tag describes. The label keys themselves are wiped rather than
+        returned. A labeled SenderDB whose parameters use match tags stores these tags with its
+        items; see PSIParams::uses_tags.
+
+        Throws std::invalid_argument if nonce_byte_count is too large, or if
+        util::compute_match_tag rejects tag_felt_count or bits_per_felt and oprf_item_labels is not
+        empty.
+        */
+        static std::vector<std::tuple<HashedItem, EncryptedLabel, std::vector<util::felt_t>>>
+        ComputeHashesAndMatchTags(
+            const gsl::span<const std::pair<Item, Label>> &oprf_item_labels,
+            const OPRFKey &oprf_key,
+            std::size_t label_byte_count,
+            std::size_t nonce_byte_count,
+            std::size_t tag_felt_count,
+            std::uint32_t bits_per_felt);
     }; // class OPRFSender
 } // namespace apsi::oprf

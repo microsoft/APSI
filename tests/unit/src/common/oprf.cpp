@@ -5,14 +5,19 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/label_encryptor.h"
+#include "apsi/util/match_tag.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -97,6 +102,91 @@ namespace APSITests {
                          });
             ASSERT_TRUE(found);
         }
+    }
+
+    TEST(OPRFTests, ComputeHashesAndMatchTags)
+    {
+        // The sender's tag of an item must be the receiver's, which the receiver computes from the
+        // label key it gets from the OPRF protocol
+        size_t item_count = 50;
+        size_t tag_felt_count = 6;
+        uint32_t bits_per_felt = 16;
+        size_t label_byte_count = 20;
+        size_t nonce_byte_count = 16;
+
+        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<Blake2xbPRNGFactory>());
+        auto rng = rng_factory->create();
+        vector<Item> items(item_count);
+        vector<pair<Item, Label>> item_labels;
+        for (auto &item : items) {
+            rng->generate(sizeof(Item), reinterpret_cast<seal_byte *>(item.value().data()));
+            Label label(label_byte_count);
+            rng->generate(label.size(), reinterpret_cast<seal_byte *>(label.data()));
+            item_labels.emplace_back(item, std::move(label));
+        }
+
+        OPRFKey oprf_key;
+        OPRFReceiver receiver(items);
+        vector<unsigned char> responses =
+            OPRFSender::ProcessQueries(receiver.query_data(), oprf_key);
+        vector<HashedItem> receiver_hashes(item_count);
+        vector<LabelKey> label_keys(item_count);
+        receiver.process_responses(responses, receiver_hashes, label_keys);
+
+        vector<HashedItem> hashes = OPRFSender::ComputeHashes(items, oprf_key);
+        auto unlabeled =
+            OPRFSender::ComputeHashesAndMatchTags(items, oprf_key, tag_felt_count, bits_per_felt);
+        auto labeled = OPRFSender::ComputeHashesAndMatchTags(
+            item_labels,
+            oprf_key,
+            label_byte_count,
+            nonce_byte_count,
+            tag_felt_count,
+            bits_per_felt);
+        ASSERT_EQ(item_count, unlabeled.size());
+        ASSERT_EQ(item_count, labeled.size());
+
+        for (size_t i = 0; i < item_count; i++) {
+            vector<apsi::util::felt_t> expected_tag =
+                apsi::util::compute_match_tag(label_keys[i], tag_felt_count, bits_per_felt);
+            ASSERT_EQ(hashes[i], receiver_hashes[i]);
+
+            ASSERT_EQ(hashes[i], unlabeled[i].first);
+            ASSERT_EQ(expected_tag, unlabeled[i].second);
+
+            ASSERT_EQ(hashes[i], get<0>(labeled[i]));
+            ASSERT_EQ(expected_tag, get<2>(labeled[i]));
+            ASSERT_EQ(
+                item_labels[i].second,
+                apsi::util::decrypt_label(get<1>(labeled[i]), label_keys[i], nonce_byte_count));
+        }
+
+        // Tags of other lengths are not prefixes of each other
+        auto longer = OPRFSender::ComputeHashesAndMatchTags(
+            items, oprf_key, tag_felt_count + 1, bits_per_felt);
+        ASSERT_FALSE(equal(
+            unlabeled[0].second.begin(), unlabeled[0].second.end(), longer[0].second.begin()));
+
+        // The tag parameters and nonce size are checked
+        ASSERT_THROW(
+            OPRFSender::ComputeHashesAndMatchTags(items, oprf_key, 0, bits_per_felt),
+            invalid_argument);
+        ASSERT_THROW(
+            OPRFSender::ComputeHashesAndMatchTags(items, oprf_key, tag_felt_count, 65),
+            invalid_argument);
+        ASSERT_THROW(
+            OPRFSender::ComputeHashesAndMatchTags(
+                item_labels, oprf_key, label_byte_count, nonce_byte_count, 0, bits_per_felt),
+            invalid_argument);
+        ASSERT_THROW(
+            OPRFSender::ComputeHashesAndMatchTags(
+                item_labels,
+                oprf_key,
+                label_byte_count,
+                max_nonce_byte_count + 1,
+                tag_felt_count,
+                bits_per_felt),
+            invalid_argument);
     }
 
     TEST(OPRFTests, ProcessQueriesRejectsTooManyItems)

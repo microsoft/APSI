@@ -6,6 +6,7 @@ set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
     ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/match_tag.cpp
     ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
@@ -16,6 +17,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
         ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.h
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.h
+        ${CMAKE_CURRENT_LIST_DIR}/match_tag.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h
         ${CMAKE_CURRENT_LIST_DIR}/task_group.h
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.h

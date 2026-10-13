@@ -7,6 +7,7 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
         ${CMAKE_CURRENT_LIST_DIR}/log.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/match_tag.cpp
         ${CMAKE_CURRENT_LIST_DIR}/oprf.cpp
         ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
         ${CMAKE_CURRENT_LIST_DIR}/psi_params.cpp

@@ -1151,10 +1151,12 @@ namespace APSITests {
             static_cast<void>(
                 PSIParams::Load(with_version(to_string(apsi_serialization_version)))));
 
-        // Any other is refused, in both directions.
+        // Any other is refused, in both directions: 0, and 3, the first version above both that
+        // this build implements. Version 2 is refused too, but by another rule, as this file has
+        // no match tags; see JSONTagPartCount.
         ASSERT_THROW(
             static_cast<void>(
-                PSIParams::Load(with_version(to_string(apsi_serialization_version + 1)))),
+                PSIParams::Load(with_version(to_string(PSIParams::tag_serialization_version + 1)))),
             runtime_error);
         ASSERT_THROW(static_cast<void>(PSIParams::Load(with_version("0"))), runtime_error);
 
@@ -1322,5 +1324,335 @@ namespace APSITests {
 
         ASSERT_EQ(json_files, checked) << "every parameter set must be checked";
         ASSERT_LE(size_t(30), checked) << "expected to find the shipped parameter sets";
+    }
+
+    namespace {
+        /**
+        Parameters, with match tags unless tag_part_count is zero, whose single bundle index holds
+        poly_modulus_degree / felts_per_item items. The coefficient modulus is SEAL's default,
+        which is valid for every plain modulus used below.
+        */
+        PSIParams make_tag_params(
+            uint32_t felts_per_item,
+            uint32_t tag_part_count,
+            uint64_t plain_modulus = 65537,
+            uint32_t max_items_per_bin = 16,
+            size_t poly_modulus_degree = 4096)
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = felts_per_item;
+            item_params.tag_part_count = tag_part_count;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = 3;
+            table_params.max_items_per_bin = max_items_per_bin;
+            table_params.table_size = static_cast<uint32_t>(poly_modulus_degree / felts_per_item);
+
+            PSIParams::QueryParams query_params;
+            query_params.query_powers = { 1, 3, 5 };
+
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(poly_modulus_degree);
+            seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
+            seal_params.set_plain_modulus(plain_modulus);
+
+            return { item_params, table_params, query_params, seal_params };
+        }
+
+        /**
+        A JSON parameter file for parameters with match tags, with the item_params and version
+        given verbatim so that a test can leave either out.
+        */
+        string tag_json(const string &item_params, const string &version)
+        {
+            string json = "{";
+            if (!version.empty()) {
+                json += "\"version\": " + version + ",";
+            }
+            json += "\"table_params\": { \"hash_func_count\": 3, \"table_size\": 4096, "
+                    "\"max_items_per_bin\": 16 },"
+                    "\"item_params\": " +
+                    item_params +
+                    ","
+                    "\"query_params\": { \"ps_low_degree\": 0, \"query_powers\": [ 1, 3, 5 ] },"
+                    "\"seal_params\": { \"plain_modulus\": 65537, \"poly_modulus_degree\": 4096, "
+                    "\"coeff_modulus_bits\": [ 36, 36, 37 ] }"
+                    "}";
+            return json;
+        }
+
+        /**
+        Serializes parameters the way PSIParams::save does, but with a version and tag part count
+        of the caller's choosing, so that a test can produce combinations save never writes.
+        tag_part_count is left out entirely when has_tag_part_count is false.
+        */
+        string save_with(
+            const PSIParams &params,
+            uint32_t version,
+            bool has_tag_part_count,
+            uint32_t tag_part_count)
+        {
+            flatbuffers::FlatBufferBuilder fbs_builder(128);
+
+            vector<uint32_t> powers(
+                params.query_params().query_powers.cbegin(),
+                params.query_params().query_powers.cend());
+            auto query_powers = fbs_builder.CreateVector(powers);
+            auto query_params = fbs::CreateQueryParams(
+                fbs_builder, params.query_params().ps_low_degree, query_powers);
+
+            stringstream seal_ss;
+            params.seal_params().save(seal_ss, compr_mode_type::none);
+            string seal_str = seal_ss.str();
+            vector<uint8_t> seal_bytes(seal_str.cbegin(), seal_str.cend());
+            auto seal_data = fbs_builder.CreateVector(seal_bytes);
+            auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_data);
+
+            fbs::ItemParams item_params(params.item_params().felts_per_item);
+            fbs::TableParams table_params(
+                params.table_params().table_size,
+                params.table_params().max_items_per_bin,
+                params.table_params().hash_func_count);
+
+            fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
+            psi_params_builder.add_version(version);
+            psi_params_builder.add_item_params(&item_params);
+            psi_params_builder.add_table_params(&table_params);
+            psi_params_builder.add_query_params(query_params);
+            psi_params_builder.add_seal_params(seal_params);
+            if (has_tag_part_count) {
+                // add_tag_part_count leaves out a zero, as FlatBuffers leaves out every scalar
+                // equal to its default, so force it to be written
+                fbs_builder.ForceDefaults(true);
+                psi_params_builder.add_tag_part_count(tag_part_count);
+                fbs_builder.ForceDefaults(false);
+            }
+            auto root = psi_params_builder.Finish();
+            fbs_builder.FinishSizePrefixed(root);
+
+            return { reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
+                     fbs_builder.GetSize() };
+        }
+    } // namespace
+
+    TEST(PSIParamsTagTests, TagAccessors)
+    {
+        PSIParams untagged = make_tag_params(8, 0);
+        ASSERT_FALSE(untagged.uses_tags());
+        ASSERT_EQ(0, untagged.tag_part_count());
+        ASSERT_EQ(0, untagged.tag_bit_count());
+
+        PSIParams tagged = make_tag_params(1, 3);
+        ASSERT_TRUE(tagged.uses_tags());
+        ASSERT_EQ(3, tagged.tag_part_count());
+        ASSERT_EQ(16, tagged.item_bit_count());
+        ASSERT_EQ(48, tagged.tag_bit_count());
+        ASSERT_EQ(4096, tagged.items_per_bundle());
+        ASSERT_EQ(4096, tagged.bins_per_bundle());
+
+        PSIParams tagged2 = make_tag_params(2, 2);
+        ASSERT_EQ(32, tagged2.item_bit_count());
+        ASSERT_EQ(64, tagged2.tag_bit_count());
+
+        // The tag part count is described only when there is one, so that parameters without
+        // match tags describe themselves exactly as in APSI 1.x
+        ASSERT_EQ(string::npos, untagged.to_string().find("tag_part_count"));
+        ASSERT_NE(string::npos, tagged.to_string().find("item_params.tag_part_count: 3"));
+    }
+
+    TEST(PSIParamsTagTests, ValidationBoundaries)
+    {
+        // A single field element per item is allowed only with match tags, which also lift the
+        // 80-bit minimum on the item
+        ASSERT_THROW(make_tag_params(1, 0), invalid_argument);
+        ASSERT_THROW(make_tag_params(4, 0), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(5, 0));
+        ASSERT_NO_THROW(make_tag_params(1, 3));
+        ASSERT_NO_THROW(make_tag_params(4, 1));
+
+        // felts_per_item is still bounded above, and so is the item
+        ASSERT_THROW(make_tag_params(33, 1), invalid_argument);
+        ASSERT_THROW(make_tag_params(9, 1), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(8, 1));
+
+        // The tag must have at least tag_bit_count_min bits. With 16 bits per item, two parts
+        // are too few and three are enough; with 13, three parts are 39 bits and too few.
+        ASSERT_THROW(make_tag_params(1, 2), invalid_argument);
+        ASSERT_THROW(make_tag_params(1, 3, 12289, 16, 2048), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(1, 4, 12289, 16, 2048));
+
+        // Exactly tag_bit_count_min is enough: a 21-bit plain modulus gives 20 bits per item
+        uint64_t t21 = PlainModulus::Batching(4096, 21).value();
+        ASSERT_EQ(40, make_tag_params(1, 2, t21).tag_bit_count());
+        ASSERT_THROW(make_tag_params(1, 1, t21), invalid_argument);
+
+        // The part count is bounded
+        ASSERT_NO_THROW(make_tag_params(1, PSIParams::ItemParams::tag_part_count_max));
+        ASSERT_THROW(
+            make_tag_params(1, PSIParams::ItemParams::tag_part_count_max + 1), invalid_argument);
+        ASSERT_THROW(make_tag_params(1, 0xFFFFFFFF), invalid_argument);
+
+        // A bin holds at most max_items_per_bin items at distinct points, so there must be that
+        // many points: 2^13 with a 14-bit plain modulus. Without match tags this does not apply.
+        ASSERT_NO_THROW(make_tag_params(1, 4, 12289, 8192, 2048));
+        ASSERT_THROW(make_tag_params(1, 4, 12289, 8193, 2048), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(7, 0, 12289, 8193, 2048));
+    }
+
+    TEST(PSIParamsTagTests, FalsePositiveProbabilityPerBinBundle)
+    {
+        // Without match tags the figure depends on the bin size and the item, as in APSI 1.x
+        PSIParams untagged = make_tag_params(8, 0);
+        ASSERT_DOUBLE_EQ((-16.0 + log2(16.0)) * 8, untagged.log2_fpp_per_bin_bundle());
+
+        // With them it is the tag size, whatever the bin size
+        ASSERT_DOUBLE_EQ(-48.0, make_tag_params(1, 3).log2_fpp_per_bin_bundle());
+        ASSERT_DOUBLE_EQ(-48.0, make_tag_params(1, 3, 65537, 2000).log2_fpp_per_bin_bundle());
+        ASSERT_DOUBLE_EQ(-112.0, make_tag_params(7, 1).log2_fpp_per_bin_bundle());
+
+        // A tag comes from a 128-bit label key, so no tag gives more than 128 bits
+        ASSERT_EQ(1024, make_tag_params(8, 8).tag_bit_count());
+        ASSERT_DOUBLE_EQ(-128.0, make_tag_params(8, 8).log2_fpp_per_bin_bundle());
+    }
+
+    TEST(PSIParamsTagTests, SaveLoadWithTags)
+    {
+        for (const auto &params :
+             { make_tag_params(1, 3), make_tag_params(2, 2), make_tag_params(1, 64) }) {
+            stringstream ss;
+            size_t save_size = params.save(ss);
+            string bytes = ss.str();
+
+            // Parameters with match tags are written with version 2, which APSI 1.x refuses
+            auto loaded_fbs = fbs::GetSizePrefixedPSIParams(bytes.data());
+            ASSERT_EQ(PSIParams::tag_serialization_version, loaded_fbs->version());
+            ASSERT_EQ(params.tag_part_count(), loaded_fbs->tag_part_count());
+            ASSERT_NE(apsi_serialization_version, loaded_fbs->version());
+            ASSERT_FALSE(same_serialization_version(loaded_fbs->version()));
+
+            auto loaded = PSIParams::Load(ss);
+            ASSERT_EQ(save_size, loaded.second);
+            ASSERT_EQ(params.to_string(), loaded.first.to_string());
+            ASSERT_EQ(params.tag_part_count(), loaded.first.tag_part_count());
+            ASSERT_EQ(params.tag_bit_count(), loaded.first.tag_bit_count());
+
+            // And saving again reproduces the same bytes
+            stringstream ss2;
+            loaded.first.save(ss2);
+            ASSERT_EQ(bytes, ss2.str());
+        }
+    }
+
+    TEST(PSIParamsTagTests, SaveWithoutTagsIsAsInAPSI1x)
+    {
+        // Parameters without match tags are written exactly as APSI 1.x writes them: with version
+        // 1 and no tag part count at all, not even a zero. save_with writes the fields APSI 1.x
+        // writes, in the order it writes them, which is what this compares against.
+        PSIParams untagged = make_tag_params(8, 0);
+        stringstream ss;
+        untagged.save(ss);
+        ASSERT_EQ(save_with(untagged, apsi_serialization_version, false, 0), ss.str());
+
+        string bytes = ss.str();
+        auto loaded_fbs = fbs::GetSizePrefixedPSIParams(bytes.data());
+        ASSERT_EQ(apsi_serialization_version, loaded_fbs->version());
+        ASSERT_EQ(0, loaded_fbs->tag_part_count());
+
+        // Generated tables inherit privately from flatbuffers::Table, which is what can tell a
+        // field written as zero from one left out
+        const auto *table = reinterpret_cast<const flatbuffers::Table *>(loaded_fbs);
+        ASSERT_FALSE(table->CheckField(fbs::PSIParams::VT_TAG_PART_COUNT));
+    }
+
+    TEST(PSIParamsTagTests, LoadRequiresTheVersionToMatchTheTagPartCount)
+    {
+        PSIParams untagged = make_tag_params(8, 0);
+        PSIParams tagged = make_tag_params(1, 3);
+
+        auto load = [](const string &bytes) {
+            stringstream ss(bytes);
+            return PSIParams::Load(ss).first;
+        };
+
+        // The two combinations save writes load
+        ASSERT_EQ(untagged.to_string(), load(save_with(untagged, 1, false, 0)).to_string());
+        ASSERT_EQ(tagged.to_string(), load(save_with(tagged, 2, true, 3)).to_string());
+
+        // A zero tag part count written explicitly is the same as none
+        ASSERT_EQ(untagged.to_string(), load(save_with(untagged, 1, true, 0)).to_string());
+
+        // Version 1 with a tag part count would be read by APSI 1.x as parameters without match
+        // tags, so it is refused rather than read as either
+        ASSERT_THROW(load(save_with(tagged, 1, true, 3)), runtime_error);
+
+        // Version 2 needs a tag part count
+        ASSERT_THROW(load(save_with(untagged, 2, false, 0)), runtime_error);
+        ASSERT_THROW(load(save_with(untagged, 2, true, 0)), runtime_error);
+
+        // Other versions are refused whatever the tag part count. Version 3 without one is refused
+        // by the version check alone, the others by the tag part count rule as well.
+        ASSERT_THROW(load(save_with(tagged, 3, true, 3)), runtime_error);
+        ASSERT_THROW(load(save_with(untagged, 3, false, 0)), runtime_error);
+        ASSERT_THROW(load(save_with(untagged, 0, false, 0)), runtime_error);
+
+        // A tag part count the parameters do not allow is refused by validation
+        ASSERT_THROW(
+            load(save_with(tagged, 2, true, PSIParams::ItemParams::tag_part_count_max + 1)),
+            invalid_argument);
+        ASSERT_THROW(load(save_with(tagged, 2, true, 1)), invalid_argument);
+    }
+
+    TEST(PSIParamsTagTests, JSONTagPartCount)
+    {
+        auto load = [](const string &item_params, const string &version) {
+            return PSIParams::Load(tag_json(item_params, version));
+        };
+
+        // Absent or zero: parameters without match tags, with or without version 1
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8 }", "").uses_tags());
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8, \"tag_part_count\": 0 }", "").uses_tags());
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8, \"tag_part_count\": 0 }", "1").uses_tags());
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8, \"tag_part_count\": null }", "").uses_tags());
+
+        // Non-zero, with version 2: match tags
+        PSIParams p = load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "2");
+        ASSERT_TRUE(p.uses_tags());
+        ASSERT_EQ(3, p.tag_part_count());
+        ASSERT_EQ(1, p.item_params().felts_per_item);
+        ASSERT_EQ(48, p.tag_bit_count());
+
+        // Match tags require version 2, and version 2 requires match tags. A version of APSI
+        // that predates match tags ignores tag_part_count but refuses version 2, so this is what
+        // makes it refuse a file meant for match tags rather than misread it.
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "")),
+            runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "1")),
+            runtime_error);
+        ASSERT_THROW(static_cast<void>(load("{ \"felts_per_item\": 8 }", "2")), runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 8, \"tag_part_count\": 0 }", "2")),
+            runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "3")),
+            runtime_error);
+
+        // A tag part count that is not an unsigned integer is refused
+        for (const string &value : vector<string>{ "-3", "1.5", "true", "\"3\"", "[]", "{}" }) {
+            ASSERT_THROW(
+                static_cast<void>(
+                    load("{ \"felts_per_item\": 1, \"tag_part_count\": " + value + " }", "2")),
+                runtime_error)
+                << value;
+        }
+
+        // And one the parameters do not allow is refused by validation
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 2 }", "2")),
+            invalid_argument);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 65 }", "2")),
+            invalid_argument);
     }
 } // namespace APSITests

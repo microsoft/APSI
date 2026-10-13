@@ -36,6 +36,17 @@ namespace apsi::util {
     using AlgItemLabel = std::vector<std::pair<felt_t, std::vector<felt_t>>>;
 
     /**
+    An item as a SenderDB whose parameters use match tags stores it: the item itself, which
+    identifies it exactly, and its algebraic form, whose label parts begin with the parts of the
+    item's match tag (see algebraize_item_tag_label).
+    */
+    struct TaggedAlgItemLabel {
+        HashedItem item;
+
+        AlgItemLabel alg_item_label;
+    };
+
+    /**
     Converts the given bitstring to a sequence of field elements (modulo `mod`).
     */
     std::vector<felt_t> bits_to_field_elts(
@@ -73,6 +84,27 @@ namespace apsi::util {
     */
     AlgItem algebraize_item(
         const HashedItem &item, std::size_t item_bit_count, const seal::Modulus &mod);
+
+    /**
+    Converts an item, its match tag, and its encrypted label into the form a SenderDB stores for
+    parameters with match tags: one (felt_t, std::vector<felt_t>) pair per field element of the
+    item, where the first value is the field element of the item and the second holds the label
+    parts in that slot. The label parts are the tag parts followed by the parts of the encrypted
+    label, so that with tag_part_count tag parts, part p in slot s is tag[p * felts_per_item + s]
+    for p < tag_part_count, and the parts that follow are exactly what algebraize_item_label
+    gives for the encrypted label.
+
+    tag holds the tag in the layout compute_match_tag gives it, so its size must be a non-zero
+    multiple of the number of field elements of the item; otherwise this throws
+    std::invalid_argument. encrypted_label may be empty, as it is for an unlabeled SenderDB, in
+    which case the label parts are the tag parts alone.
+    */
+    AlgItemLabel algebraize_item_tag_label(
+        const HashedItem &item,
+        gsl::span<const felt_t> tag,
+        const EncryptedLabel &encrypted_label,
+        std::size_t item_bit_count,
+        const seal::Modulus &mod);
 
     /**
     Converts a sequence of field elements into a HashedItem. This will throw an invalid_argument

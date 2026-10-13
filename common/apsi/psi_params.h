@@ -4,6 +4,7 @@
 #pragma once
 
 // STD
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -33,6 +34,31 @@ namespace apsi {
         constexpr static std::uint32_t item_bit_count_min = 80;
 
         constexpr static std::uint32_t item_bit_count_max = 128;
+
+        /**
+        The smallest item_bit_count allowed for parameters that use match tags; see uses_tags. The
+        tag then decides a match, and the bits of an item only select its point in a bin, so this
+        only keeps bin bundles from filling with almost nothing for want of points. It never binds
+        in practice, as the plain modulus gives at least 13 bits per field element.
+        */
+        constexpr static std::uint32_t item_bit_count_min_with_tags = 8;
+
+        /**
+        The smallest tag_bit_count allowed for parameters that use match tags. A receiver's item
+        that is not in the sender's set passes the tag check against one bin bundle with
+        probability 2^-tag_bit_count, so this keeps log2_fpp_per_bin_bundle at -40 or below. That
+        is a bound per receiver's item and bin bundle, not per query: see
+        sender::SenderDB::log2_fpp.
+        */
+        constexpr static std::uint32_t tag_bit_count_min = 40;
+
+        /**
+        The version a serialized PSIParams carries when it uses match tags. Parameters without match
+        tags are written with apsi_serialization_version, exactly as by APSI 1.x. APSI 1.x checks
+        the version against apsi_serialization_version, and so refuses parameters with match tags,
+        and every SenderDB holding them, rather than misreading them as parameters without.
+        */
+        constexpr static std::uint32_t tag_serialization_version = 2;
 
         /**
         An upper bound on the size, in bytes, this charges to the encrypted query a receiver builds
@@ -84,9 +110,36 @@ namespace apsi {
             constexpr static std::uint32_t felts_per_item_min = 2;
 
             /**
+            The smallest felts_per_item allowed for parameters that use match tags. An item's field
+            elements then only select it within its bin, so a single one suffices.
+            */
+            constexpr static std::uint32_t felts_per_item_min_with_tags = 1;
+
+            /**
+            An upper bound on tag_part_count. Each tag part costs a polynomial per bin, a
+            polynomial evaluation per bin bundle in every query, and a ciphertext per bin bundle
+            in every response, so a parameter set needing more than a handful is better served by
+            more bits per item. This leaves ample room above any useful value.
+            */
+            constexpr static std::uint32_t tag_part_count_max = 64;
+
+            /**
             Specified how many SEAL batching slots are occupied by an item.
             */
             std::uint32_t felts_per_item = 0;
+
+            /**
+            The number of match tag parts, each of which is as large as an item. Zero, the
+            default, selects matching polynomials, as in APSI 1.x: a receiver's item matches when
+            every one of its field elements is a root of a bin's matching polynomial. A non-zero
+            value selects match tags instead: the sender stores with every item a pseudorandom tag
+            of tag_part_count * item_bit_count bits, derived from the item's OPRF output as
+            util::compute_match_tag describes, and a receiver's item matches only when the sender
+            returns exactly the receiver's own tag for it. A non-member then passes with probability
+            2^-tag_bit_count per bin bundle, however many items a bin holds, so felts_per_item can
+            be as small as one. See PSIParams::uses_tags.
+            */
+            std::uint32_t tag_part_count = 0;
         };
 
         /**
@@ -219,6 +272,43 @@ namespace apsi {
             return item_bit_count_per_felt_;
         }
 
+        /**
+        Returns the number of match tag parts; zero for parameters that do not use match tags.
+        See ItemParams::tag_part_count.
+        */
+        [[nodiscard]]
+        std::uint32_t tag_part_count() const
+        {
+            return item_params_.tag_part_count;
+        }
+
+        /**
+        Returns the number of bits in a match tag, tag_part_count() * item_bit_count(); zero for
+        parameters that do not use match tags.
+        */
+        [[nodiscard]]
+        std::uint32_t tag_bit_count() const
+        {
+            return tag_bit_count_;
+        }
+
+        /**
+        Returns whether these parameters use match tags, that is, whether tag_part_count() is
+        non-zero.
+
+        With match tags, the sender stores with every item, as the first tag_part_count() parts
+        of its label, a tag derived from the item's OPRF output (util::compute_match_tag), and
+        computes no matching polynomial. A query is answered with the label results alone, and
+        the receiver accepts an item exactly when the sender returns the item's own tag. The
+        receiver therefore needs the label keys of its items, which the OPRF provides, whether or
+        not the sender's items have labels. Without match tags, everything is as in APSI 1.x.
+        */
+        [[nodiscard]]
+        bool uses_tags() const
+        {
+            return item_params_.tag_part_count != 0;
+        }
+
         PSIParams(
             ItemParams item_params,
             TableParams table_params,
@@ -241,12 +331,21 @@ namespace apsi {
         Returns an upper bound on the base-2 logarithm of the false-positive probability per
         receiver's item, against a SINGLE bin bundle.
 
+        Without match tags, an item that is not in the sender's set is reported when each of its
+        field elements is a root of its bin's matching polynomial, even if the roots come from
+        different items of the sender, which bounds the probability by
+        (max_items_per_bin / 2^item_bit_count_per_felt) to the power felts_per_item. With match
+        tags, it is reported only when the sender returns exactly its tag, which happens with
+        probability 2^-tag_bit_count however many items the bin holds. A tag is derived from a
+        128-bit label key, though, and two items with the same key have the same tag however long
+        it is, so this returns -min(tag_bit_count(), 128).
+
         This is not the probability a deployment sees, and is not meant to be read as one. A
         receiver's item is matched against every bin bundle at its bundle index, and a location
-        holding more items than max_items_per_bin spills into further bundles, each carrying its
-        own matching polynomial; a match from any of them is reported. A query of many items is
-        likelier to contain a false positive than a query of one. Both terms are missing here,
-        and together they are worth several bits and more than ten for some parameter sets.
+        holding more items than max_items_per_bin spills into further bundles, each answered
+        separately; a match from any of them is reported. A query of many items is likelier to
+        contain a false positive than a query of one. Both terms are missing here, and together
+        they are worth several bits and more than ten for some parameter sets.
 
         PSIParams cannot supply either: it does not know how large a sender's set is, nor how
         many items a query will carry. sender::SenderDB::log2_fpp knows the first and takes the
@@ -255,6 +354,10 @@ namespace apsi {
         [[nodiscard]]
         double log2_fpp_per_bin_bundle() const
         {
+            if (uses_tags()) {
+                return -static_cast<double>(std::min<std::uint32_t>(tag_bit_count_, 128));
+            }
+
             return std::min<double>(
                 0.0,
                 (-static_cast<double>(item_bit_count_per_felt_) +
@@ -264,17 +367,37 @@ namespace apsi {
 
         /**
         Writes the PSIParams to a stream.
+
+        Parameters without match tags are written exactly as APSI 1.x writes them, with
+        apsi_serialization_version as their version. Parameters with match tags are written with
+        tag_serialization_version and the tag part count; see tag_serialization_version for why.
         */
         std::size_t save(std::ostream &out) const;
 
         /**
         Reads the PSIParams from a stream.
+
+        Accepts parameters without match tags written with apsi_serialization_version, and
+        parameters with match tags written with tag_serialization_version. Anything else,
+        including a version that disagrees with whether a tag part count is present, is refused
+        with std::runtime_error.
         */
         [[nodiscard]]
         static std::pair<PSIParams, std::size_t> Load(std::istream &in);
 
         /**
-        Reads the PSIParams from a JSON string
+        Reads the PSIParams from a JSON string.
+
+        The key item_params.tag_part_count selects match tags; absent or zero, the parameters do
+        not use them. The top-level key version names the version of the serialized parameters the
+        file describes. Parameters with match tags must name tag_serialization_version.
+        Parameters without them may name apsi_serialization_version or leave the key out, as
+        the parameter files of APSI 1.x do. Anything else is refused with std::runtime_error.
+
+        The version is required with match tags because APSI 1.x and older ignore
+        item_params.tag_part_count, as they ignore every key they do not know, and so could read a
+        file meant for match tags as parameters without them. Versions since APSI 1.0.0 refuse a
+        version they do not implement, and so refuse such a file instead.
         */
         [[nodiscard]]
         static PSIParams Load(const std::string &in);
@@ -297,6 +420,8 @@ namespace apsi {
         std::uint32_t item_bit_count_ = 0;
 
         std::uint32_t item_bit_count_per_felt_ = 0;
+
+        std::uint32_t tag_bit_count_ = 0;
 
         void initialize();
     }; // class PSIParams
