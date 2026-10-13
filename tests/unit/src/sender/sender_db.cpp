@@ -2186,21 +2186,36 @@ namespace APSITests {
             const PSIParams &params = sender_db.get_params();
             const Modulus &mod = params.seal_params().plain_modulus();
             size_t felts_per_item = params.item_params().felts_per_item;
+            size_t tag_part_count = params.tag_part_count();
 
             auto [hashed_item, label_key] = oprf::OPRFSender::GetItemHash(item, key);
             vector<apsi::util::felt_t> felts =
                 apsi::util::algebraize_item(hashed_item, params.item_bit_count(), mod);
+            vector<apsi::util::felt_t> tag;
+            if (params.uses_tags()) {
+                tag = apsi::util::compute_match_tag(
+                    label_key, tag_part_count * felts_per_item, params.item_bit_count_per_felt());
+            }
 
             vector<vector<Label>> labels;
             for (const auto &place : places_of(hashed_item, params)) {
                 labels.emplace_back();
                 for (const BinBundleCache &cache : sender_db.get_cache_at(place.first)) {
-                    // Whether this bin bundle holds the item: its matching polynomials vanish at
-                    // the item's field elements
+                    // Whether this bin bundle holds the item: without match tags its matching
+                    // polynomials vanish at the item's field elements, and with match tags its
+                    // tag polynomials give the item's tag there
                     bool holds = true;
                     for (size_t s = 0; holds && (s < felts_per_item); s++) {
                         size_t bin = place.second + s;
-                        holds = evaluate_polyn(cache.felt_matching_polyns[bin], felts[s], mod) == 0;
+                        if (!params.uses_tags()) {
+                            holds =
+                                evaluate_polyn(cache.felt_matching_polyns[bin], felts[s], mod) == 0;
+                        }
+                        for (size_t p = 0; holds && (p < tag_part_count); p++) {
+                            holds =
+                                evaluate_polyn(cache.felt_interp_polyns[p][bin], felts[s], mod) ==
+                                tag[(p * felts_per_item) + s];
+                        }
                     }
                     if (!holds) {
                         continue;
@@ -2210,14 +2225,14 @@ namespace APSITests {
                     // them
                     apsi::util::AlgLabel alg_label;
                     size_t part_count = cache.felt_interp_polyns.size();
-                    for (size_t p = 0; p < part_count; p++) {
+                    for (size_t p = tag_part_count; p < part_count; p++) {
                         for (size_t s = 0; s < felts_per_item; s++) {
                             alg_label.push_back(evaluate_polyn(
                                 cache.felt_interp_polyns[p][place.second + s], felts[s], mod));
                         }
                     }
                     EncryptedLabel encrypted_label = apsi::util::dealgebraize_label(
-                        alg_label, part_count * params.item_bit_count(), mod);
+                        alg_label, (part_count - tag_part_count) * params.item_bit_count(), mod);
                     encrypted_label.resize(
                         sender_db.get_nonce_byte_count() + sender_db.get_label_byte_count());
                     labels.back().push_back(
@@ -2455,6 +2470,9 @@ namespace APSITests {
             }
         };
 
+        // Without match tags, as an older version of APSI would have left the database, and with
+        // them, which take the same path
         test_fun(with_shallow_bins(*get_params1(), 3));
+        test_fun(create_tag_params());
     }
 } // namespace APSITests

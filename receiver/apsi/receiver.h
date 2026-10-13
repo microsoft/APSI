@@ -93,13 +93,15 @@ namespace apsi::receiver {
     Receiver::process_result require the IndexTranslationTable and the LabelKeyVector objects
     created in the previous steps.
 
-    A null result package is logged and skipped, as in APSI 1.x, and one without a psi_result
-    throws std::runtime_error. A lost package could hide a match, so a caller collecting packages
-    itself should treat a failed receive as a failed query, as the simple API does.
-
-    This Receiver does not support parameters with match tags (see PSIParams::uses_tags):
-    Receiver::create_query, and with it Receiver::request_query, throws std::invalid_argument for
-    them.
+    With match tags (see PSIParams::uses_tags), the receiver derives the tags of its items from
+    their label keys, so it needs the LabelKeyVector even when the sender's items have no labels.
+    Receiver::request_query, Receiver::process_result_part, and Receiver::process_result then throw
+    std::invalid_argument unless there is a label key for every item. The same functions also throw
+    std::runtime_error on a result package that is null or cannot be a result for these parameters.
+    With matching polynomials, a null result package is logged and skipped, as in APSI 1.x, and one
+    without a psi_result throws std::runtime_error. Either way, a lost package could hide a match,
+    so a caller collecting packages itself should treat a failed receive as a failed query, as the
+    simple API does.
     */
     class Receiver {
     public:
@@ -219,9 +221,9 @@ namespace apsi::receiver {
         before the query response or partway through the result packages; see
         Receiver::default_receive_timeout for what that bound means and how to lift it.
 
-        This throws std::invalid_argument before anything is sent if the parameters use match
-        tags, which this Receiver does not support, and std::runtime_error if a result package
-        cannot be a result for these parameters.
+        With parameters that use match tags, label_keys must hold the label key of every item, or
+        this throws std::invalid_argument before anything is sent, and a result package that
+        cannot be a result for these parameters makes this throw std::runtime_error.
         */
         std::vector<MatchRecord> request_query(
             const std::vector<HashedItem> &items,
@@ -266,8 +268,10 @@ namespace apsi::receiver {
         point where no query is in flight; otherwise every query it sends carries the same
         relinearization keys, and a sender can recognize them as coming from one receiver.
 
-        This throws std::invalid_argument if the parameters use match tags, which this Receiver
-        does not support.
+        With parameters that use match tags, an empty entry of the cuckoo table is encoded as the
+        value 2^item_bit_count_per_felt in each of its slots, which no field element of a
+        sender's item can take, so that an empty entry never selects a value the sender stores.
+        Without match tags it is the all-zero item, as in APSI 1.x.
         */
         std::pair<Request, IndexTranslationTable> create_query(
             const std::vector<HashedItem> &items);
@@ -277,10 +281,18 @@ namespace apsi::receiver {
         the original vector of OPRF hashed items used to create the query. The return value
         includes matches only for those items whose results happened to be in this particular
         result part. Thus, to determine whether there was a match with the sender's data, the
-        results for each received ResultPart must be checked.
+        results for each received ResultPart must be checked. Processing decrypts the ciphertexts
+        in result_part, which cannot be processed again.
 
-        A null result_part is logged and yields an empty vector, and one without a PSI result
-        throws std::runtime_error.
+        Without match tags, a null result_part is logged and yields an empty vector, and one
+        without a PSI result throws std::runtime_error. With parameters that use match tags, an
+        item matches when the result holds its match tag in the item's slots. Every ciphertext in
+        result_part is decrypted either way, and with match tags and labels, the label of every
+        queried item at the package's bundle index is decoded and decrypted as well, whether or not
+        any item matches, so that the time taken does not tell the sender which of the receiver's
+        items it holds. With match tags, this throws std::invalid_argument unless label_keys holds
+        a label key for every item of the query, and std::runtime_error if result_part is null or
+        does not have the structure network::ResultPackage::check_tag_structure describes.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result_part(
             const LabelKeyVector &label_keys,
@@ -290,10 +302,12 @@ namespace apsi::receiver {
         /**
         This function does multiple calls to Receiver::process_result_part, once for each
         ResultPart in the given vector. The results are collected together so that the returned
-        vector of MatchRecords reflects the logical OR of the results from each ResultPart.
+        vector of MatchRecords reflects the logical OR of the results from each ResultPart. When
+        two ResultParts both match an item, the first match is kept and an error is logged.
 
         This throws as Receiver::process_result_part does, for any one of the ResultParts, so that
-        a package without a PSI result aborts the whole query.
+        a package that cannot be a result aborts the whole query: with match tags, a null or
+        malformed one, and without them, one without a PSI result.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result(
             const LabelKeyVector &label_keys,
@@ -368,12 +382,56 @@ namespace apsi::receiver {
             std::vector<MatchRecord> mrs;
         };
 
+        /**
+        With match tags, throws std::invalid_argument unless there is a label key for each of the
+        item_count items of the query, as the tags cannot be checked without them. Does nothing
+        without match tags.
+        */
+        void check_label_keys(const LabelKeyVector &label_keys, std::size_t item_count) const;
+
+        /**
+        With match tags, returns the match tag of each of the item_count items of the query,
+        derived from its label key, so that a query derives each tag once rather than for every
+        result package. Returns an empty vector without match tags. The caller has checked the
+        label keys with check_label_keys.
+        */
+        [[nodiscard]] std::vector<std::vector<std::uint64_t>> compute_match_tags(
+            const LabelKeyVector &label_keys, std::size_t item_count) const;
+
+        /**
+        With match tags, throws std::runtime_error, aborting the query, if result_part is null or
+        does not have the structure network::ResultPackage::check_tag_structure describes. Does
+        nothing without match tags, where a null package is skipped instead.
+        */
+        void check_tagged_result_part(const ResultPart &result_part) const;
+
+        /**
+        The work of process_result_part. With match tags, match_tags holds the match tag of every
+        item of the query, as compute_match_tags gives them, or is null, and then the tags of the
+        items at the package's bundle index are derived from their label keys.
+        */
+        [[nodiscard]] std::vector<MatchRecord> process_result_part(
+            const LabelKeyVector &label_keys,
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part,
+            const std::vector<std::vector<std::uint64_t>> *match_tags) const;
+
+        /**
+        The work of process_result_part for parameters with match tags.
+        */
+        [[nodiscard]] std::vector<MatchRecord> process_tagged_result_part(
+            const LabelKeyVector &label_keys,
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part,
+            const std::vector<std::vector<std::uint64_t>> *match_tags) const;
+
         void process_result_worker(
             std::atomic<std::uint32_t> &package_count,
             ResultMergeState &merge_state,
             ReceiveDeadline &deadline,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
+            const std::vector<std::vector<std::uint64_t>> &match_tags,
             network::Channel &chl) const;
 
         void initialize();

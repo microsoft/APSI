@@ -21,6 +21,9 @@
 #include "apsi/requests.h"
 #include "apsi/responses.h"
 #include "apsi/seal_object.h"
+#include "apsi/util/db_encoding.h"
+#include "apsi/util/label_encryptor.h"
+#include "apsi/util/match_tag.h"
 
 // SEAL
 #include "seal/ciphertext.h"
@@ -346,6 +349,52 @@ namespace APSITests {
             return { item_params, table_params, query_params, seal_params };
         }
 
+        LabelKey make_label_key(size_t seed)
+        {
+            LabelKey key{};
+            for (size_t i = 0; i < key.size(); i++) {
+                key[i] = static_cast<unsigned char>((seed * 31) + (i * 7) + 1);
+            }
+            return key;
+        }
+
+        /**
+        A query a Receiver made: its items, a label key for each, its index translation table, and
+        the position of each item in the receiver's cuckoo table.
+        */
+        struct TagQuery {
+            vector<HashedItem> items;
+
+            LabelKeyVector label_keys;
+
+            IndexTranslationTable itt;
+
+            vector<size_t> positions;
+        };
+
+        TagQuery make_tag_query(Receiver &receiver, const PSIParams &params, size_t item_count)
+        {
+            vector<HashedItem> items;
+            LabelKeyVector label_keys;
+            for (size_t i = 0; i < item_count; i++) {
+                items.push_back(make_hashed_item(i + 1, 1000 + i));
+                label_keys.push_back(make_label_key(i));
+            }
+            IndexTranslationTable itt = receiver.create_query(items).second;
+
+            size_t table_size = params.table_params().table_size;
+            vector<size_t> positions(item_count, table_size);
+            for (size_t table_idx = 0; table_idx < table_size; table_idx++) {
+                size_t item_idx = itt.find_item_idx(table_idx);
+                if (item_idx != itt.item_count()) {
+                    positions[item_idx] = table_idx;
+                }
+            }
+            return TagQuery{
+                std::move(items), std::move(label_keys), std::move(itt), std::move(positions)
+            };
+        }
+
         /**
         Slot values for the result of one bin bundle: part_count parts of random values, which
         is what a sender's polynomials give in slots where they hold no item.
@@ -363,6 +412,42 @@ namespace APSITests {
                 }
             }
             return parts;
+        }
+
+        /**
+        Writes into parts what a sender holding the item with the given tag and encrypted label
+        gives in the item's slots: the label parts algebraize_item_tag_label lays out.
+        */
+        void put_item(
+            vector<vector<uint64_t>> &parts,
+            const PSIParams &params,
+            const HashedItem &item,
+            size_t table_idx,
+            const vector<apsi::util::felt_t> &tag,
+            const EncryptedLabel &encrypted_label)
+        {
+            apsi::util::AlgItemLabel alg_item_label = apsi::util::algebraize_item_tag_label(
+                item,
+                tag,
+                encrypted_label,
+                params.item_bit_count(),
+                params.seal_params().plain_modulus());
+            size_t felts_per_item = params.item_params().felts_per_item;
+            size_t bundle_pos = table_idx % params.items_per_bundle();
+            for (size_t s = 0; s < felts_per_item; s++) {
+                ASSERT_EQ(parts.size(), alg_item_label[s].second.size());
+                for (size_t p = 0; p < parts.size(); p++) {
+                    parts[p][(bundle_pos * felts_per_item) + s] = alg_item_label[s].second[p];
+                }
+            }
+        }
+
+        vector<apsi::util::felt_t> tag_of(const LabelKey &key, const PSIParams &params)
+        {
+            return apsi::util::compute_match_tag(
+                key,
+                params.tag_part_count() * params.item_params().felts_per_item,
+                params.item_bit_count_per_felt());
         }
 
         /**
@@ -411,14 +496,366 @@ namespace APSITests {
         }
     } // namespace
 
-    TEST(ReceiverTagTests, ParametersWithMatchTagsAreRefused)
+    TEST(ReceiverTagTests, EmptyTableEntriesHoldNoSenderPoint)
     {
-        // This receiver cannot match items by their tags, so it refuses a query with parameters
-        // that use them, before anything is sent, rather than misread its result
+        // Without match tags an empty entry of the receiver's cuckoo table is the all-zero item.
+        // With them it is 2^item_bit_count_per_felt in every slot, a value no field element of a
+        // sender's item can take, so that an empty entry never picks out a sender's tag.
+        for (bool tags : { false, true }) {
+            PSIParams params = tags ? make_tag_test_params() : make_test_params();
+            Receiver receiver(params);
+            const CryptoContext &crypto_context = receiver.get_crypto_context();
+
+            vector<HashedItem> items{ make_hashed_item(1, 2),
+                                      make_hashed_item(3, 4),
+                                      make_hashed_item(5, 6) };
+            auto [request, itt] = receiver.create_query(items);
+            auto query = to_query_request(std::move(request));
+            ASSERT_NE(nullptr, query);
+
+            size_t felts_per_item = params.item_params().felts_per_item;
+            size_t items_per_bundle = params.items_per_bundle();
+            apsi::util::felt_t empty_value =
+                tags ? (uint64_t(1) << params.item_bit_count_per_felt()) : 0;
+            const auto &power_one = query->data.at(1);
+            ASSERT_EQ(params.bundle_idx_count(), power_one.size());
+
+            size_t filled_count = 0;
+            for (size_t bundle_idx = 0; bundle_idx < power_one.size(); bundle_idx++) {
+                SEALObject<Ciphertext> encrypted = power_one[bundle_idx];
+                Ciphertext ct = encrypted.extract(receiver.get_seal_context());
+                Plaintext pt;
+                crypto_context.decryptor()->decrypt(ct, pt);
+                vector<uint64_t> slots;
+                crypto_context.encoder()->decode(pt, slots);
+
+                for (size_t pos = 0; pos < items_per_bundle; pos++) {
+                    size_t item_idx = itt.find_item_idx((bundle_idx * items_per_bundle) + pos);
+                    vector<apsi::util::felt_t> expected(felts_per_item, empty_value);
+                    if (item_idx != itt.item_count()) {
+                        expected = apsi::util::algebraize_item(
+                            items[item_idx],
+                            params.item_bit_count(),
+                            params.seal_params().plain_modulus());
+                        filled_count++;
+                    }
+                    for (size_t s = 0; s < felts_per_item; s++) {
+                        ASSERT_EQ(expected[s], slots[(pos * felts_per_item) + s]);
+                    }
+                }
+            }
+            ASSERT_EQ(items.size(), filled_count);
+        }
+    }
+
+    TEST(ReceiverTagTests, ItemsMatchByTheirTags)
+    {
         PSIParams params = make_tag_test_params();
         Receiver receiver(params);
-        vector<HashedItem> items{ make_hashed_item(1, 2), make_hashed_item(3, 4) };
-        ASSERT_THROW(static_cast<void>(receiver.create_query(items)), invalid_argument);
+        TagQuery query = make_tag_query(receiver, params, 20);
+
+        // Every third item is the sender's
+        vector<vector<uint64_t>> parts = random_parts(params, params.tag_part_count());
+        for (size_t i = 0; i < query.items.size(); i += 3) {
+            put_item(
+                parts,
+                params,
+                query.items[i],
+                query.positions[i],
+                tag_of(query.label_keys[i], params),
+                {});
+        }
+
+        // An item answered with the tag of another
+        put_item(
+            parts,
+            params,
+            query.items[1],
+            query.positions[1],
+            tag_of(query.label_keys[0], params),
+            {});
+
+        // And one answered with its own tag but for one of its field elements
+        vector<apsi::util::felt_t> almost = tag_of(query.label_keys[2], params);
+        almost.back() ^= 1;
+        put_item(parts, params, query.items[2], query.positions[2], almost, {});
+
+        // Decrypting a package consumes it, so each call gets its own copy
+        auto package = make_package(receiver, 0, 0, parts);
+        vector<MatchRecord> part_result =
+            receiver.process_result_part(query.label_keys, query.itt, copy_package(*package));
+        vector<MatchRecord> result =
+            receiver.process_result(query.label_keys, query.itt, one_part(std::move(package)));
+        ASSERT_EQ(query.items.size(), part_result.size());
+        ASSERT_EQ(query.items.size(), result.size());
+        for (size_t i = 0; i < query.items.size(); i++) {
+            ASSERT_EQ(i % 3 == 0, part_result[i].found) << "item " << i;
+            ASSERT_EQ(i % 3 == 0, result[i].found) << "item " << i;
+            ASSERT_FALSE(result[i].label);
+        }
+    }
+
+    TEST(ReceiverTagTests, MatchesCompareWholeFieldElements)
+    {
+        // A slot can hold a value of 2^item_bit_count_per_felt or more, which agrees with a tag
+        // in its low bits without being the tag. With 13 bits per field element and a plain
+        // modulus of 12289, such values are common.
+        PSIParams params = make_tag_test_params(4, 2048, 12289);
+        ASSERT_EQ(13, params.item_bit_count_per_felt());
+        Receiver receiver(params);
+        TagQuery query = make_tag_query(receiver, params, 8);
+
+        vector<vector<uint64_t>> parts = random_parts(params, params.tag_part_count());
+        vector<bool> expected_found(query.items.size());
+        size_t lifted_count = 0;
+        for (size_t i = 0; i < query.items.size(); i++) {
+            vector<apsi::util::felt_t> tag = tag_of(query.label_keys[i], params);
+            bool lifted = false;
+            if (i % 2) {
+                // Every part of the tag that can be lifted by 2^13 within the plain modulus is
+                for (auto &value : tag) {
+                    if (value + 8192 < 12289) {
+                        value += 8192;
+                        lifted = true;
+                    }
+                }
+            }
+            expected_found[i] = !lifted;
+            lifted_count += lifted ? 1 : 0;
+            put_item(parts, params, query.items[i], query.positions[i], tag, {});
+        }
+        ASSERT_LT(size_t(0), lifted_count);
+
+        vector<MatchRecord> result = receiver.process_result(
+            query.label_keys, query.itt, one_part(make_package(receiver, 0, 0, parts)));
+        for (size_t i = 0; i < query.items.size(); i++) {
+            ASSERT_EQ(expected_found[i], result[i].found) << "item " << i;
+        }
+    }
+
+    TEST(ReceiverTagTests, LabelsOfMatchesAreDecrypted)
+    {
+        PSIParams params = make_tag_test_params();
+        Receiver receiver(params);
+        TagQuery query = make_tag_query(receiver, params, 10);
+
+        // 4 bytes of nonce and 10 of label make 7 parts of 16 bits
+        uint32_t label_byte_count = 10;
+        uint32_t nonce_byte_count = 4;
+        size_t part_count = params.tag_part_count() + 7;
+        vector<vector<uint64_t>> parts = random_parts(params, part_count);
+        vector<Label> labels;
+        for (size_t i = 0; i < query.items.size(); i++) {
+            Label label(label_byte_count);
+            for (size_t j = 0; j < label.size(); j++) {
+                label[j] = static_cast<unsigned char>((i * 16) + j);
+            }
+            labels.push_back(label);
+            if (i % 2 == 0) {
+                EncryptedLabel encrypted_label = apsi::util::encrypt_label(
+                    label, query.label_keys[i], label_byte_count, nonce_byte_count);
+                put_item(
+                    parts,
+                    params,
+                    query.items[i],
+                    query.positions[i],
+                    tag_of(query.label_keys[i], params),
+                    encrypted_label);
+            }
+        }
+
+        vector<MatchRecord> result = receiver.process_result(
+            query.label_keys,
+            query.itt,
+            one_part(make_package(receiver, label_byte_count, nonce_byte_count, parts)));
+        for (size_t i = 0; i < query.items.size(); i++) {
+            ASSERT_EQ(i % 2 == 0, result[i].found) << "item " << i;
+            if (i % 2 == 0) {
+                ASSERT_TRUE(result[i].label);
+                ASSERT_EQ(labels[i], result[i].label.value());
+            } else {
+                ASSERT_FALSE(result[i].label);
+            }
+        }
+    }
+
+    TEST(ReceiverTagTests, EveryPartIsDecryptedWhetherOrNotAnItemMatches)
+    {
+        // Every ciphertext of a result package is decrypted, whether or not one of the receiver's
+        // items is at its bundle index and whether or not one of them matches, so that the time
+        // processing takes depends on neither. To see that, parts are left as ciphertexts that
+        // cannot be decrypted at all, so that processing fails where they are decrypted.
+        PSIParams params = make_tag_test_params();
+        Receiver receiver(params);
+        TagQuery query = make_tag_query(receiver, params, 5);
+
+        // The label parts of a package in which no tag matches
+        vector<vector<uint64_t>> tag_parts = random_parts(params, params.tag_part_count());
+        auto no_match = make_package(receiver, 10, 0, tag_parts);
+        for (size_t p = 0; p < 5; p++) {
+            no_match->label_result.emplace_back(Ciphertext());
+        }
+        ASSERT_ANY_THROW(
+            static_cast<void>(receiver.process_result(
+                query.label_keys, query.itt, one_part(copy_package(*no_match)))));
+        ASSERT_ANY_THROW(
+            static_cast<void>(receiver.process_result_part(
+                query.label_keys, query.itt, copy_package(*no_match))));
+
+        // The tag parts of a package at a bundle index that holds none of the receiver's items
+        TagQuery empty_query = make_tag_query(receiver, params, 0);
+        auto no_items = make_package(receiver, 0, 0, {});
+        for (size_t p = 0; p < params.tag_part_count(); p++) {
+            no_items->label_result.emplace_back(Ciphertext());
+        }
+        ASSERT_ANY_THROW(
+            static_cast<void>(receiver.process_result(
+                empty_query.label_keys, empty_query.itt, one_part(copy_package(*no_items)))));
+
+        // Decryptable parts in the same places are processed as usual
+        auto decryptable = make_package(receiver, 0, 0, tag_parts);
+        vector<MatchRecord> result;
+        ASSERT_NO_THROW(
+            result = receiver.process_result(
+                empty_query.label_keys, empty_query.itt, one_part(std::move(decryptable))));
+        ASSERT_TRUE(result.empty());
+    }
+
+    TEST(ReceiverTagTests, MalformedPackagesAbortTheQuery)
+    {
+        // With match tags, a package that cannot be a result for the query means a part of the
+        // answer is missing, and possibly a match with it. Rather than going on without it, as
+        // without match tags, the receiver refuses the whole result.
+        PSIParams params = make_tag_test_params();
+        Receiver receiver(params);
+        TagQuery query = make_tag_query(receiver, params, 5);
+
+        // 4 bytes of nonce and 10 of label make 7 parts of 16 bits
+        vector<vector<uint64_t>> parts = random_parts(params, params.tag_part_count() + 7);
+        put_item(
+            parts,
+            params,
+            query.items[0],
+            query.positions[0],
+            tag_of(query.label_keys[0], params),
+            EncryptedLabel(14));
+        auto valid = make_package(receiver, 10, 4, parts);
+        ASSERT_TRUE(
+            receiver.process_result(query.label_keys, query.itt, one_part(copy_package(*valid)))[0]
+                .found);
+
+        vector<pair<string, unique_ptr<ResultPackage>>> malformed;
+        auto add_malformed = [&](string name) -> ResultPackage & {
+            malformed.emplace_back(std::move(name), copy_package(*valid));
+            return *malformed.back().second;
+        };
+        add_malformed("a PSI result").psi_result = valid->label_result[0];
+        add_malformed("a label part too few").label_result.pop_back();
+        add_malformed("a label part too many").label_result.push_back(valid->label_result[0]);
+        add_malformed("label parts without a label").label_byte_count = 0;
+        add_malformed("too large a label_byte_count").label_byte_count = 1025;
+        add_malformed("too large a nonce_byte_count").nonce_byte_count = max_nonce_byte_count + 1;
+        add_malformed("a bundle index out of range").bundle_idx = params.bundle_idx_count();
+        malformed.emplace_back("no package", nullptr);
+
+        for (const auto &[name, package] : malformed) {
+            SCOPED_TRACE(name);
+            vector<ResultPart> result;
+            result.push_back(copy_package(*valid));
+            result.push_back(package ? copy_package(*package) : nullptr);
+            ASSERT_THROW(
+                static_cast<void>(receiver.process_result(query.label_keys, query.itt, result)),
+                runtime_error);
+            ASSERT_THROW(
+                static_cast<void>(
+                    receiver.process_result_part(query.label_keys, query.itt, result[1])),
+                runtime_error);
+        }
+
+        // Without a label there are only the tag parts, and no nonce
+        vector<vector<uint64_t>> tag_parts = random_parts(params, params.tag_part_count());
+        auto unlabeled = make_package(receiver, 0, 0, tag_parts);
+        ASSERT_NO_THROW(
+            static_cast<void>(receiver.process_result(
+                query.label_keys, query.itt, one_part(copy_package(*unlabeled)))));
+        unlabeled->nonce_byte_count = 4;
+        ASSERT_THROW(
+            static_cast<void>(receiver.process_result(
+                query.label_keys, query.itt, one_part(copy_package(*unlabeled)))),
+            runtime_error);
+        unlabeled->nonce_byte_count = 0;
+        unlabeled->label_result.push_back(valid->label_result[0]);
+        ASSERT_THROW(
+            static_cast<void>(receiver.process_result(
+                query.label_keys, query.itt, one_part(std::move(unlabeled)))),
+            runtime_error);
+    }
+
+    TEST(ReceiverTagTests, LabelKeysAreRequired)
+    {
+        PSIParams params = make_tag_test_params();
+        Receiver receiver(params);
+        TagQuery query = make_tag_query(receiver, params, 5);
+        vector<vector<uint64_t>> parts = random_parts(params, params.tag_part_count());
+        auto package = make_package(receiver, 0, 0, parts);
+
+        ASSERT_THROW(
+            static_cast<void>(
+                receiver.process_result({}, query.itt, one_part(copy_package(*package)))),
+            invalid_argument);
+        LabelKeyVector too_few(query.label_keys.begin(), query.label_keys.end() - 1);
+        ASSERT_THROW(
+            static_cast<void>(receiver.process_result_part(too_few, query.itt, package)),
+            invalid_argument);
+
+        // request_query refuses before sending anything
+        CapturingChannel chl;
+        ASSERT_THROW(
+            static_cast<void>(receiver.request_query(query.items, {}, chl)), invalid_argument);
+        ASSERT_TRUE(chl.sent_relin_keys.empty());
+        ASSERT_NO_THROW(
+            static_cast<void>(receiver.request_query(query.items, query.label_keys, chl)));
+        ASSERT_EQ(1, chl.sent_relin_keys.size());
+
+        // Without match tags they are needed only for labels, as in APSI 1.x
+        Receiver untagged_receiver(make_test_params());
+        CapturingChannel untagged_chl;
+        ASSERT_NO_THROW(
+            static_cast<void>(untagged_receiver.request_query(query.items, {}, untagged_chl)));
+    }
+
+    TEST(ReceiverTagTests, ARepeatedMatchKeepsTheFirst)
+    {
+        // Two packages giving an item its tag, which an honest sender gives only with
+        // probability 2^-tag_bit_count: the first match is kept, as without match tags
+        PSIParams params = make_tag_test_params();
+        Receiver receiver(params);
+        TagQuery query = make_tag_query(receiver, params, 3);
+
+        vector<unique_ptr<ResultPackage>> packages;
+        for (unsigned char first_byte : array<unsigned char, 2>{ 1, 2 }) {
+            vector<vector<uint64_t>> parts = random_parts(params, params.tag_part_count() + 1);
+            Label label{ first_byte, 0 };
+            put_item(
+                parts,
+                params,
+                query.items[1],
+                query.positions[1],
+                tag_of(query.label_keys[1], params),
+                apsi::util::encrypt_label(label, query.label_keys[1], 2, 0));
+            packages.push_back(make_package(receiver, 2, 0, parts));
+        }
+
+        for (size_t first : { 0U, 1U }) {
+            vector<ResultPart> result;
+            result.push_back(copy_package(*packages[first]));
+            result.push_back(copy_package(*packages[1 - first]));
+            vector<MatchRecord> mrs = receiver.process_result(query.label_keys, query.itt, result);
+            ASSERT_FALSE(mrs[0].found);
+            ASSERT_TRUE(mrs[1].found);
+            ASSERT_FALSE(mrs[2].found);
+            ASSERT_EQ(first + 1, mrs[1].label.value()[0]);
+        }
     }
 
     TEST(ReceiverTagTests, PackageWithoutPSIResultAbortsTheQueryWithoutTags)

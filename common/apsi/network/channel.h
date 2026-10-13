@@ -23,7 +23,7 @@
 
 namespace apsi::network {
     /**
-    Channel is an interfacate to implement a communication channel between a sender and a
+    Channel is an interface to implement a communication channel between a sender and a
     receiver. It keeps track of the number of bytes sent and received.
 
     A receive call may block, and Channel itself makes no promise about for how long: a channel

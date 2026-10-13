@@ -89,13 +89,18 @@ namespace APSITests {
         The transform must leave exactly as many packages as the announced package_count. A
         worker that gets nothing back, from a channel reporting no failure, concludes the
         package is merely late and waits for it.
+
+        With checks_results false, receive_result_for hands every package over unchecked, as a
+        channel written elsewhere may, rather than as Channel::receive_result_for does.
         */
         class ReplayChannel final : public NetworkChannel {
         public:
             using Transform = function<vector<ResultPackage>(vector<ResultPackage>)>;
 
-            ReplayChannel(shared_ptr<SenderDB> sender_db, Transform transform)
-                : sender_db_(std::move(sender_db)), transform_(std::move(transform))
+            ReplayChannel(
+                shared_ptr<SenderDB> sender_db, Transform transform, bool checks_results = true)
+                : sender_db_(std::move(sender_db)), transform_(std::move(transform)),
+                  checks_results_(checks_results)
             {}
 
             void send(unique_ptr<SenderOperation> sop) override
@@ -133,6 +138,15 @@ namespace APSITests {
                 return make_unique<ResultPackage>(script_[next_++]);
             }
 
+            unique_ptr<ResultPackage> receive_result_for(
+                shared_ptr<SEALContext> context, const PSIParams &params) override
+            {
+                if (checks_results_) {
+                    return NetworkChannel::receive_result_for(std::move(context), params);
+                }
+                return receive_result(std::move(context));
+            }
+
             /**
             How many packages the transform produced. A test asserts on this so that a transform
             that quietly stopped misbehaving is caught: the receiver's answer alone would not
@@ -150,6 +164,8 @@ namespace APSITests {
             shared_ptr<SenderDB> sender_db_;
 
             Transform transform_;
+
+            bool checks_results_;
 
             vector<ResultPackage> script_;
 
@@ -210,6 +226,42 @@ namespace APSITests {
             ResultPackage out_of_range = packages.front();
             out_of_range.bundle_idx = numeric_limits<uint32_t>::max();
             packages.push_back(std::move(out_of_range));
+            return packages;
+        }
+
+        /**
+        Appends a copy of the first package claiming the given bundle_idx.
+        */
+        ReplayChannel::Transform AppendPackageAtBundleIdx(uint32_t bundle_idx)
+        {
+            return [bundle_idx](vector<ResultPackage> packages) {
+                ResultPackage misplaced = packages.front();
+                misplaced.bundle_idx = bundle_idx;
+                packages.push_back(std::move(misplaced));
+                return packages;
+            };
+        }
+
+        /**
+        Appends a copy of the first package that also carries a PSI result, a copy of its first
+        label part. A result for parameters with match tags has none.
+        */
+        vector<ResultPackage> AppendPackageWithPSIResult(vector<ResultPackage> packages)
+        {
+            ResultPackage with_psi_result = packages.front();
+            with_psi_result.psi_result = with_psi_result.label_result.front();
+            packages.push_back(std::move(with_psi_result));
+            return packages;
+        }
+
+        /**
+        Appends a copy of the first package without its last label part.
+        */
+        vector<ResultPackage> AppendPackageMissingALabelPart(vector<ResultPackage> packages)
+        {
+            ResultPackage missing_part = packages.front();
+            missing_part.label_result.pop_back();
+            packages.push_back(std::move(missing_part));
             return packages;
         }
 
@@ -723,10 +775,12 @@ namespace APSITests {
         checks only the type is satisfied by either, so it would go on passing if the failure
         went unnoticed and the deadline cleaned up minutes later. The generous timeout and the
         tight bound on elapsed time say the same thing a second way: reaching the deadline at all
-        is a failure of this test.
+        is a failure of this test. An exchange that includes computing the sender's answer takes a
+        looser bound.
         */
         template <typename Callable>
-        void ExpectFailureIsReported(const Channel &chl, Callable exchange)
+        void ExpectFailureIsReported(
+            const Channel &chl, Callable exchange, chrono::milliseconds bound = 5s)
         {
             auto start = chrono::steady_clock::now();
             try {
@@ -736,8 +790,23 @@ namespace APSITests {
                 ASSERT_NE(string::npos, string(ex.what()).find("failed to receive"));
             }
 
-            ASSERT_LT(chrono::steady_clock::now() - start, 5s);
+            ASSERT_LT(chrono::steady_clock::now() - start, bound);
             ASSERT_TRUE(chl.receive_failed());
+        }
+
+        /**
+        Parameters with match tags, as create_tag_params1 makes them, with a table twice as large,
+        so that every answer has a result package for each of two bundle indices. With a single
+        bundle index, how many packages an answer has would depend on the sender's OPRF key.
+        */
+        PSIParams create_two_bundle_idx_tag_params()
+        {
+            PSIParams params = create_tag_params1();
+            PSIParams::TableParams table_params = params.table_params();
+            table_params.table_size *= 2;
+            return {
+                params.item_params(), table_params, params.query_params(), params.seal_params()
+            };
         }
 
         void SetUpTestLoggingAndThreads()
@@ -872,6 +941,123 @@ namespace APSITests {
         ASSERT_EQ(uint32_t(honest.packages.size() + 1), chl.announced_count());
 
         VerifyResults(honest, query_result);
+    }
+
+    TEST(HostileSenderTests, TagLabeledDuplicateResultPackagesAreIgnored)
+    {
+        SetUpTestLoggingAndThreads();
+
+        // LabeledDuplicateResultPackagesAreIgnored with match tags, where a result is matched by
+        // its tag parts and each worker decrypts the label of every item at a package's bundle
+        // index. Two workers given the same package find the same matches, with the same labels,
+        // for the same MatchRecord slots, and the second must leave the first alone.
+        PSIParams params = create_two_bundle_idx_tag_params();
+        ASSERT_EQ(2, params.bundle_idx_count());
+        Receiver receiver(params);
+        HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10, 10);
+        ASSERT_LE(size_t(2), honest.packages.size());
+        ASSERT_FALSE(honest.sender_item_labels.empty());
+
+        ReplayChannel chl(honest.sender_db, DuplicateEachPackage);
+        vector<MatchRecord> query_result;
+        ASSERT_NO_THROW(
+            query_result =
+                receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl));
+
+        // The receiver really was given each package twice; a duplicate carries the same match
+        // as its original, so the answer alone would not show a transform that stopped.
+        ASSERT_EQ(uint32_t(honest.packages.size() * 2), chl.announced_count());
+
+        // Exactly the honest answer: every item of the intersection, with its label, and no other
+        VerifyResults(honest, query_result);
+    }
+
+    // With match tags the parameters fix the structure of every result package, so a package
+    // without it cannot be part of an answer, whatever the channel. The receiver refuses the whole
+    // query rather than leave out what the package should have held, as a match quietly lost is
+    // indistinguishable from there being none. Without match tags, a package for a bundle index the
+    // parameters do not have is ignored; see OutOfRangeBundleIdxIsIgnored. In each test below every
+    // honest package is delivered as well, followed by a copy of one of them that is wrong in one
+    // way, so that only the refusal can end the query.
+
+    TEST(HostileSenderTests, TagResultPackageWithPSIResultFailsTheQuery)
+    {
+        SetUpTestLoggingAndThreads();
+
+        PSIParams params = create_two_bundle_idx_tag_params();
+        Receiver receiver(params);
+        HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10);
+
+        ReplayChannel chl(honest.sender_db, AppendPackageWithPSIResult);
+
+        // The exchange includes the sender's honest answer, which ReplayChannel::send computes
+        ExpectFailureIsReported(
+            chl,
+            [&] { (void)receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl); },
+            60s);
+        ASSERT_EQ(uint32_t(honest.packages.size() + 1), chl.announced_count());
+    }
+
+    TEST(HostileSenderTests, TagResultPackageMissingALabelPartFailsTheQuery)
+    {
+        SetUpTestLoggingAndThreads();
+
+        // With labels, so that the part dropped is one of the label's rather than of the tag's
+        PSIParams params = create_two_bundle_idx_tag_params();
+        Receiver receiver(params);
+        HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10, 10);
+        ASSERT_LT(size_t(params.tag_part_count()), honest.packages.front().label_result.size());
+
+        ReplayChannel chl(honest.sender_db, AppendPackageMissingALabelPart);
+
+        // The exchange includes the sender's honest answer, which ReplayChannel::send computes
+        ExpectFailureIsReported(
+            chl,
+            [&] { (void)receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl); },
+            60s);
+        ASSERT_EQ(uint32_t(honest.packages.size() + 1), chl.announced_count());
+    }
+
+    TEST(HostileSenderTests, TagResultPackageAtBundleIdxCountFailsTheQuery)
+    {
+        SetUpTestLoggingAndThreads();
+
+        // The first bundle index the parameters do not have
+        PSIParams params = create_two_bundle_idx_tag_params();
+        Receiver receiver(params);
+        HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10);
+
+        ReplayChannel chl(honest.sender_db, AppendPackageAtBundleIdx(params.bundle_idx_count()));
+
+        // The exchange includes the sender's honest answer, which ReplayChannel::send computes
+        ExpectFailureIsReported(
+            chl,
+            [&] { (void)receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl); },
+            60s);
+        ASSERT_EQ(uint32_t(honest.packages.size() + 1), chl.announced_count());
+    }
+
+    TEST(HostileSenderTests, TagResultPackageAtBundleIdxCountFailsTheQueryOverAnUncheckedChannel)
+    {
+        SetUpTestLoggingAndThreads();
+
+        // A channel written elsewhere may hand over a package that cannot be a result unchecked.
+        // A result worker checks every package again, before it skips one for a bundle index the
+        // query does not cover, so the query fails all the same, although no receive does.
+        PSIParams params = create_two_bundle_idx_tag_params();
+        Receiver receiver(params);
+        HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10);
+
+        ReplayChannel chl(
+            honest.sender_db, AppendPackageAtBundleIdx(params.bundle_idx_count()), false);
+        try {
+            (void)receiver.request_query(honest.hashed_recv_items, honest.label_keys, chl);
+            FAIL() << "the query was expected to fail";
+        } catch (const runtime_error &ex) {
+            ASSERT_NE(string::npos, string(ex.what()).find("result package is for bundle index"));
+        }
+        ASSERT_FALSE(chl.receive_failed());
+        ASSERT_EQ(uint32_t(honest.packages.size() + 1), chl.announced_count());
     }
 
     TEST(HostileSenderTests, ProcessResultIgnoresDuplicatePackages)

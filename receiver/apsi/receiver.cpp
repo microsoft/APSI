@@ -24,6 +24,7 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/match_tag.h"
 #include "apsi/util/utils.h"
 
 // Kuku
@@ -353,14 +354,6 @@ namespace apsi {
 
         pair<Request, IndexTranslationTable> Receiver::create_query(const vector<HashedItem> &items)
         {
-            // This receiver cannot match items by their tags, so a query with parameters that use
-            // them is refused rather than its result misread
-            if (params_.uses_tags()) {
-                APSI_LOG_ERROR("Cannot create a query: the parameters use match tags");
-                throw invalid_argument(
-                    "parameters with match tags are not supported by this receiver");
-            }
-
             APSI_LOG_INFO("Creating encrypted query for " << items.size() << " items");
             STOPWATCH(recv_stopwatch, "Receiver::create_query");
 
@@ -444,6 +437,21 @@ namespace apsi {
 
                     vector<uint64_t> alg_items;
                     for (const auto &item : bundle_items) {
+                        // With match tags, an empty entry of the table gets a value no field
+                        // element of a sender's item can take: those have
+                        // item_bit_count_per_felt bits, and 2^item_bit_count_per_felt is below
+                        // the plain modulus, which is an odd prime. An empty entry therefore never
+                        // evaluates a label polynomial at one of the sender's points, where it
+                        // would return that item's tag. Without match tags, an empty entry is the
+                        // all-zero item, as in APSI 1.x.
+                        if (params_.uses_tags() && cuckoo.is_empty_item(item)) {
+                            alg_items.insert(
+                                alg_items.end(),
+                                params_.item_params().felts_per_item,
+                                uint64_t(1) << params_.item_bit_count_per_felt());
+                            continue;
+                        }
+
                         // Now set up a BitstringView to this item
                         gsl::span<const unsigned char> item_bytes(
                             reinterpret_cast<const unsigned char *>(item.data()), sizeof(item));
@@ -503,6 +511,11 @@ namespace apsi {
             NetworkChannel &chl,
             chrono::milliseconds timeout)
         {
+            // With match tags, every result is checked against tags derived from the label keys,
+            // so a query without them would be answered with no matches at all. Refuse it before
+            // anything is sent.
+            check_label_keys(label_keys, items.size());
+
             // No ThreadPoolMgr here: the receiver puts no work on the shared pool.
             // Query creation and result decryption run on this thread and on the dedicated
             // result-worker threads below, so a process that only receives holds no pool
@@ -522,6 +535,10 @@ namespace apsi {
             auto query = create_query(items);
             chl.send(std::move(query.first));
             auto itt = std::move(query.second);
+
+            // With match tags, the tag of every item is derived once, while the sender answers,
+            // rather than for every result package
+            vector<vector<felt_t>> match_tags = compute_match_tags(label_keys, itt.item_count());
 
             // One deadline covers both phases of the exchange. The query response restarts it, so
             // the sender gets the full window again for the first result package, and each package
@@ -580,7 +597,7 @@ namespace apsi {
             for (size_t t = 0; t < task_count; t++) {
                 result_workers.push_back(async(launch::async, [&] {
                     process_result_worker(
-                        package_count, merge_state, deadline, label_keys, itt, chl);
+                        package_count, merge_state, deadline, label_keys, itt, match_tags, chl);
                 }));
             }
 
@@ -615,7 +632,20 @@ namespace apsi {
             const IndexTranslationTable &itt,
             const ResultPart &result_part) const
         {
+            return process_result_part(label_keys, itt, result_part, nullptr);
+        }
+
+        vector<MatchRecord> Receiver::process_result_part(
+            const LabelKeyVector &label_keys,
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part,
+            const vector<vector<felt_t>> *match_tags) const
+        {
             STOPWATCH(recv_stopwatch, "Receiver::process_result_part");
+
+            if (params_.uses_tags()) {
+                return process_tagged_result_part(label_keys, itt, result_part, match_tags);
+            }
 
             if (!result_part) {
                 APSI_LOG_ERROR("Failed to process result: result_part is null");
@@ -797,9 +827,18 @@ namespace apsi {
             APSI_LOG_INFO("Processing " << result.size() << " result parts");
             STOPWATCH(recv_stopwatch, "Receiver::process_result");
 
+            // With match tags, nothing can be matched without the label keys
+            check_label_keys(label_keys, itt.item_count());
+
+            // With match tags, the tag of every item is derived once rather than for every part
+            vector<vector<felt_t>> match_tags = compute_match_tags(label_keys, itt.item_count());
+
             vector<MatchRecord> mrs(itt.item_count());
 
             for (const auto &result_part : result) {
+                // With match tags, a package that cannot be a result of this query aborts it
+                check_tagged_result_part(result_part);
+
                 if (!result_part) {
                     APSI_LOG_ERROR("Failed to process result: result_part is null");
                     continue;
@@ -809,7 +848,7 @@ namespace apsi {
                     continue;
                 }
 
-                auto this_mrs = process_result_part(label_keys, itt, result_part);
+                auto this_mrs = process_result_part(label_keys, itt, result_part, &match_tags);
                 if (this_mrs.size() != mrs.size()) {
                     // Something went wrong with process_result; error is already logged
                     continue;
@@ -846,12 +885,209 @@ namespace apsi {
             return mrs;
         }
 
+        void Receiver::check_label_keys(const LabelKeyVector &label_keys, size_t item_count) const
+        {
+            if (params_.uses_tags() && (label_keys.size() != item_count)) {
+                APSI_LOG_ERROR(
+                    "Expected " << item_count << " label keys, one for each item, but "
+                                << label_keys.size()
+                                << " were given; the parameters use match tags, which are "
+                                   "derived from the label keys");
+                throw invalid_argument("label keys are required with match tags");
+            }
+        }
+
+        vector<vector<felt_t>> Receiver::compute_match_tags(
+            const LabelKeyVector &label_keys, size_t item_count) const
+        {
+            vector<vector<felt_t>> match_tags;
+            if (!params_.uses_tags()) {
+                return match_tags;
+            }
+
+            size_t tag_felt_count = mul_safe(
+                safe_cast<size_t>(params_.tag_part_count()),
+                safe_cast<size_t>(params_.item_params().felts_per_item));
+            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
+            match_tags.reserve(item_count);
+            for (size_t item_idx = 0; item_idx < item_count; item_idx++) {
+                match_tags.push_back(
+                    compute_match_tag(label_keys[item_idx], tag_felt_count, bits_per_felt));
+            }
+
+            return match_tags;
+        }
+
+        void Receiver::check_tagged_result_part(const ResultPart &result_part) const
+        {
+            if (!params_.uses_tags()) {
+                return;
+            }
+
+            // A missing or malformed package means a part of the answer is missing, and with it
+            // possibly a match. Quietly going on would make that indistinguishable from there not
+            // being one.
+            if (!result_part) {
+                APSI_LOG_ERROR("Failed to process result: result_part is null");
+                throw runtime_error("result part is null");
+            }
+
+            try {
+                result_part->check_tag_structure(params_);
+            } catch (const runtime_error &ex) {
+                APSI_LOG_ERROR("Failed to process result: " << ex.what());
+                throw;
+            }
+        }
+
+        vector<MatchRecord> Receiver::process_tagged_result_part(
+            const LabelKeyVector &label_keys,
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part,
+            const vector<vector<felt_t>> *match_tags) const
+        {
+            // Checked again for a caller of process_result_part that has not checked
+            check_label_keys(label_keys, itt.item_count());
+            check_tagged_result_part(result_part);
+
+            // The number of items that were submitted in the query
+            size_t item_count = itt.item_count();
+
+            size_t felts_per_item = safe_cast<size_t>(params_.item_params().felts_per_item);
+            size_t items_per_bundle = safe_cast<size_t>(params_.items_per_bundle());
+            size_t bundle_start =
+                mul_safe(safe_cast<size_t>(result_part->bundle_idx), items_per_bundle);
+            size_t tag_part_count = params_.tag_part_count();
+            size_t tag_felt_count = mul_safe(tag_part_count, felts_per_item);
+            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
+
+            // Find the receiver's items at this bundle index, by their position in the bundle
+            vector<pair<size_t, size_t>> bundle_items;
+            for (const auto &[table_idx, item_idx] : itt.table_idx_to_item_idx_) {
+                if ((table_idx >= bundle_start) && (table_idx - bundle_start < items_per_bundle)) {
+                    bundle_items.emplace_back(table_idx - bundle_start, item_idx);
+                }
+            }
+
+            // Visit the items in slot order, as without match tags, not in the hash map's order
+            sort(bundle_items.begin(), bundle_items.end());
+
+            // Set up the result vector
+            vector<MatchRecord> mrs(item_count);
+
+            // Every part of every package is decrypted, whether or not any of the receiver's items
+            // is at its bundle index and whether or not one of them matches, as without match
+            // tags. The sender can observe how long the receiver takes, and could otherwise tell
+            // from it whether one matched. The tag and label work below still runs once for each
+            // of the receiver's items at this bundle index, so the time grows with their number.
+            vector<vector<uint64_t>> tag_result =
+                result_part->extract_tag_result(crypto_context_, tag_part_count);
+
+            // check_tagged_result_part has made sure there are exactly as many label parts as the
+            // label and nonce byte counts call for. The label parts are decrypted as well, whether
+            // or not any item matches.
+            size_t label_byte_count = safe_cast<size_t>(result_part->label_byte_count);
+            size_t nonce_byte_count = safe_cast<size_t>(result_part->nonce_byte_count);
+            size_t effective_label_byte_count = add_safe(nonce_byte_count, label_byte_count);
+            vector<vector<uint64_t>> label_result;
+            if (label_byte_count) {
+                label_result = result_part->extract_label_result(crypto_context_, tag_part_count);
+            }
+            size_t label_bit_count =
+                mul_safe(safe_cast<size_t>(params_.item_bit_count()), label_result.size());
+
+            // The tags of the items at this bundle index are derived here, unless the caller has
+            // derived the tag of every item of the query
+            vector<vector<felt_t>> derived_tags;
+            if (!match_tags) {
+                derived_tags.resize(item_count);
+                for (const auto &bundle_item : bundle_items) {
+                    size_t item_idx = bundle_item.second;
+                    derived_tags[item_idx] =
+                        compute_match_tag(label_keys[item_idx], tag_felt_count, bits_per_felt);
+                }
+                match_tags = &derived_tags;
+            }
+
+            // An item matches when its slots hold exactly its own tag. The values compared are
+            // whole field elements: a slot can hold a value of 2^bits_per_felt or more, which is
+            // never part of a tag, and comparing only its low bits would make false positives
+            // likelier. Every field element is compared, and the label of every item is decoded and
+            // decrypted, so that the work done does not depend on which items match or how much of
+            // a tag a slot agrees with. Only a match keeps its label.
+            for (const auto &[bundle_pos, item_idx] : bundle_items) {
+                const vector<felt_t> &expected_tag = (*match_tags)[item_idx];
+
+                felt_t difference = 0;
+                for (size_t part_idx = 0; part_idx < tag_part_count; part_idx++) {
+                    for (size_t felt_idx = 0; felt_idx < felts_per_item; felt_idx++) {
+                        size_t slot = (bundle_pos * felts_per_item) + felt_idx;
+                        difference |= tag_result[part_idx][slot] ^
+                                      expected_tag[(part_idx * felts_per_item) + felt_idx];
+                    }
+                }
+
+                Label label;
+                if (label_byte_count) {
+                    // Collect the label parts in the item's slots, part by part, as the sender
+                    // laid them out
+                    AlgLabel alg_label;
+                    alg_label.reserve(mul_safe(label_result.size(), felts_per_item));
+                    size_t label_offset = mul_safe(bundle_pos, felts_per_item);
+                    for (const auto &label_part : label_result) {
+                        copy_n(
+                            label_part.begin() + static_cast<ptrdiff_t>(label_offset),
+                            felts_per_item,
+                            back_inserter(alg_label));
+                    }
+
+                    // Create the label, resize it down to the effective byte count, and decrypt
+                    EncryptedLabel encrypted_label = dealgebraize_label(
+                        alg_label, label_bit_count, params_.seal_params().plain_modulus());
+                    encrypted_label.resize(effective_label_byte_count);
+                    label = decrypt_label(encrypted_label, label_keys[item_idx], nonce_byte_count);
+                }
+
+                if (difference) {
+                    continue;
+                }
+
+                // Two cuckoo table indices in this one package translated to the same item. The
+                // translation table is built by the receiver and maps each item to a single
+                // location, so this indicates the table has been corrupted rather than anything
+                // the sender did. Report it and keep the match already recorded.
+                if (mrs[item_idx]) {
+                    APSI_LOG_ERROR(
+                        "The table index -> item index translation table indicated a "
+                        "location that was already filled by another match from this "
+                        "result package; the translation table (query) has probably "
+                        "been corrupted; keeping the first match");
+                    continue;
+                }
+
+                APSI_LOG_DEBUG(
+                    "Match found for items[" << item_idx << "] at cuckoo table index "
+                                             << add_safe(bundle_start, bundle_pos));
+
+                MatchRecord mr;
+                mr.found = true;
+                if (label_byte_count) {
+                    mr.label.set(std::move(label));
+                }
+
+                mrs[item_idx] = std::move(mr);
+            }
+
+            return mrs;
+        }
+
         void Receiver::process_result_worker(
             atomic<uint32_t> &package_count,
             ResultMergeState &merge_state,
             ReceiveDeadline &deadline,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
+            const vector<vector<felt_t>> &match_tags,
             Channel &chl) const
         {
             stringstream sw_ss;
@@ -895,6 +1131,11 @@ namespace apsi {
                 // not just for the one that happened to read it.
                 deadline.note_progress();
 
+                // With match tags, a package that cannot be a result of this query aborts it.
+                // receive_result_for has already checked, unless a channel written elsewhere
+                // overrides it without checking, and checking again costs nothing.
+                check_tagged_result_part(result_part);
+
                 // The bundle index is readable before the package is decrypted, so screen it
                 // first: a package for an index this query does not cover costs us no decryption.
                 if (!bundle_idx_in_range(result_part->bundle_idx, params_.bundle_idx_count())) {
@@ -902,7 +1143,7 @@ namespace apsi {
                 }
 
                 // Process the ResultPart to get the corresponding vector of MatchRecords
-                auto this_mrs = process_result_part(label_keys, itt, result_part);
+                auto this_mrs = process_result_part(label_keys, itt, result_part, &match_tags);
                 if (this_mrs.size() != merge_state.mrs.size()) {
                     // Something went wrong with process_result_part; error is already logged
                     continue;
