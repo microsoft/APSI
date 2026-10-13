@@ -6,20 +6,26 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <random>
+#include <stdexcept>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 // APSI
 #include "apsi/item.h"
+#include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/psi_params.h"
 #include "apsi/receiver.h"
 #include "apsi/requests.h"
+#include "apsi/responses.h"
 #include "apsi/seal_object.h"
 
 // SEAL
+#include "seal/ciphertext.h"
 #include "seal/modulus.h"
+#include "seal/plaintext.h"
 #include "seal/relinkeys.h"
 #include "seal/serialization.h"
 
@@ -309,5 +315,130 @@ namespace APSITests {
         ASSERT_NE(nullptr, second);
 
         ASSERT_EQ(save_relin_keys(first->relin_keys), save_relin_keys(second->relin_keys));
+    }
+
+    namespace {
+        /**
+        Parameters with match tags of tag_part_count parts and a single bundle index.
+        */
+        PSIParams make_tag_test_params(
+            uint32_t tag_part_count = 3,
+            size_t poly_modulus_degree = 4096,
+            uint64_t plain_modulus = 65537)
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = 1;
+            item_params.tag_part_count = tag_part_count;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = 3;
+            table_params.max_items_per_bin = 16;
+            table_params.table_size = static_cast<uint32_t>(poly_modulus_degree);
+
+            PSIParams::QueryParams query_params;
+            query_params.query_powers = { 1, 3, 5 };
+
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(poly_modulus_degree);
+            seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
+            seal_params.set_plain_modulus(plain_modulus);
+
+            return { item_params, table_params, query_params, seal_params };
+        }
+
+        /**
+        Slot values for the result of one bin bundle: part_count parts of random values, which
+        is what a sender's polynomials give in slots where they hold no item.
+        */
+        vector<vector<uint64_t>> random_parts(const PSIParams &params, size_t part_count)
+        {
+            mt19937_64 rng(part_count);
+            uniform_int_distribution<uint64_t> dist(
+                0, params.seal_params().plain_modulus().value() - 1);
+            vector<vector<uint64_t>> parts(
+                part_count, vector<uint64_t>(params.seal_params().poly_modulus_degree()));
+            for (auto &part : parts) {
+                for (auto &value : part) {
+                    value = dist(rng);
+                }
+            }
+            return parts;
+        }
+
+        /**
+        A ResultPackage for bundle index 0 holding the given parts, encrypted under the receiver's
+        key, as label_result.
+        */
+        unique_ptr<ResultPackage> make_package(
+            const Receiver &receiver,
+            uint32_t label_byte_count,
+            uint32_t nonce_byte_count,
+            const vector<vector<uint64_t>> &parts)
+        {
+            const CryptoContext &crypto_context = receiver.get_crypto_context();
+            auto package = make_unique<ResultPackage>();
+            package->bundle_idx = 0;
+            package->compr_mode = compr_mode_type::none;
+            package->label_byte_count = label_byte_count;
+            package->nonce_byte_count = nonce_byte_count;
+            for (const auto &part : parts) {
+                Plaintext pt;
+                crypto_context.encoder()->encode(part, pt);
+                Ciphertext ct;
+                crypto_context.encryptor()->encrypt_symmetric(pt, ct);
+                package->label_result.emplace_back(std::move(ct));
+            }
+            return package;
+        }
+
+        unique_ptr<ResultPackage> copy_package(const ResultPackage &package)
+        {
+            auto copy = make_unique<ResultPackage>();
+            copy->bundle_idx = package.bundle_idx;
+            copy->compr_mode = package.compr_mode;
+            copy->psi_result = package.psi_result;
+            copy->label_byte_count = package.label_byte_count;
+            copy->nonce_byte_count = package.nonce_byte_count;
+            copy->label_result = package.label_result;
+            return copy;
+        }
+
+        vector<ResultPart> one_part(unique_ptr<ResultPackage> package)
+        {
+            vector<ResultPart> result;
+            result.push_back(std::move(package));
+            return result;
+        }
+    } // namespace
+
+    TEST(ReceiverTagTests, ParametersWithMatchTagsAreRefused)
+    {
+        // This receiver cannot match items by their tags, so it refuses a query with parameters
+        // that use them, before anything is sent, rather than misread its result
+        PSIParams params = make_tag_test_params();
+        Receiver receiver(params);
+        vector<HashedItem> items{ make_hashed_item(1, 2), make_hashed_item(3, 4) };
+        ASSERT_THROW(static_cast<void>(receiver.create_query(items)), invalid_argument);
+    }
+
+    TEST(ReceiverTagTests, PackageWithoutPSIResultAbortsTheQueryWithoutTags)
+    {
+        // The schema does not require a PSI result, as a result with match tags has none, so
+        // without match tags its absence is checked in code. Such a package is refused, as APSI
+        // 1.x's schema refuses it, rather than skipped: skipping it would quietly leave out
+        // whatever matches it holds.
+        PSIParams params = make_test_params();
+        Receiver receiver(params);
+        vector<HashedItem> items{ make_hashed_item(1, 2), make_hashed_item(3, 4) };
+        auto itt = receiver.create_query(items).second;
+
+        vector<vector<uint64_t>> parts = random_parts(params, 1);
+        auto package = make_package(receiver, 0, 0, parts);
+        ASSERT_THROW(
+            static_cast<void>(receiver.process_result_part({}, itt, copy_package(*package))),
+            runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(receiver.process_result({}, itt, one_part(std::move(package)))),
+            runtime_error);
     }
 } // namespace APSITests

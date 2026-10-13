@@ -5,9 +5,13 @@ include "ciphertext.fbs";
 
 namespace apsi.network.fbs;
 
+// A result for parameters with match tags carries its tags and labels in label_result and has no
+// psi_result; a result for parameters without match tags always has one. The receiver checks
+// which it expects, so psi_result is not marked required here. That changes only what the
+// verifier accepts, not what is written.
 table ResultPackage {
     bundle_idx:uint32;
-    psi_result:Ciphertext (required);
+    psi_result:Ciphertext;
     label_byte_count:uint32;
     nonce_byte_count:uint32;
     label_result:[Ciphertext];

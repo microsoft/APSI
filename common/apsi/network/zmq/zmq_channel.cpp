@@ -106,6 +106,22 @@ namespace apsi {
                 return obj.load(stream, std::move(context));
             }
 
+            // context is taken by value to match the by-value SEALContext convention of the
+            // Channel interface this helper serves.
+            // NOLINTNEXTLINE(performance-unnecessary-value-param)
+            size_t load_result_from_string(
+                string data,
+                shared_ptr<SEALContext> context,
+                const PSIParams &params,
+                ResultPackage &rp)
+            {
+                ArrayGetBuffer agbuf(
+                    reinterpret_cast<const char *>(data.data()),
+                    static_cast<streamsize>(data.size()));
+                istream stream(&agbuf);
+                return rp.load(stream, context, params);
+            }
+
             template <typename T>
             size_t save_to_message(const T &obj, multipart_t &msg)
             {
@@ -583,6 +599,18 @@ namespace apsi {
 
         unique_ptr<ResultPackage> ZMQChannel::receive_result(shared_ptr<SEALContext> context)
         {
+            return receive_result_package(std::move(context), nullptr);
+        }
+
+        unique_ptr<ResultPackage> ZMQChannel::receive_result_for(
+            shared_ptr<SEALContext> context, const PSIParams &params)
+        {
+            return receive_result_package(std::move(context), &params);
+        }
+
+        unique_ptr<ResultPackage> ZMQChannel::receive_result_package(
+            shared_ptr<SEALContext> context, const PSIParams *params)
+        {
             throw_if_not_connected();
 
             bool valid_context = context && context->parameters_set();
@@ -616,19 +644,25 @@ namespace apsi {
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
             try {
-                bytes_received = load_from_string(msg[0].to_string(), std::move(context), *rp);
+                bytes_received =
+                    params ? load_result_from_string(
+                                 msg[0].to_string(), std::move(context), *params, *rp)
+                           : load_from_string(msg[0].to_string(), std::move(context), *rp);
                 bytes_received_ += bytes_received;
             } catch (const invalid_argument &ex) {
-                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
                 set_receive_failed();
                 return nullptr;
             } catch (const runtime_error &ex) {
-                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
                 set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
-                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
                 set_receive_failed();
                 return nullptr;
             }

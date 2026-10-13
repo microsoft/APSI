@@ -67,9 +67,176 @@ namespace APSITests {
 
             return context;
         }
+
+        /**
+        Parameters with match tags and the same encryption parameters as get_params, so that
+        get_context can encrypt for them: three tag parts of 16 bits, one field element per item.
+        */
+        PSIParams get_tag_params()
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = 1;
+            item_params.tag_part_count = 3;
+
+            PSIParams::TableParams table_params = get_params()->table_params();
+            table_params.table_size = 4096;
+
+            return {
+                item_params, table_params, get_params()->query_params(), get_params()->seal_params()
+            };
+        }
+
+        unique_ptr<ResultPackage> make_package(bool with_psi_result, size_t part_count)
+        {
+            Ciphertext ct;
+            get_context()->encryptor()->encrypt_zero_symmetric(ct);
+
+            auto rp = make_unique<ResultPackage>();
+            rp->bundle_idx = 0;
+            if (with_psi_result) {
+                rp->psi_result = ct;
+            }
+            for (size_t i = 0; i < part_count; i++) {
+                rp->label_result.emplace_back(ct);
+            }
+            return rp;
+        }
+
+        /**
+        A channel written outside APSI: it implements receive_result only, here by handing out
+        packages it has been given, and inherits receive_result_for.
+        */
+        class PresetChannel final : public Channel {
+        public:
+            void send(unique_ptr<SenderOperation>) override
+            {}
+
+            unique_ptr<SenderOperation> receive_operation(
+                shared_ptr<SEALContext>, SenderOperationType) override
+            {
+                return nullptr;
+            }
+
+            void send(unique_ptr<SenderOperationResponse>) override
+            {}
+
+            unique_ptr<SenderOperationResponse> receive_response(SenderOperationType) override
+            {
+                return nullptr;
+            }
+
+            void send(unique_ptr<ResultPackage> rp) override
+            {
+                packages.push_back(std::move(rp));
+            }
+
+            unique_ptr<ResultPackage> receive_result(shared_ptr<SEALContext>) override
+            {
+                if (packages.empty()) {
+                    return nullptr;
+                }
+                auto rp = std::move(packages.front());
+                packages.erase(packages.begin());
+                return rp;
+            }
+
+            vector<unique_ptr<ResultPackage>> packages;
+        };
     } // namespace
 
     class StreamChannelTests : public ::testing::Test {};
+
+    TEST_F(StreamChannelTests, ReceiveResultForChecksTheStructureOfTagResults)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        PSIParams tag_params = get_tag_params();
+
+        // A package with the structure the parameters call for is received
+        svr.send(make_package(false, 3));
+        auto rp = clt.receive_result_for(get_context()->seal_context(), tag_params);
+        ASSERT_NE(nullptr, rp);
+        ASSERT_EQ(3, rp->label_result.size());
+        ASSERT_FALSE(clt.receive_failed());
+
+        // One without it is a failed receive, as an unreadable package is
+        svr.send(make_package(true, 3));
+        ASSERT_EQ(nullptr, clt.receive_result_for(get_context()->seal_context(), tag_params));
+        ASSERT_TRUE(clt.receive_failed());
+
+        // Without match tags, a package is received if it has a PSI result
+        StreamChannel clt2(/* istream */ stream2, /* ostream */ stream1);
+        svr.send(make_package(true, 3));
+        rp = clt2.receive_result_for(get_context()->seal_context(), *get_params());
+        ASSERT_NE(nullptr, rp);
+        ASSERT_FALSE(clt2.receive_failed());
+    }
+
+    TEST_F(StreamChannelTests, ReceiveResultForRequiresPSIResultWithoutTags)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        // Without match tags every result package has a PSI result, which the schema of APSI 1.x
+        // requires. The schema does not, as a result for parameters with match tags has none, so
+        // a package without one must fail the receive: Receiver::request_query then aborts the
+        // query instead of returning partial results.
+        svr.send(make_package(true, 0));
+        ASSERT_NE(nullptr, clt.receive_result_for(get_context()->seal_context(), *get_params()));
+        ASSERT_FALSE(clt.receive_failed());
+
+        svr.send(make_package(false, 0));
+        ASSERT_EQ(nullptr, clt.receive_result_for(get_context()->seal_context(), *get_params()));
+        ASSERT_TRUE(clt.receive_failed());
+
+        // The overload of ResultPackage::load with parameters refuses it in the same way, while the
+        // one without parameters loads it
+        stringstream ss;
+        make_package(false, 0)->save(ss);
+        string saved = ss.str();
+
+        ResultPackage rp;
+        stringstream in1(saved);
+        ASSERT_THROW(rp.load(in1, get_context()->seal_context(), *get_params()), runtime_error);
+        stringstream in2(saved);
+        ASSERT_NO_THROW(rp.load(in2, get_context()->seal_context()));
+        ASSERT_FALSE(rp.psi_result);
+    }
+
+    TEST_F(StreamChannelTests, DefaultReceiveResultForChecksTheLoadedPackage)
+    {
+        PSIParams tag_params = get_tag_params();
+
+        PresetChannel chl;
+        chl.send(make_package(false, 3));
+        chl.send(make_package(false, 2));
+        chl.send(make_package(true, 3));
+
+        ASSERT_NE(nullptr, chl.receive_result_for(get_context()->seal_context(), tag_params));
+        ASSERT_FALSE(chl.receive_failed());
+        ASSERT_EQ(nullptr, chl.receive_result_for(get_context()->seal_context(), tag_params));
+        ASSERT_TRUE(chl.receive_failed());
+
+        // Without match tags only the presence of the PSI result is checked
+        ASSERT_NE(nullptr, chl.receive_result_for(get_context()->seal_context(), *get_params()));
+
+        // And nothing arriving is still not a failure of its own
+        uint64_t failures = chl.receive_failure_count();
+        ASSERT_EQ(nullptr, chl.receive_result_for(get_context()->seal_context(), tag_params));
+        ASSERT_EQ(failures, chl.receive_failure_count());
+
+        // A package without a PSI result is a failed receive without match tags
+        chl.send(make_package(false, 3));
+        ASSERT_EQ(nullptr, chl.receive_result_for(get_context()->seal_context(), *get_params()));
+        ASSERT_EQ(failures + 1, chl.receive_failure_count());
+    }
 
     TEST_F(StreamChannelTests, SendReceiveParms)
     {

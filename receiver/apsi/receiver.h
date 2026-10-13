@@ -82,14 +82,24 @@ namespace apsi::receiver {
     important piece of data: the number of ResultPart objects the receiver should expect to
     receive from the sender in the next step.
 
-    (4) network::Channel::receive_result must be called repeatedly to receive all ResultParts.
-    For each received ResultPart Receiver::process_result_part must be called to find a
-    std::vector<MatchRecord> representing the match data associated to that ResultPart.
-    Alternatively, one can first retrieve all ResultParts, collect them into a
-    std::vector<ResultPart>, and use Receiver::process_result to find the complete result --
-    just like what the simple API returns. Both Receiver::process_result_part and
-    Receiver::process_result require the IndexTranslationTable and the LabelKeyVector
-    objects created in the previous steps.
+    (4) network::Channel::receive_result_for must be called repeatedly, with the Receiver's
+    seal::SEALContext, from Receiver::get_seal_context, and the PSIParams the Receiver was created
+    from, to receive all ResultParts. It rejects, as a failed receive, a package that cannot be a
+    result for these parameters. For each received ResultPart Receiver::process_result_part must be
+    called to find a std::vector<MatchRecord> representing the match data associated to that
+    ResultPart. Alternatively, one can first retrieve all ResultParts, collect them into a
+    std::vector<ResultPart>, and use Receiver::process_result to find the complete result -- just
+    like what the simple API returns. Both Receiver::process_result_part and
+    Receiver::process_result require the IndexTranslationTable and the LabelKeyVector objects
+    created in the previous steps.
+
+    A null result package is logged and skipped, as in APSI 1.x, and one without a psi_result
+    throws std::runtime_error. A lost package could hide a match, so a caller collecting packages
+    itself should treat a failed receive as a failed query, as the simple API does.
+
+    This Receiver does not support parameters with match tags (see PSIParams::uses_tags):
+    Receiver::create_query, and with it Receiver::request_query, throws std::invalid_argument for
+    them.
     */
     class Receiver {
     public:
@@ -208,6 +218,10 @@ namespace apsi::receiver {
         Throws std::runtime_error if the sender sends nothing for timeout, whether that happens
         before the query response or partway through the result packages; see
         Receiver::default_receive_timeout for what that bound means and how to lift it.
+
+        This throws std::invalid_argument before anything is sent if the parameters use match
+        tags, which this Receiver does not support, and std::runtime_error if a result package
+        cannot be a result for these parameters.
         */
         std::vector<MatchRecord> request_query(
             const std::vector<HashedItem> &items,
@@ -251,6 +265,9 @@ namespace apsi::receiver {
         more than one query is responsible for calling Receiver::reset_keys between them, at a
         point where no query is in flight; otherwise every query it sends carries the same
         relinearization keys, and a sender can recognize them as coming from one receiver.
+
+        This throws std::invalid_argument if the parameters use match tags, which this Receiver
+        does not support.
         */
         std::pair<Request, IndexTranslationTable> create_query(
             const std::vector<HashedItem> &items);
@@ -261,6 +278,9 @@ namespace apsi::receiver {
         includes matches only for those items whose results happened to be in this particular
         result part. Thus, to determine whether there was a match with the sender's data, the
         results for each received ResultPart must be checked.
+
+        A null result_part is logged and yields an empty vector, and one without a PSI result
+        throws std::runtime_error.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result_part(
             const LabelKeyVector &label_keys,
@@ -271,6 +291,9 @@ namespace apsi::receiver {
         This function does multiple calls to Receiver::process_result_part, once for each
         ResultPart in the given vector. The results are collected together so that the returned
         vector of MatchRecords reflects the logical OR of the results from each ResultPart.
+
+        This throws as Receiver::process_result_part does, for any one of the ResultParts, so that
+        a package without a PSI result aborts the whole query.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result(
             const LabelKeyVector &label_keys,

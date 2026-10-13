@@ -86,12 +86,27 @@ namespace apsi::network {
         std::unique_ptr<ResultPackage> receive_result(
             std::shared_ptr<seal::SEALContext> context) override;
 
+        /**
+        Receive a ResultPackage from a sender as a result of a query made with the given parameters;
+        see Channel::receive_result_for. A package that cannot be a result for these parameters is
+        rejected before any ciphertext in it is loaded.
+        */
+        std::unique_ptr<ResultPackage> receive_result_for(
+            std::shared_ptr<seal::SEALContext> context, const PSIParams &params) override;
+
     protected:
         std::istream &in_;
 
         std::ostream &out_;
 
     private:
+        /**
+        Receives a ResultPackage as receive_result does, checking its structure against params
+        before loading it if params is not null; see Channel::receive_result_for.
+        */
+        std::unique_ptr<ResultPackage> receive_result_package(
+            std::shared_ptr<seal::SEALContext> context, const PSIParams *params);
+
         std::mutex receive_mutex_;
 
         std::mutex send_mutex_;

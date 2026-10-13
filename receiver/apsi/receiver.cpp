@@ -353,6 +353,14 @@ namespace apsi {
 
         pair<Request, IndexTranslationTable> Receiver::create_query(const vector<HashedItem> &items)
         {
+            // This receiver cannot match items by their tags, so a query with parameters that use
+            // them is refused rather than its result misread
+            if (params_.uses_tags()) {
+                APSI_LOG_ERROR("Cannot create a query: the parameters use match tags");
+                throw invalid_argument(
+                    "parameters with match tags are not supported by this receiver");
+            }
+
             APSI_LOG_INFO("Creating encrypted query for " << items.size() << " items");
             STOPWATCH(recv_stopwatch, "Receiver::create_query");
 
@@ -614,6 +622,15 @@ namespace apsi {
                 return {};
             }
 
+            // Without match tags every result package has a PSI result. The schema does not require
+            // one, since a result for parameters with match tags has none, so its absence is
+            // checked here. A package without one is refused as the APSI 1.x schema refused it:
+            // skipping it would quietly leave out whatever matches it holds.
+            if (!result_part->psi_result) {
+                APSI_LOG_ERROR("Failed to process result: result_part has no PSI result");
+                throw runtime_error("result part has no PSI result");
+            }
+
             // The number of items that were submitted in the query
             size_t item_count = itt.item_count();
 
@@ -867,7 +884,7 @@ namespace apsi {
                 // package_count, and the package that would have filled it has been discarded.
                 // Sleeping between attempts keeps an idle wait off the CPU.
                 ResultPart result_part;
-                while (!(result_part = chl.receive_result(seal_context))) {
+                while (!(result_part = chl.receive_result_for(seal_context, params_))) {
                     throw_if_receive_failed(chl, "result package");
                     deadline.throw_if_expired("result package");
 

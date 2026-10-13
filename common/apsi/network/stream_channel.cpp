@@ -304,6 +304,18 @@ namespace apsi::network {
 
     unique_ptr<ResultPackage> StreamChannel::receive_result(shared_ptr<SEALContext> context)
     {
+        return receive_result_package(std::move(context), nullptr);
+    }
+
+    unique_ptr<ResultPackage> StreamChannel::receive_result_for(
+        shared_ptr<SEALContext> context, const PSIParams &params)
+    {
+        return receive_result_package(std::move(context), &params);
+    }
+
+    unique_ptr<ResultPackage> StreamChannel::receive_result_package(
+        shared_ptr<SEALContext> context, const PSIParams *params)
+    {
         bool valid_context = context && context->parameters_set();
         if (!valid_context) {
             // Cannot receive a result package without a valid SEALContext
@@ -319,7 +331,7 @@ namespace apsi::network {
         unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
         try {
-            bytes_received_ += rp->load(in_, context);
+            bytes_received_ += params ? rp->load(in_, context, *params) : rp->load(in_, context);
         } catch (const invalid_argument &ex) {
             APSI_LOG_ERROR("An exception was thrown loading result package data: " << ex.what());
             set_receive_failed();

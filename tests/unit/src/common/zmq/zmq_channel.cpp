@@ -89,6 +89,22 @@ namespace APSITests {
 
             return context;
         }
+
+        /**
+        Receives an operation on the channel, waiting for one as long as no receive fails, for at
+        most 30 seconds. Returns null if a receive fails or none arrives in time.
+        */
+        unique_ptr<ZMQSenderOperation> receive_operation_in_time(ZMQSenderChannel &svr)
+        {
+            auto end = chrono::steady_clock::now() + 30s;
+            uint64_t failure_count = svr.receive_failure_count();
+            unique_ptr<ZMQSenderOperation> nsop;
+            while (!(nsop = svr.receive_network_operation(get_context()->seal_context(), true)) &&
+                   (svr.receive_failure_count() == failure_count) &&
+                   (chrono::steady_clock::now() < end)) {
+            }
+            return nsop;
+        }
     } // namespace
 
     class ZMQChannelTests : public ::testing::Test {
@@ -566,6 +582,81 @@ namespace APSITests {
         nrp->client_id = std::move(client_id);
         nrp->rp = std::move(rp);
         svr.send(std::move(nrp));
+
+        clientth.join();
+    }
+
+    TEST_F(ZMQChannelTests, ReceiveResultForChecksTheStructureOfTagResults)
+    {
+        ZMQSenderChannel svr;
+        ZMQReceiverChannel clt;
+
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
+
+        // Parameters with match tags and the same encryption parameters as get_params: three tag
+        // parts, one field element per item
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 1;
+        item_params.tag_part_count = 3;
+        PSIParams::TableParams table_params = get_params()->table_params();
+        table_params.table_size = 4096;
+        PSIParams tag_params(
+            item_params, table_params, get_params()->query_params(), get_params()->seal_params());
+
+        // A package, or null once a receive has failed or none has arrived in 30 seconds
+        auto receive = [&clt](const PSIParams &params) {
+            auto end = chrono::steady_clock::now() + 30s;
+            unique_ptr<ResultPackage> rp;
+            while (!(rp = clt.receive_result_for(get_context()->seal_context(), params)) &&
+                   !clt.receive_failed() && (chrono::steady_clock::now() < end)) {
+                this_thread::sleep_for(10ms);
+            }
+            return rp;
+        };
+
+        thread clientth([&] {
+            this_thread::sleep_for(50ms);
+
+            // Let the server know where to send the packages
+            clt.send(make_unique<SenderOperationParms>());
+
+            // A package with the structure the parameters call for is received, and one with a
+            // PSI result, which parameters with match tags rule out, is a failed receive
+            auto rp = receive(tag_params);
+            ASSERT_NE(nullptr, rp);
+            ASSERT_EQ(3, rp->label_result.size());
+            ASSERT_FALSE(clt.receive_failed());
+
+            ASSERT_EQ(nullptr, receive(tag_params));
+            ASSERT_TRUE(clt.receive_failed());
+        });
+
+        // The server's part returns early if an assertion fails, and the client then stops
+        // waiting within its deadline, so that the client thread is joined on every path
+        auto serve = [&] {
+            auto nsop = receive_operation_in_time(svr);
+            ASSERT_NE(nullptr, nsop);
+            ASSERT_EQ(SenderOperationType::sop_parms, nsop->sop->type());
+            auto client_id = nsop->client_id;
+
+            Ciphertext ct;
+            get_context()->encryptor()->encrypt_zero_symmetric(ct);
+            for (bool with_psi_result : { false, true }) {
+                auto rp = make_unique<ResultPackage>();
+                if (with_psi_result) {
+                    rp->psi_result = ct;
+                }
+                for (int i = 0; i < 3; i++) {
+                    rp->label_result.emplace_back(ct);
+                }
+                auto nrp = make_unique<ZMQResultPackage>();
+                nrp->client_id = client_id;
+                nrp->rp = std::move(rp);
+                svr.send(std::move(nrp));
+            }
+        };
+        serve();
 
         clientth.join();
     }

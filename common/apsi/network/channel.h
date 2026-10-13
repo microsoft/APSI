@@ -8,11 +8,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
+#include <utility>
 
 // APSI
+#include "apsi/log.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/sender_operation_response.h"
+#include "apsi/psi_params.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -35,8 +39,8 @@ namespace apsi::network {
     waiting for as long as the peer stays silent.
 
     Implementations must tolerate concurrent calls. A receiver runs several result workers at
-    once, all calling receive_result on the same channel, and a sender sends result packages from
-    several tasks at once. The channels shipped with APSI serialize sends and receives
+    once, all calling receive_result_for on the same channel, and a sender sends result packages
+    from several tasks at once. The channels shipped with APSI serialize sends and receives
     internally; a channel written elsewhere has to do the same, and so does any send callback
     passed to sender::Sender, which is invoked from those same concurrent tasks.
     */
@@ -103,6 +107,46 @@ namespace apsi::network {
         */
         virtual std::unique_ptr<ResultPackage> receive_result(
             std::shared_ptr<seal::SEALContext> context) = 0;
+
+        /**
+        Receive a ResultPackage from a sender as a result of a query made with the given
+        parameters. This behaves as receive_result does, except that a package that cannot be a
+        result of such a query is rejected as a failed receive: for parameters with match tags,
+        one that does not have the structure ResultPackage::check_tag_structure describes, and
+        for parameters without them, one without a PSI result. A receiver uses this, so that such
+        a package is never processed.
+
+        The channels shipped with APSI check the structure on the serialized package, before any
+        ciphertext in it is loaded; see ResultPackage::load. The default implementation, which a
+        channel written elsewhere inherits, receives the package with receive_result and checks
+        the loaded package instead.
+        */
+        virtual std::unique_ptr<ResultPackage> receive_result_for(
+            std::shared_ptr<seal::SEALContext> context, const PSIParams &params)
+        {
+            std::unique_ptr<ResultPackage> rp = receive_result(std::move(context));
+            if (!rp) {
+                return rp;
+            }
+
+            if (params.uses_tags()) {
+                try {
+                    rp->check_tag_structure(params);
+                } catch (const std::runtime_error &ex) {
+                    APSI_LOG_ERROR("Rejected a result package: " << ex.what());
+                    set_receive_failed();
+                    return nullptr;
+                }
+            } else if (!rp->psi_result) {
+                APSI_LOG_ERROR(
+                    "Rejected a result package: the PSI result is missing, but the parameters do "
+                    "not use match tags");
+                set_receive_failed();
+                return nullptr;
+            }
+
+            return rp;
+        }
 
         /**
         Returns true if a receive call has failed in a way that retrying cannot repair. There
