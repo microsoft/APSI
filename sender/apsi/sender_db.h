@@ -206,9 +206,10 @@ namespace apsi::sender {
         void insert_or_assign(const std::vector<std::pair<Item, Label>> &data);
 
         /**
-        Inserts the given (hashed) item-label pair into the database. This function can be used
-        only on a labeled SenderDB instance. If the item already exists in the database, its
-        label is overwritten with the new label.
+        Inserts the given item-label pair into the database. The item is hashed with the OPRF key
+        of this SenderDB, as by every function that takes an Item, so a HashedItem passed here is
+        hashed again. This function can be used only on a labeled SenderDB instance. If the item
+        already exists in the database, its label is overwritten with the new label.
         */
         void insert_or_assign(const std::pair<Item, Label> &data)
         {
@@ -223,8 +224,9 @@ namespace apsi::sender {
         void insert_or_assign(const std::vector<Item> &data);
 
         /**
-        Inserts the given (hashed) item into the database. This function can be used only on an
-        unlabeled SenderDB instance.
+        Inserts the given item into the database. The item is hashed with the OPRF key of this
+        SenderDB, as by every function that takes an Item, so a HashedItem passed here is hashed
+        again. This function can be used only on an unlabeled SenderDB instance.
         */
         void insert_or_assign(const Item &data)
         {
@@ -259,8 +261,9 @@ namespace apsi::sender {
         void remove(const std::vector<Item> &data);
 
         /**
-        Removes the given (hashed) item from the database. Throws std::logic_error if the item is
-        not in the database.
+        Removes the given item from the database. The item is hashed with the OPRF key of this
+        SenderDB, as by every function that takes an Item, so a HashedItem passed here is hashed
+        again. Throws std::logic_error if the item is not in the database.
         */
         void remove(const Item &data)
         {
