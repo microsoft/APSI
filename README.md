@@ -1613,8 +1613,9 @@ Older SEAL releases carry known vulnerabilities, including in the deserializatio
 
 #### Note on Microsoft SEAL and Intel HEXL
 
-[Intel HEXL](https://GitHub.com/IntelLabs/hexl) is an optional dependency of Microsoft SEAL that accelerates low-level arithmetic with advanced vector extensions.
-Its impact depends on the processor, but it can substantially reduce APSI sender online computation time.
+[Intel HEXL](https://GitHub.com/IntelLabs/hexl) is an optional dependency of Microsoft SEAL that accelerates low-level arithmetic with AVX-512, and we recommend it for a sender on an x86-64 processor that has AVX-512.
+On an Intel Xeon 6973P-C with Microsoft SEAL 4.7.0 and a million items, a sender answering on one thread spent 19% to 24% less CPU time per query with `1M-256`, `1M-1-32`, `1M-4096-com` and `1M-11041`, which compute powers or use Paterson-Stockmeyer, and 2% to 7% less with `1M-1`, `1M-512-cmp` and `1M-4096-cmp`, whose queries go mostly to the sums of products that APSI computes itself, without Intel HEXL.
+With these sets, a receiver spent 14% to 35% less CPU time processing a result.
 To enable, configure with `-DVCPKG_MANIFEST_FEATURES=hexl` (in addition to any other features), which adds `seal[hexl]` to the manifest-mode resolution.
 
 ## Command-Line Interface (CLI)
