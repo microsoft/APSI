@@ -424,12 +424,18 @@ namespace apsi {
                     << " hash functions; cuckoo table fill-rate: " << cuckoo.fill_rate());
             }
 
-            // Once the table is filled, fill the table_idx_to_item_idx map
+            // Once the table is filled, fill the table_idx_to_item_idx map. An item that appears
+            // more than once has a single location, which is mapped to the item's first index; its
+            // other indices are recorded, so that they get the same MatchRecord.
             for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
                 kuku::item_type kuku_item;
                 std::memcpy(&kuku_item, items[item_idx].value().data(), sizeof(kuku_item));
                 auto item_loc = cuckoo.query(kuku_item);
-                itt.table_idx_to_item_idx_[item_loc.location()] = item_idx;
+                auto [where, inserted] =
+                    itt.table_idx_to_item_idx_.emplace(item_loc.location(), item_idx);
+                if (!inserted) {
+                    itt.repeated_items_.emplace_back(item_idx, where->second);
+                }
             }
 
             // Set up unencrypted query data
@@ -832,6 +838,8 @@ namespace apsi {
                     mrs[item_idx] = std::move(mr);
                 });
 
+            copy_to_repeated_items(itt, mrs);
+
             return mrs;
         }
 
@@ -932,6 +940,16 @@ namespace apsi {
             }
 
             return match_tags;
+        }
+
+        void Receiver::copy_to_repeated_items(
+            const IndexTranslationTable &itt, vector<MatchRecord> &mrs)
+        {
+            for (const auto &[repeat_idx, first_idx] : itt.repeated_items_) {
+                if (mrs[first_idx]) {
+                    mrs[repeat_idx] = mrs[first_idx];
+                }
+            }
         }
 
         void Receiver::check_tagged_result_part(const ResultPart &result_part) const
@@ -1093,6 +1111,8 @@ namespace apsi {
 
                 mrs[item_idx] = std::move(mr);
             }
+
+            copy_to_repeated_items(itt, mrs);
 
             return mrs;
         }

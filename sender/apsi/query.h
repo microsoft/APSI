@@ -48,6 +48,10 @@ namespace apsi::sender {
         */
         Query(QueryRequest query_request, std::shared_ptr<sender::SenderDB> sender_db);
 
+        /**
+        Returns a copy of this Query, valid exactly when this one is, with copies of its
+        relinearization keys and ciphertexts. The copy shares the SenderDB of this Query.
+        */
         [[nodiscard]] Query deep_copy() const;
 
         Query(const Query &source) = delete;

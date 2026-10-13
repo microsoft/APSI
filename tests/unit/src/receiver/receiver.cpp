@@ -11,6 +11,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -20,14 +21,20 @@
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/sender_operation_response.h"
+#include "apsi/network/stream_channel.h"
+#include "apsi/oprf/oprf_sender.h"
 #include "apsi/psi_params.h"
+#include "apsi/query.h"
 #include "apsi/receiver.h"
 #include "apsi/requests.h"
 #include "apsi/responses.h"
 #include "apsi/seal_object.h"
+#include "apsi/sender.h"
+#include "apsi/sender_db.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/match_tag.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/ciphertext.h"
@@ -987,5 +994,179 @@ namespace APSITests {
         ASSERT_THROW(
             static_cast<void>(receiver.process_result({}, itt, one_part(std::move(package)))),
             runtime_error);
+    }
+
+    namespace {
+        /**
+        Answers every query the receiver sends from the given SenderDB with Sender::RunQuery, over a
+        StreamChannel, which lets request_query run against a sender without a network.
+        */
+        class LoopbackChannel final : public NetworkChannel {
+        public:
+            explicit LoopbackChannel(shared_ptr<sender::SenderDB> sender_db)
+                : sender_db_(std::move(sender_db)), chl_(ss_)
+            {}
+
+            void send(unique_ptr<SenderOperation> sop) override
+            {
+                chl_.send(std::move(sop));
+                sender::Query query(
+                    to_query_request(chl_.receive_operation(sender_db_->get_seal_context())),
+                    sender_db_);
+                sender::Sender::RunQuery(query, chl_);
+            }
+
+            unique_ptr<SenderOperation> receive_operation(
+                shared_ptr<SEALContext>, SenderOperationType) override
+            {
+                return nullptr;
+            }
+
+            void send(unique_ptr<SenderOperationResponse>) override
+            {}
+
+            unique_ptr<SenderOperationResponse> receive_response(
+                SenderOperationType expected) override
+            {
+                return chl_.receive_response(expected);
+            }
+
+            void send(unique_ptr<ResultPackage>) override
+            {}
+
+            unique_ptr<ResultPackage> receive_result(shared_ptr<SEALContext> context) override
+            {
+                return chl_.receive_result(std::move(context));
+            }
+
+            unique_ptr<ResultPackage> receive_result_for(
+                shared_ptr<SEALContext> context, const PSIParams &params) override
+            {
+                return chl_.receive_result_for(std::move(context), params);
+            }
+
+        private:
+            shared_ptr<sender::SenderDB> sender_db_;
+
+            stringstream ss_;
+
+            StreamChannel chl_;
+        }; // class LoopbackChannel
+
+        /**
+        Checks that result has, for each of the given items, a match if held has the item, with
+        its label if it has one, and no match otherwise.
+        */
+        void check_matches(
+            const vector<MatchRecord> &result,
+            const vector<Item> &items,
+            const unordered_map<Item, Label> &held)
+        {
+            ASSERT_EQ(items.size(), result.size());
+            for (size_t i = 0; i < items.size(); i++) {
+                auto where = held.find(items[i]);
+                ASSERT_EQ(where != held.end(), result[i].found) << "item " << i;
+                if ((where != held.end()) && !where->second.empty()) {
+                    ASSERT_EQ(where->second, result[i].label.value()) << "item " << i;
+                } else {
+                    ASSERT_FALSE(result[i].label) << "item " << i;
+                }
+            }
+        }
+    } // namespace
+
+    TEST(ReceiverApiTests, ARepeatedItemIsAnsweredAtEveryIndex)
+    {
+        // An item given more than once has one location in the receiver's cuckoo table, so the
+        // sender answers it once. Each of its indices must still get the item's MatchRecord, with
+        // matching polynomials and with match tags, with labels and without.
+        for (bool tags : { false, true }) {
+            for (size_t label_byte_count : { size_t(0), size_t(10) }) {
+                SCOPED_TRACE(
+                    string(tags ? "with" : "without") + " match tags, " +
+                    (label_byte_count ? "labeled" : "unlabeled"));
+                PSIParams params = tags ? make_tag_test_params() : make_test_params();
+                auto sender_db = make_shared<sender::SenderDB>(params, label_byte_count, 4);
+
+                vector<Item> sender_items;
+                unordered_map<Item, Label> held;
+                vector<pair<Item, Label>> sender_data;
+                for (uint64_t i = 0; i < 20; i++) {
+                    Item item(i + 1, 1000 + i);
+                    Label label(label_byte_count);
+                    for (size_t j = 0; j < label.size(); j++) {
+                        label[j] = static_cast<unsigned char>((i * 16) + j);
+                    }
+                    sender_items.push_back(item);
+                    sender_data.emplace_back(item, label);
+                    held[item] = label;
+                }
+                if (label_byte_count) {
+                    sender_db->set_data(sender_data);
+                } else {
+                    sender_db->set_data(sender_items);
+                }
+
+                // Two items the sender holds and two it does not, all but one given more than once
+                Item held_a = sender_items[3];
+                Item held_b = sender_items[11];
+                Item absent_a(5000, 1);
+                Item absent_b(5001, 1);
+                vector<Item> items{ held_a,   absent_a, held_a,   held_b,
+                                    absent_a, held_a,   absent_b, held_b };
+                vector<HashedItem> hashed_items;
+                LabelKeyVector label_keys;
+                for (const auto &item : items) {
+                    auto hash = oprf::OPRFSender::GetItemHash(item, sender_db->get_oprf_key());
+                    hashed_items.push_back(hash.first);
+                    label_keys.push_back(hash.second);
+                }
+
+                Receiver receiver(params);
+                LoopbackChannel loopback(sender_db);
+                ASSERT_NO_FATAL_FAILURE(check_matches(
+                    receiver.request_query(hashed_items, label_keys, loopback), items, held));
+
+                // The same query through create_query, with the result packages processed one by
+                // one and all together. Processing a package consumes it, so each is loaded twice.
+                auto query = receiver.create_query(hashed_items);
+                stringstream ss;
+                StreamChannel chl(ss);
+                chl.send(std::move(query.first));
+                sender::Query sender_query(
+                    to_query_request(chl.receive_operation(sender_db->get_seal_context())),
+                    sender_db);
+                ASSERT_TRUE(sender_query.is_valid());
+                sender::Sender::RunQuery(sender_query, chl);
+                QueryResponse response = to_query_response(chl.receive_response());
+                ASSERT_NE(nullptr, response);
+
+                vector<ResultPart> result_parts;
+                vector<MatchRecord> merged(items.size());
+                for (uint32_t i = 0; i < response->package_count; i++) {
+                    vector<unsigned char> saved = apsi::util::read_from_stream(ss);
+                    auto load = [&] {
+                        stringstream package_ss(string(saved.begin(), saved.end()));
+                        auto package = make_unique<ResultPackage>();
+                        package->load(package_ss, receiver.get_seal_context());
+                        return package;
+                    };
+                    result_parts.push_back(load());
+
+                    vector<MatchRecord> part =
+                        receiver.process_result_part(label_keys, query.second, load());
+                    ASSERT_EQ(items.size(), part.size());
+                    for (size_t j = 0; j < part.size(); j++) {
+                        if (part[j]) {
+                            ASSERT_FALSE(merged[j]) << "item " << j;
+                            merged[j] = part[j];
+                        }
+                    }
+                }
+                ASSERT_NO_FATAL_FAILURE(check_matches(merged, items, held));
+                ASSERT_NO_FATAL_FAILURE(check_matches(
+                    receiver.process_result(label_keys, query.second, result_parts), items, held));
+            }
+        }
     }
 } // namespace APSITests

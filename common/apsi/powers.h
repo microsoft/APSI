@@ -337,6 +337,11 @@ namespace apsi {
         */
         PowersDag(const PowersDag &pd) = default;
 
+        /**
+        Copies a given PowersDag to this one.
+        */
+        PowersDag &operator=(const PowersDag &pd) = default;
+
     private:
         std::unordered_map<std::uint32_t, PowersNode> nodes_;
 

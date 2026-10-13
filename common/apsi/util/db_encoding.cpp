@@ -172,10 +172,10 @@ namespace apsi::util {
                 uint32_t dest_begin = dest_bit_offset >> 3U;
                 uint32_t dest_offset = dest_bit_offset & 7U;
                 uint32_t src_offset = src_bit_offset & 7U;
-                uint32_t high_diff = src_offset + diff - 8U;
                 unsigned char &dest_val = dest[dest_begin];
 
-                if (high_diff <= 0) {
+                // The diff bits either all lie in src[src_begin] or continue into the next byte
+                if (src_offset + diff <= 8U) {
                     unsigned char mask =
                         static_cast<unsigned char>((static_cast<uint32_t>(1) << diff) - 1);
                     unsigned char mid = static_cast<unsigned char>(
@@ -189,6 +189,7 @@ namespace apsi::util {
                         (static_cast<uint32_t>(dest_val) & static_cast<uint32_t>(mask)) |
                         static_cast<uint32_t>(mid));
                 } else {
+                    uint32_t high_diff = src_offset + diff - 8U;
                     uint32_t low_diff = diff - high_diff;
 
                     unsigned char low_mask =

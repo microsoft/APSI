@@ -254,7 +254,8 @@ namespace apsi::receiver {
         Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of
         items, and the result is a same-size vector of MatchRecord objects. If an item is in the
         intersection, the corresponding MatchRecord indicates it in the `found` field, and the
-        `label` field may contain the corresponding label if a sender's data included it.
+        `label` field may contain the corresponding label if a sender's data included it. An item
+        that appears more than once in the vector gets the same MatchRecord at each of its indices.
 
         Throws std::runtime_error if the sender sends nothing for timeout, whether that happens
         before the query response or partway through the result packages; see
@@ -321,11 +322,12 @@ namespace apsi::receiver {
 
         /**
         Processes a ResultPart object and returns a vector of MatchRecords in the same order as
-        the original vector of OPRF hashed items used to create the query. The return value
-        includes matches only for those items whose results happened to be in this particular
-        result part. Thus, to determine whether there was a match with the sender's data, the
-        results for each received ResultPart must be checked. Processing decrypts the ciphertexts
-        in result_part, which cannot be processed again.
+        the original vector of OPRF hashed items used to create the query. An item that appears
+        more than once in that vector gets the same MatchRecord at each of its indices. The return
+        value includes matches only for those items whose results happened to be in this
+        particular result part. Thus, to determine whether there was a match with the sender's
+        data, the results for each received ResultPart must be checked. Processing decrypts the
+        ciphertexts in result_part, which cannot be processed again.
 
         Without match tags, a null result_part is logged and yields an empty vector, and one
         without a PSI result throws std::runtime_error. With parameters that use match tags, an
@@ -440,6 +442,13 @@ namespace apsi::receiver {
         */
         [[nodiscard]] std::vector<std::vector<std::uint64_t>> compute_match_tags(
             const LabelKeyVector &label_keys, std::size_t item_count) const;
+
+        /**
+        Copies the MatchRecord of each item that appears more than once among the items of the
+        query from its first index to its other indices, if it reports a match.
+        */
+        static void copy_to_repeated_items(
+            const IndexTranslationTable &itt, std::vector<MatchRecord> &mrs);
 
         /**
         With match tags, throws std::runtime_error, aborting the query, if result_part is null or

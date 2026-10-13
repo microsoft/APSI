@@ -62,7 +62,9 @@ namespace apsi {
             Query result;
             result.relin_keys_ = relin_keys_;
             result.data_ = data_;
+            result.pd_ = pd_;
             result.sender_db_ = sender_db_;
+            result.valid_ = valid_;
             result.compr_mode_ = compr_mode_;
             result.params_fingerprint_ = params_fingerprint_;
 

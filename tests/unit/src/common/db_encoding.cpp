@@ -164,6 +164,45 @@ namespace APSITests {
         }
     }
 
+    TEST(DbEncodingTests, FieldEltsToBitsTakesOnlyTheLowBitsOfEachFieldElement)
+    {
+        // Each field element contributes its low bits_per_felt bits, in order, and nothing else:
+        // not its higher bits, which a decrypted value can have, and nothing past bit_count in the
+        // last byte. Every bit position within a byte, and every way the bits of a field element
+        // can fall across byte boundaries, is covered by going through bits_per_felt from 1 to 20
+        // and every bit_count the field elements allow.
+        mt19937_64 rng(1);
+        for (uint32_t bits_per_felt = 1; bits_per_felt <= 20; bits_per_felt++) {
+            Modulus mod((uint64_t(1) << bits_per_felt) + 1);
+            uniform_int_distribution<felt_t> felt_dist(0, mod.value() - 1);
+            for (uint32_t felt_count = 1; felt_count <= 5; felt_count++) {
+                uint32_t min_bit_count = ((felt_count - 1) * bits_per_felt) + 1;
+                uint32_t max_bit_count = felt_count * bits_per_felt;
+                for (uint32_t bit_count = min_bit_count; bit_count <= max_bit_count; bit_count++) {
+                    for (int rep = 0; rep < 4; rep++) {
+                        vector<felt_t> felts(felt_count);
+                        for (auto &felt : felts) {
+                            felt = felt_dist(rng);
+                        }
+
+                        vector<unsigned char> expected((bit_count + 7) / 8, 0);
+                        for (uint32_t bit_idx = 0; bit_idx < bit_count; bit_idx++) {
+                            felt_t bit =
+                                (felts[bit_idx / bits_per_felt] >> (bit_idx % bits_per_felt)) & 1;
+                            expected[bit_idx / 8] |=
+                                static_cast<unsigned char>(bit << (bit_idx % 8));
+                        }
+
+                        Bitstring bits = field_elts_to_bits(felts, bit_count, mod);
+                        ASSERT_EQ(bit_count, bits.bit_count());
+                        ASSERT_EQ(expected, bits.release())
+                            << "bits_per_felt " << bits_per_felt << ", bit_count " << bit_count;
+                    }
+                }
+            }
+        }
+    }
+
     TEST(DbEncodingTests, AlgebraizeItemTagLabel)
     {
         Modulus mod(65537);

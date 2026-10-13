@@ -15,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -420,6 +421,50 @@ namespace APSITests {
         ASSERT_FALSE(packages.empty());
         ASSERT_EQ(packages, answer(from_received));
         ASSERT_EQ(packages, answer(from_sent));
+    }
+
+    TEST(QueryTests, DeepCopyOfAValidQueryIsValidAndHasCiphertextsOfItsOwn)
+    {
+        // A copy of a valid query is valid, holds the same compression mode, relinearization keys,
+        // PowersDag, parameter fingerprint and ciphertexts, shares the SenderDB, and is answered
+        // exactly as the query is
+        auto sender_db = make_shared<SenderDB>(make_test_params());
+        for (uint64_t i = 0; i < 20; i++) {
+            sender_db->insert_or_assign(HashedItem(i, i));
+        }
+        Query query(make_honest_query(sender_db->get_params()), sender_db);
+        ASSERT_TRUE(query.is_valid());
+        ASSERT_LT(size_t(0), query.relin_keys().size());
+        ASSERT_TRUE(query.params_fingerprint().has_value());
+
+        Query copy = query.deep_copy();
+        ASSERT_TRUE(copy.is_valid());
+        ASSERT_EQ(query.compr_mode(), copy.compr_mode());
+        ASSERT_EQ(saved_relin_keys(query), saved_relin_keys(copy));
+        ASSERT_TRUE(copy.pd().is_configured());
+        ASSERT_EQ(query.pd().to_dot(), copy.pd().to_dot());
+        ASSERT_EQ(query.params_fingerprint(), copy.params_fingerprint());
+        ASSERT_EQ(saved_ciphertexts(query), saved_ciphertexts(copy));
+        ASSERT_EQ(query.sender_db(), copy.sender_db());
+
+        vector<vector<unsigned char>> packages = answer(query);
+        ASSERT_FALSE(packages.empty());
+        ASSERT_EQ(packages, answer(copy));
+
+        // The copy's ciphertexts are its own: changing every one of them leaves the query's as
+        // they were. Query gives access to its ciphertexts only for reading, as nothing else
+        // changes them, but the copy is not a const object, so a const_cast may change them.
+        map<uint32_t, vector<vector<unsigned char>>> saved = saved_ciphertexts(query);
+        Evaluator evaluator(*sender_db->get_seal_context());
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        auto &copy_data = const_cast<unordered_map<uint32_t, vector<Ciphertext>> &>(copy.data());
+        for (auto &q : copy_data) {
+            for (auto &ct : q.second) {
+                evaluator.negate_inplace(ct);
+            }
+        }
+        ASSERT_NE(saved, saved_ciphertexts(copy));
+        ASSERT_EQ(saved, saved_ciphertexts(query));
     }
 
     // SEAL compresses what it saves, and a ciphertext whose data is zero compresses so well that a
