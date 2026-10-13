@@ -73,7 +73,9 @@ namespace apsi::sender {
 
         /**
         Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator
-        and batch encoder to do encoding and NTT ops.
+        and batch encoder to do encoding and NTT ops. If compressed is set, each plaintext is
+        bit-packed when that saves at least an eighth of its size, and is kept uncompressed
+        otherwise.
         */
         BatchedPlaintextPolyn(
             const std::vector<FEltPolyn> &polyns,
@@ -653,7 +655,8 @@ namespace apsi::sender {
         /**
         Saves the BinBundle to a stream. A BinBundle with match tags writes no matching
         polynomials, and, unless it is stripped, writes the HashedItems of its items. A BinBundle
-        without match tags writes exactly what it always has.
+        without match tags writes the fields APSI 1.x writes, though a compressed one bit-packs its
+        plaintexts, or keeps them uncompressed, where APSI 1.x used Zstandard.
         */
         std::size_t save(std::ostream &out, std::uint32_t bundle_idx) const;
 

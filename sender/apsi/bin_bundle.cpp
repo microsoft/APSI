@@ -190,6 +190,37 @@ namespace apsi {
                     }
                 }
             }
+
+            /**
+            Helper function. Saves a plaintext of a BatchedPlaintextPolyn. A compressed one is
+            bit-packed if that saves at least an eighth of its size, and is saved uncompressed
+            otherwise, as copying the coefficients then loads faster than unpacking them, for little
+            more memory. Plaintexts modulo primes of up to 55 bits are therefore bit-packed, and
+            those modulo primes of 56 bits or more are not: Microsoft SEAL's 2-byte header on each
+            block of 1024 bytes leaves 56-bit coefficients a saving of only 12.3%. The plaintexts of
+            the constant coefficients, which are not in NTT form, hold values below the plain
+            modulus and are bit-packed as well.
+            */
+            vector<unsigned char> save_plaintext(const Plaintext &pt, bool compressed)
+            {
+                auto save = [&pt](compr_mode_type compr_mode) {
+                    vector<unsigned char> data(safe_cast<size_t>(pt.save_size(compr_mode)));
+                    size_t size = static_cast<size_t>(pt.save(
+                        reinterpret_cast<seal_byte *>(data.data()), data.size(), compr_mode));
+                    data.resize(size);
+                    return data;
+                };
+
+                vector<unsigned char> uncompressed = save(compr_mode_type::none);
+                if (!compressed) {
+                    return uncompressed;
+                }
+
+                vector<unsigned char> packed = save(compr_mode_type::bitpack);
+                return packed.size() <= uncompressed.size() - uncompressed.size() / 8
+                           ? packed
+                           : uncompressed;
+            }
         } // namespace
 
         /**
@@ -452,8 +483,6 @@ namespace apsi {
             bool compressed)
             : crypto_context(std::move(context))
         {
-            compr_mode_type compr_mode = compressed ? compr_mode_type::zstd : compr_mode_type::none;
-
             // Find the highest degree polynomial in the list. The max degree determines how many
             // Plaintexts we need to make
             size_t max_deg = 0;
@@ -502,12 +531,7 @@ namespace apsi {
                 }
 
                 // Push the new Plaintext
-                vector<unsigned char> pt_data;
-                pt_data.resize(safe_cast<size_t>(pt.save_size(compr_mode)));
-                size_t size = static_cast<size_t>(pt.save(
-                    reinterpret_cast<seal_byte *>(pt_data.data()), pt_data.size(), compr_mode));
-                pt_data.resize(size);
-                batched_coeffs.push_back(std::move(pt_data));
+                batched_coeffs.push_back(save_plaintext(pt, compressed));
             }
         }
 

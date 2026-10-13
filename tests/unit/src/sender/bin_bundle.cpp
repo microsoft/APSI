@@ -24,6 +24,7 @@
 
 // SEAL
 #include "seal/keygenerator.h"
+#include "seal/serialization.h"
 #include "seal/util/uintarithsmallmod.h"
 
 // Google Test
@@ -93,6 +94,69 @@ namespace APSITests {
             }
 
             return params;
+        }
+
+        /**
+        Parameters with a single prime of the given bit count at the level plaintexts are encoded
+        at. A second prime, which only keys use, makes the coefficient modulus 109 bits, the most
+        Microsoft SEAL allows for this poly_modulus_degree.
+        */
+        shared_ptr<PSIParams> get_params_with_data_prime(int bit_count)
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = 8;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = 3;
+            table_params.max_items_per_bin = 16;
+            table_params.table_size = 1024;
+
+            PSIParams::QueryParams query_params;
+            query_params.query_powers = { 1, 3, 5 };
+
+            size_t pmd = 4096;
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(pmd);
+            seal_params.set_coeff_modulus(
+                CoeffModulus::Create(pmd, { bit_count, 109 - bit_count }));
+            seal_params.set_plain_modulus(65537);
+
+            return make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
+        }
+
+        /**
+        The compression mode each plaintext of a BatchedPlaintextPolyn was saved in
+        */
+        vector<compr_mode_type> stored_compr_modes(const BatchedPlaintextPolyn &bpp)
+        {
+            vector<compr_mode_type> modes;
+            for (const auto &data : bpp.batched_coeffs) {
+                Serialization::SEALHeader header;
+                static_cast<void>(Serialization::LoadHeader(
+                    reinterpret_cast<const seal_byte *>(data.data()), data.size(), header));
+                modes.push_back(header.compr_mode);
+            }
+
+            return modes;
+        }
+
+        /**
+        The plaintext saved as data, loaded and saved again uncompressed
+        */
+        vector<unsigned char> resaved_uncompressed(
+            const CryptoContext &context, const vector<unsigned char> &data)
+        {
+            Plaintext pt;
+            pt.load(
+                *context.seal_context(),
+                reinterpret_cast<const seal_byte *>(data.data()),
+                data.size());
+
+            vector<unsigned char> out(static_cast<size_t>(pt.save_size(compr_mode_type::none)));
+            out.resize(
+                static_cast<size_t>(pt.save(
+                    reinterpret_cast<seal_byte *>(out.data()), out.size(), compr_mode_type::none)));
+            return out;
         }
 
         bool find_in_bin(const vector<felt_t> &bin, felt_t element)
@@ -226,6 +290,144 @@ namespace APSITests {
 
         // Non-power-of-two felts_per_item
         test_fun(get_params2());
+    }
+
+    TEST(BinBundleTests, BatchedPlaintextPolynStoresBitPackedAndLoadsAnyMode)
+    {
+        // A compressed BatchedPlaintextPolyn bit-packs a plaintext when that saves at least an
+        // eighth of its size and keeps it uncompressed otherwise; an uncompressed one keeps every
+        // plaintext as it is. Evaluation loads each plaintext in whatever mode it was saved in, so
+        // plaintexts compressed with Zstandard or zlib, as APSI 1.x compressed them, give the same
+        // result.
+        vector<FEltPolyn> polyns;
+        polyns.push_back({ 1, 2, 3 });
+        polyns.push_back({ 1, 2 });
+        polyns.push_back({ 3 });
+        polyns.push_back({ 1, 2, 3, 4, 5 });
+
+        auto test_fun = [&polyns](
+                            const shared_ptr<PSIParams> &params,
+                            const vector<compr_mode_type> &expected_modes) {
+            CryptoContext context(*params);
+            context.set_evaluator();
+
+            BatchedPlaintextPolyn packed(polyns, context, 0, true);
+            ASSERT_EQ(expected_modes, stored_compr_modes(packed));
+
+            BatchedPlaintextPolyn plain(polyns, context, 0, false);
+            ASSERT_EQ(
+                vector<compr_mode_type>(polyns.back().size(), compr_mode_type::none),
+                stored_compr_modes(plain));
+
+            // Each plaintext loads as the one saved, in whatever mode it was saved
+            for (size_t i = 0; i < plain.batched_coeffs.size(); i++) {
+                ASSERT_EQ(
+                    plain.batched_coeffs[i],
+                    resaved_uncompressed(context, packed.batched_coeffs[i]))
+                    << "plaintext " << i;
+            }
+
+            KeyGenerator keygen(*context.seal_context());
+            context.set_secret(keygen.secret_key());
+            Plaintext ones_pt(1);
+            ones_pt[0] = 1;
+            Ciphertext ones_ct;
+            context.encryptor()->encrypt_symmetric(ones_pt, ones_ct);
+            context.evaluator()->transform_to_ntt_inplace(ones_ct);
+            vector<Ciphertext> ct_ones_vec(5, ones_ct);
+            MemoryPoolHandle pool = MemoryManager::GetPool();
+
+            auto eval_ones = [&](const BatchedPlaintextPolyn &bpp) {
+                Plaintext pt;
+                context.decryptor()->decrypt(bpp.eval(ct_ones_vec, pool), pt);
+                vector<uint64_t> result;
+                context.encoder()->decode(pt, result);
+                return result;
+            };
+
+            vector<uint64_t> expected = eval_ones(packed);
+            ASSERT_EQ(6, expected[0]);
+            ASSERT_EQ(3, expected[1]);
+            ASSERT_EQ(3, expected[2]);
+            ASSERT_EQ(15, expected[3]);
+            ASSERT_EQ(expected, eval_ones(plain));
+
+            // The same plaintexts saved again in each other mode this build of Microsoft SEAL
+            // supports: none, zlib and zstd
+            for (uint8_t value = 0; value < 3; value++) {
+                auto mode = static_cast<compr_mode_type>(value);
+                if (!Serialization::IsSupportedComprMode(mode)) {
+                    continue;
+                }
+
+                BatchedPlaintextPolyn resaved(polyns, context, 0, true);
+                for (auto &data : resaved.batched_coeffs) {
+                    Plaintext pt;
+                    pt.unsafe_load(
+                        *context.seal_context(),
+                        reinterpret_cast<const seal_byte *>(data.data()),
+                        data.size());
+                    vector<unsigned char> out(static_cast<size_t>(pt.save_size(mode)));
+                    out.resize(
+                        static_cast<size_t>(
+                            pt.save(reinterpret_cast<seal_byte *>(out.data()), out.size(), mode)));
+                    data = std::move(out);
+                }
+
+                ASSERT_EQ(
+                    vector<compr_mode_type>(polyns.back().size(), mode),
+                    stored_compr_modes(resaved));
+                ASSERT_EQ(expected, eval_ones(resaved));
+            }
+        };
+
+        // Two 36-bit primes at the level plaintexts are encoded at: every plaintext is bit-packed
+        test_fun(get_params1(), vector<compr_mode_type>(5, compr_mode_type::bitpack));
+        test_fun(get_params2(), vector<compr_mode_type>(5, compr_mode_type::bitpack));
+
+        // A 60-bit prime: bit-packing the plaintexts in NTT form would save only a sixteenth, so
+        // they are kept uncompressed. The constant coefficients are not in NTT form; they are
+        // reduced modulo the 17-bit plain modulus and are still bit-packed.
+        vector<compr_mode_type> modes_60(5, compr_mode_type::none);
+        modes_60[0] = compr_mode_type::bitpack;
+        test_fun(get_params_with_data_prime(60), modes_60);
+
+        // The boundary. Microsoft SEAL bit-packs in blocks of 1024 bytes with a 2-byte header each,
+        // which saves 13.9% of a plaintext modulo a 55-bit prime, so it is bit-packed, and 12.3% of
+        // one modulo a 56-bit prime, so it is kept uncompressed. The constant coefficients are
+        // bit-packed either way, and with Paterson-Stockmeyer so are those of the inner
+        // polynomials, every ps_low_degree + 1 coefficients, which are not in NTT form either.
+        for (int bit_count : { 55, 56 }) {
+            SCOPED_TRACE(to_string(bit_count) + "-bit prime");
+            shared_ptr<PSIParams> params = get_params_with_data_prime(bit_count);
+            CryptoContext context(*params);
+            context.set_evaluator();
+            ASSERT_EQ(
+                bit_count,
+                context.seal_context()
+                    ->first_context_data()
+                    ->parms()
+                    .coeff_modulus()[0]
+                    .bit_count());
+
+            vector<compr_mode_type> modes(
+                5, (bit_count <= 55) ? compr_mode_type::bitpack : compr_mode_type::none);
+            modes[0] = compr_mode_type::bitpack;
+            test_fun(params, modes);
+
+            BatchedPlaintextPolyn packed(polyns, context, 2, true);
+            vector<compr_mode_type> ps_modes = modes;
+            ps_modes[3] = compr_mode_type::bitpack;
+            ASSERT_EQ(ps_modes, stored_compr_modes(packed));
+
+            BatchedPlaintextPolyn plain(polyns, context, 2, false);
+            for (size_t i = 0; i < plain.batched_coeffs.size(); i++) {
+                ASSERT_EQ(
+                    plain.batched_coeffs[i],
+                    resaved_uncompressed(context, packed.batched_coeffs[i]))
+                    << "plaintext " << i;
+            }
+        }
     }
 
     TEST(BinBundleTests, BinBundleUnlabeledCreate)
