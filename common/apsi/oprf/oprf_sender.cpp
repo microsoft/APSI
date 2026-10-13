@@ -164,6 +164,22 @@ namespace apsi::oprf {
         return get_item_hash(item, oprf_key);
     }
 
+    namespace {
+        /**
+        Throws std::invalid_argument if a label is longer than label_byte_count. util::encrypt_label
+        would truncate it, and the receiver cannot tell a truncated label from a correct one.
+        */
+        void check_label_sizes(
+            const gsl::span<const pair<Item, Label>> &item_labels, size_t label_byte_count)
+        {
+            for (const auto &item_label : item_labels) {
+                if (item_label.second.size() > label_byte_count) {
+                    throw invalid_argument("a label is longer than label_byte_count");
+                }
+            }
+        }
+    } // namespace
+
     vector<HashedItem> OPRFSender::ComputeHashes(
         const gsl::span<const Item> &oprf_items, const OPRFKey &oprf_key)
     {
@@ -207,6 +223,7 @@ namespace apsi::oprf {
         if (nonce_byte_count > max_nonce_byte_count) {
             throw invalid_argument("nonce_byte_count is too large");
         }
+        check_label_sizes(oprf_item_labels, label_byte_count);
 
         STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashes (labeled)");
         APSI_LOG_DEBUG(
@@ -306,6 +323,7 @@ namespace apsi::oprf {
         if (nonce_byte_count > max_nonce_byte_count) {
             throw invalid_argument("nonce_byte_count is too large");
         }
+        check_label_sizes(oprf_item_labels, label_byte_count);
 
         STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashesAndMatchTags (labeled)");
         APSI_LOG_DEBUG(

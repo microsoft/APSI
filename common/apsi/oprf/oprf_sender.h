@@ -102,6 +102,15 @@ namespace apsi::oprf {
         static std::vector<HashedItem> ComputeHashes(
             const gsl::span<const Item> &oprf_items, const OPRFKey &oprf_key);
 
+        /**
+        Computes the OPRF hashes of the given items and encrypts their labels with the items'
+        label keys, each label padded to label_byte_count bytes and preceded by a random nonce of
+        nonce_byte_count bytes, as a labeled SenderDB stores them.
+
+        Throws std::invalid_argument if nonce_byte_count is too large, or if a label is longer
+        than label_byte_count, rather than truncating it: the receiver could not tell a truncated
+        label from a correct one.
+        */
         static std::vector<std::pair<HashedItem, EncryptedLabel>> ComputeHashes(
             const gsl::span<const std::pair<Item, Label>> &oprf_item_labels,
             const OPRFKey &oprf_key,
@@ -133,9 +142,9 @@ namespace apsi::oprf {
         returned. A labeled SenderDB whose parameters use match tags stores these tags with its
         items; see PSIParams::uses_tags.
 
-        Throws std::invalid_argument if nonce_byte_count is too large, or if
-        util::compute_match_tag rejects tag_felt_count or bits_per_felt and oprf_item_labels is not
-        empty.
+        Throws std::invalid_argument if nonce_byte_count is too large, if a label is longer than
+        label_byte_count, as ComputeHashes does, or if util::compute_match_tag rejects
+        tag_felt_count or bits_per_felt and oprf_item_labels is not empty.
         */
         static std::vector<std::tuple<HashedItem, EncryptedLabel, std::vector<util::felt_t>>>
         ComputeHashesAndMatchTags(

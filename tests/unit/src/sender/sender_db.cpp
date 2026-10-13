@@ -4643,6 +4643,14 @@ namespace APSITests {
             }
             return data;
         }
+
+        /**
+        Returns the number of field elements in a match tag for the parameters.
+        */
+        size_t tag_felt_count(const PSIParams &params)
+        {
+            return params.tag_part_count() * params.item_params().felts_per_item;
+        }
     } // namespace
 
     TEST(SenderDBTests, ClearingAStrippedSenderDBGivesItANewKey)
@@ -4763,5 +4771,380 @@ namespace APSITests {
         ASSERT_EQ(size_t(1), labeled.get_item_count());
         ASSERT_TRUE(labeled.has_item(Item(100, 100)));
         ASSERT_FALSE(labeled.has_item(items[0]));
+    }
+
+    TEST(SenderDBTests, HashedItemsMakeTheSameSenderDB)
+    {
+        // Items hashed with OPRFSender::ComputeHashes, with their labels encrypted there, make the
+        // same SenderDB, byte for byte, as the items themselves do, when they are inserted, their
+        // labels replaced, and removed. The labels are encrypted without a nonce, as a nonce is
+        // drawn at random.
+        auto params = get_params1();
+        oprf::OPRFKey key = fixed_oprf_key();
+        vector<Item> items = make_items(1, 300);
+        vector<Item> removed(items.begin(), items.begin() + 100);
+
+        SenderDB unlabeled(*params, key, 0);
+        SenderDB unlabeled_hashed(*params, key, 0);
+        unlabeled.set_data(items);
+        unlabeled_hashed.set_data_hashed(oprf::OPRFSender::ComputeHashes(items, key));
+        ASSERT_TRUE(saved(unlabeled) == saved(unlabeled_hashed));
+
+        // Items already there, and an item given twice, are inserted once
+        vector<Item> more = make_items(1000, 20);
+        more.insert(more.end(), items.begin(), items.begin() + 10);
+        more.push_back(more.front());
+        unlabeled.insert_or_assign(more);
+        unlabeled_hashed.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(more, key));
+        ASSERT_EQ(size_t(320), unlabeled_hashed.get_item_count());
+        ASSERT_TRUE(saved(unlabeled) == saved(unlabeled_hashed));
+
+        unlabeled.remove(removed);
+        unlabeled_hashed.remove_hashed(oprf::OPRFSender::ComputeHashes(removed, key));
+        ASSERT_EQ(size_t(220), unlabeled_hashed.get_item_count());
+        ASSERT_TRUE(saved(unlabeled) == saved(unlabeled_hashed));
+
+        vector<pair<Item, Label>> data = with_labels(items, 16);
+        SenderDB labeled(*params, key, 16, 0);
+        SenderDB labeled_hashed(*params, key, 16, 0);
+        labeled.set_data(data);
+        labeled_hashed.set_data_hashed(oprf::OPRFSender::ComputeHashes(data, key, 16, 0));
+        ASSERT_TRUE(saved(labeled) == saved(labeled_hashed));
+
+        // New labels for items already there, and new items, one with a short label, which is
+        // padded where it is encrypted
+        vector<pair<Item, Label>> update;
+        for (size_t i = 0; i < 50; i++) {
+            update.emplace_back(
+                items[2 * i], create_label(static_cast<unsigned char>(i + 100), 16));
+        }
+        update.emplace_back(Item(5000, 5000), Label{ 1, 2, 3 });
+        labeled.insert_or_assign(update);
+        labeled_hashed.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(update, key, 16, 0));
+        ASSERT_TRUE(saved(labeled) == saved(labeled_hashed));
+        Label padded(16);
+        copy_n(update.back().second.begin(), 3, padded.begin());
+        ASSERT_EQ(padded, labeled_hashed.get_label(Item(5000, 5000)));
+        ASSERT_EQ(update.front().second, labeled_hashed.get_label(items[0]));
+
+        labeled.remove(removed);
+        labeled_hashed.remove_hashed(oprf::OPRFSender::ComputeHashes(removed, key));
+        ASSERT_TRUE(saved(labeled) == saved(labeled_hashed));
+
+        // With a nonce the bytes differ, but the labels decrypt alike
+        SenderDB nonced(*params, key, 16, 16);
+        nonced.set_data_hashed(oprf::OPRFSender::ComputeHashes(data, key, 16, 16));
+        for (const auto &[item, label] : data) {
+            ASSERT_EQ(label, nonced.get_label(item));
+        }
+    }
+
+    TEST(SenderDBTagTests, HashedItemsMakeTheSameSenderDB)
+    {
+        // As without match tags, with the tags computed by OPRFSender::ComputeHashesAndMatchTags
+        // where the items are hashed
+        PSIParams params = create_tag_params();
+        oprf::OPRFKey key = fixed_oprf_key();
+        size_t felt_count = tag_felt_count(params);
+        uint32_t bits_per_felt = params.item_bit_count_per_felt();
+        vector<Item> items = make_items(1, 300);
+        vector<Item> removed(items.begin(), items.begin() + 100);
+
+        SenderDB unlabeled(params, key, 0);
+        SenderDB unlabeled_hashed(params, key, 0);
+        unlabeled.set_data(items);
+        unlabeled_hashed.set_data_hashed(
+            oprf::OPRFSender::ComputeHashesAndMatchTags(items, key, felt_count, bits_per_felt));
+        ASSERT_TRUE(saved(unlabeled) == saved(unlabeled_hashed));
+
+        // Items already there, and an item given twice with its tag, are inserted once
+        vector<Item> more = make_items(1000, 20);
+        more.insert(more.end(), items.begin(), items.begin() + 10);
+        more.push_back(more.front());
+        unlabeled.insert_or_assign(more);
+        unlabeled_hashed.insert_or_assign_hashed(
+            oprf::OPRFSender::ComputeHashesAndMatchTags(more, key, felt_count, bits_per_felt));
+        ASSERT_EQ(size_t(320), unlabeled_hashed.get_item_count());
+        ASSERT_TRUE(saved(unlabeled) == saved(unlabeled_hashed));
+
+        unlabeled.remove(removed);
+        unlabeled_hashed.remove_hashed(oprf::OPRFSender::ComputeHashes(removed, key));
+        ASSERT_TRUE(saved(unlabeled) == saved(unlabeled_hashed));
+
+        vector<pair<Item, Label>> data = with_labels(items, 20);
+        SenderDB labeled(params, key, 20, 0);
+        SenderDB labeled_hashed(params, key, 20, 0);
+        labeled.set_data(data);
+        labeled_hashed.set_data_hashed(
+            oprf::OPRFSender::ComputeHashesAndMatchTags(
+                data, key, 20, 0, felt_count, bits_per_felt));
+        ASSERT_TRUE(saved(labeled) == saved(labeled_hashed));
+
+        vector<pair<Item, Label>> update;
+        for (size_t i = 0; i < 50; i++) {
+            update.emplace_back(
+                items[2 * i], create_label(static_cast<unsigned char>(i + 100), 20));
+        }
+        update.emplace_back(Item(5000, 5000), create_label(7, 20));
+        labeled.insert_or_assign(update);
+        labeled_hashed.insert_or_assign_hashed(
+            oprf::OPRFSender::ComputeHashesAndMatchTags(
+                update, key, 20, 0, felt_count, bits_per_felt));
+        ASSERT_TRUE(saved(labeled) == saved(labeled_hashed));
+
+        labeled.remove(removed);
+        labeled_hashed.remove_hashed(oprf::OPRFSender::ComputeHashes(removed, key));
+        ASSERT_TRUE(saved(labeled) == saved(labeled_hashed));
+    }
+
+    TEST(SenderDBTests, HashedItemsThatDoNotFitAreRefused)
+    {
+        auto params = get_params1();
+        oprf::OPRFKey key = fixed_oprf_key();
+        vector<Item> items = make_items(1, 10);
+        vector<pair<Item, Label>> data = with_labels(items, 8);
+        vector<pair<HashedItem, vector<apsi::util::felt_t>>> tagged{
+            { HashedItem(1, 1), vector<apsi::util::felt_t>(8) }
+        };
+        vector<tuple<HashedItem, EncryptedLabel, vector<apsi::util::felt_t>>> tagged_labeled{
+            { HashedItem(1, 1), EncryptedLabel(12), vector<apsi::util::felt_t>(8) }
+        };
+
+        // Data for the other kind of SenderDB, or with match tags, which the parameters do not use
+        SenderDB unlabeled(*params, key, 0);
+        SenderDB labeled(*params, key, 8, 4);
+        ASSERT_THROW(
+            unlabeled.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(data, key, 8, 4)),
+            logic_error);
+        ASSERT_THROW(unlabeled.insert_or_assign_hashed(tagged), logic_error);
+        ASSERT_THROW(unlabeled.insert_or_assign_hashed(tagged_labeled), logic_error);
+        ASSERT_THROW(
+            labeled.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(items, key)),
+            logic_error);
+        ASSERT_THROW(labeled.insert_or_assign_hashed(tagged), logic_error);
+        ASSERT_THROW(labeled.insert_or_assign_hashed(tagged_labeled), logic_error);
+        ASSERT_EQ(size_t(0), unlabeled.get_item_count());
+        ASSERT_EQ(size_t(0), labeled.get_item_count());
+
+        // An encrypted label of the wrong size, an item given twice, or an item to remove that is
+        // not there, is refused with its whole batch
+        unlabeled.set_data(items);
+        labeled.set_data(data);
+        string unlabeled_before = saved(unlabeled);
+        string labeled_before = saved(labeled);
+        auto hashed =
+            oprf::OPRFSender::ComputeHashes(with_labels(make_items(100, 5), 8), key, 8, 4);
+        size_t encrypted_label_byte_count = hashed.back().second.size();
+        for (size_t size : { encrypted_label_byte_count - 1, encrypted_label_byte_count + 1 }) {
+            auto resized = hashed;
+            resized.back().second.resize(size);
+            ASSERT_THROW(labeled.insert_or_assign_hashed(resized), invalid_argument);
+        }
+        ASSERT_THROW(
+            labeled.insert_or_assign_hashed(
+                oprf::OPRFSender::ComputeHashes(with_labels(make_items(100, 5), 8), key, 8, 0)),
+            invalid_argument);
+        auto twice = hashed;
+        twice.push_back(hashed.front());
+        ASSERT_THROW(labeled.insert_or_assign_hashed(twice), invalid_argument);
+        ASSERT_THROW(labeled.set_data_hashed(twice), invalid_argument);
+        ASSERT_THROW(
+            labeled.set_data_hashed(oprf::OPRFSender::ComputeHashes(items, key)), logic_error);
+        vector<Item> partly_missing{ items[0], Item(9999, 9999) };
+        ASSERT_THROW(
+            labeled.remove_hashed(oprf::OPRFSender::ComputeHashes(partly_missing, key)),
+            logic_error);
+        ASSERT_THROW(
+            unlabeled.remove_hashed(oprf::OPRFSender::ComputeHashes(partly_missing, key)),
+            logic_error);
+        ASSERT_TRUE(labeled_before == saved(labeled));
+        ASSERT_TRUE(unlabeled_before == saved(unlabeled));
+
+        // A label longer than the SenderDB holds is refused where it is encrypted, as
+        // insert_or_assign refuses it, rather than truncated
+        ASSERT_THROW(
+            oprf::OPRFSender::ComputeHashes(with_labels(make_items(100, 5), 9), key, 8, 4),
+            invalid_argument);
+
+        // A stripped SenderDB takes nothing, and stays stripped
+        labeled.strip();
+        unlabeled.strip();
+        ASSERT_THROW(labeled.insert_or_assign_hashed(hashed), logic_error);
+        ASSERT_THROW(labeled.set_data_hashed(hashed), logic_error);
+        ASSERT_THROW(
+            labeled.remove_hashed(oprf::OPRFSender::ComputeHashes(items, key)), logic_error);
+        ASSERT_THROW(
+            unlabeled.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(items, key)),
+            logic_error);
+        ASSERT_THROW(
+            unlabeled.set_data_hashed(oprf::OPRFSender::ComputeHashes(items, key)), logic_error);
+        ASSERT_THROW(
+            unlabeled.remove_hashed(oprf::OPRFSender::ComputeHashes(items, key)), logic_error);
+        ASSERT_TRUE(labeled.is_stripped());
+        ASSERT_TRUE(unlabeled.is_stripped());
+    }
+
+    TEST(SenderDBTagTests, HashedItemsThatDoNotFitAreRefused)
+    {
+        PSIParams params = create_tag_params();
+        oprf::OPRFKey key = fixed_oprf_key();
+        size_t felt_count = tag_felt_count(params);
+        uint32_t bits_per_felt = params.item_bit_count_per_felt();
+        vector<Item> items = make_items(1, 10);
+        vector<pair<Item, Label>> data = with_labels(items, 10);
+
+        // Data without match tags, or for the other kind of SenderDB
+        SenderDB unlabeled(params, key, 0);
+        SenderDB labeled(params, key, 10, 16);
+        ASSERT_THROW(
+            unlabeled.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(items, key)),
+            logic_error);
+        ASSERT_THROW(
+            labeled.insert_or_assign_hashed(oprf::OPRFSender::ComputeHashes(data, key, 10, 16)),
+            logic_error);
+        ASSERT_THROW(
+            unlabeled.insert_or_assign_hashed(
+                oprf::OPRFSender::ComputeHashesAndMatchTags(
+                    data, key, 10, 16, felt_count, bits_per_felt)),
+            logic_error);
+        ASSERT_THROW(
+            labeled.insert_or_assign_hashed(
+                oprf::OPRFSender::ComputeHashesAndMatchTags(items, key, felt_count, bits_per_felt)),
+            logic_error);
+        ASSERT_EQ(size_t(0), unlabeled.get_item_count());
+        ASSERT_EQ(size_t(0), labeled.get_item_count());
+
+        // A tag of the wrong length or with a field element out of range, or an item given twice
+        // with different tags, is refused with its whole batch
+        unlabeled.set_data(items);
+        string unlabeled_before = saved(unlabeled);
+        auto tagged = oprf::OPRFSender::ComputeHashesAndMatchTags(
+            make_items(100, 5), key, felt_count, bits_per_felt);
+        auto shorter = tagged;
+        shorter.back().second.pop_back();
+        ASSERT_THROW(unlabeled.insert_or_assign_hashed(shorter), invalid_argument);
+        auto longer = tagged;
+        longer.back().second.push_back(0);
+        ASSERT_THROW(unlabeled.insert_or_assign_hashed(longer), invalid_argument);
+        auto out_of_range = tagged;
+        out_of_range.back().second.back() = uint64_t(1) << bits_per_felt;
+        ASSERT_THROW(unlabeled.insert_or_assign_hashed(out_of_range), invalid_argument);
+        auto conflicting = tagged;
+        conflicting.push_back(tagged.front());
+        conflicting.back().second.front() ^= 1;
+        ASSERT_THROW(unlabeled.insert_or_assign_hashed(conflicting), invalid_argument);
+        ASSERT_TRUE(unlabeled_before == saved(unlabeled));
+
+        // The same tag given twice is inserted once
+        auto repeated = tagged;
+        repeated.push_back(tagged.front());
+        unlabeled.insert_or_assign_hashed(repeated);
+        ASSERT_EQ(size_t(15), unlabeled.get_item_count());
+
+        // The same checks, and that of the encrypted labels, in a labeled SenderDB
+        labeled.set_data(data);
+        string labeled_before = saved(labeled);
+        auto tagged_labeled = oprf::OPRFSender::ComputeHashesAndMatchTags(
+            with_labels(make_items(100, 5), 10), key, 10, 16, felt_count, bits_per_felt);
+        auto short_label = tagged_labeled;
+        get<1>(short_label.back()).pop_back();
+        ASSERT_THROW(labeled.insert_or_assign_hashed(short_label), invalid_argument);
+        auto short_tag = tagged_labeled;
+        get<2>(short_tag.back()).pop_back();
+        ASSERT_THROW(labeled.insert_or_assign_hashed(short_tag), invalid_argument);
+        auto tag_out_of_range = tagged_labeled;
+        get<2>(tag_out_of_range.back()).front() = uint64_t(1) << bits_per_felt;
+        ASSERT_THROW(labeled.insert_or_assign_hashed(tag_out_of_range), invalid_argument);
+        auto twice = tagged_labeled;
+        twice.push_back(tagged_labeled.front());
+        ASSERT_THROW(labeled.insert_or_assign_hashed(twice), invalid_argument);
+        ASSERT_THROW(labeled.set_data_hashed(twice), invalid_argument);
+        ASSERT_TRUE(labeled_before == saved(labeled));
+
+        // A label longer than the SenderDB holds is refused where it is encrypted
+        ASSERT_THROW(
+            oprf::OPRFSender::ComputeHashesAndMatchTags(
+                with_labels(make_items(100, 5), 11), key, 10, 16, felt_count, bits_per_felt),
+            invalid_argument);
+    }
+
+    TEST(SenderDBTagTests, ReplacingTheLabelOfAHashedItemReplacesItsTag)
+    {
+        // The tag given with a new label for an item replaces the tag stored with the item. Tags
+        // computed with the right key are the same each time, but a different one makes the item
+        // invisible to receivers, which derive the tag from their own label keys.
+        PSIParams params = create_queryable_tag_params(4, 1, 3, 32);
+        oprf::OPRFKey key = fixed_oprf_key();
+        size_t felt_count = tag_felt_count(params);
+        uint32_t bits_per_felt = params.item_bit_count_per_felt();
+        auto sender_db = make_shared<SenderDB>(params, key, 8, 16);
+        vector<pair<Item, Label>> data = with_labels(make_items(1, 10), 8);
+        sender_db->set_data_hashed(
+            oprf::OPRFSender::ComputeHashesAndMatchTags(
+                data, key, 8, 16, felt_count, bits_per_felt));
+        ASSERT_EQ(
+            (vector<vector<Label>>{ { data[0].second } }),
+            query_labels(sender_db, key, { data[0].first }));
+
+        auto replacement = oprf::OPRFSender::ComputeHashesAndMatchTags(
+            vector<pair<Item, Label>>{ data[0] }, key, 8, 16, felt_count, bits_per_felt);
+        get<2>(replacement[0])[0] ^= 1;
+        sender_db->insert_or_assign_hashed(replacement);
+        ASSERT_EQ(data.size(), sender_db->get_item_count());
+        ASSERT_EQ((vector<vector<Label>>{ {} }), query_labels(sender_db, key, { data[0].first }));
+        ASSERT_EQ(
+            (vector<vector<Label>>{ { data[1].second } }),
+            query_labels(sender_db, key, { data[1].first }));
+    }
+
+    TEST(SenderDBTests, SenderDBBuiltFromHashedItemsAnswersUnderTheirKey)
+    {
+        // A SenderDB built from items hashed elsewhere, with a key of its own, answers queries for
+        // the key the items were hashed with, and not for its own, which is the one has_item and
+        // get_label hash with. Without match tags and with them, labeled and not.
+        oprf::OPRFKey key = fixed_oprf_key();
+        for (bool tags : { false, true }) {
+            PSIParams params = tags ? create_queryable_tag_params(4, 1, 3, 32) : *get_params1();
+            size_t felt_count = tag_felt_count(params);
+            uint32_t bits_per_felt = params.item_bit_count_per_felt();
+            vector<Item> items = make_items(1, 100);
+            vector<pair<Item, Label>> data = with_labels(items, 8);
+            vector<Item> queried{ items[0], items[50], Item(5000, 5000) };
+
+            for (bool labeled : { false, true }) {
+                SCOPED_TRACE(
+                    string(tags ? "with" : "without") + " match tags, " +
+                    (labeled ? "labeled" : "unlabeled"));
+                auto sender_db = make_shared<SenderDB>(params, labeled ? 8 : 0, 16);
+                if (tags && labeled) {
+                    sender_db->set_data_hashed(
+                        oprf::OPRFSender::ComputeHashesAndMatchTags(
+                            data, key, 8, 16, felt_count, bits_per_felt));
+                } else if (tags) {
+                    sender_db->set_data_hashed(
+                        oprf::OPRFSender::ComputeHashesAndMatchTags(
+                            items, key, felt_count, bits_per_felt));
+                } else if (labeled) {
+                    sender_db->set_data_hashed(oprf::OPRFSender::ComputeHashes(data, key, 8, 16));
+                } else {
+                    sender_db->set_data_hashed(oprf::OPRFSender::ComputeHashes(items, key));
+                }
+
+                Label label0 = labeled ? data[0].second : Label();
+                Label label50 = labeled ? data[50].second : Label();
+                ASSERT_EQ(
+                    (vector<vector<Label>>{ { label0 }, { label50 }, {} }),
+                    query_labels(sender_db, key, queried));
+
+                ASSERT_EQ(
+                    (vector<vector<Label>>{ {}, {}, {} }),
+                    query_labels(sender_db, sender_db->get_oprf_key(), queried));
+                ASSERT_FALSE(sender_db->has_item(items[0]));
+                ASSERT_EQ(
+                    size_t(1),
+                    sender_db->get_hashed_items().count(
+                        oprf::OPRFSender::ComputeHashes(vector<Item>{ items[0] }, key)[0]));
+            }
+        }
     }
 } // namespace APSITests

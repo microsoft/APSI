@@ -267,6 +267,106 @@ namespace apsi {
             using TaggedHashedItem = tuple<HashedItem, EncryptedLabel, vector<felt_t>>;
 
             /**
+            Returns the number of field elements of an item's match tag: tag_part_count parts of
+            felts_per_item field elements each.
+            */
+            size_t tag_felt_count(const PSIParams &params)
+            {
+                return mul_safe<size_t>(
+                    params.tag_part_count(), params.item_params().felts_per_item);
+            }
+
+            /**
+            Throws std::invalid_argument unless the encrypted label takes byte_count bytes, the
+            label byte count and the nonce byte count of the SenderDB together, as
+            util::encrypt_label makes every label take. A label of another size would give the item
+            more or fewer label parts than its bin bundles hold.
+            */
+            void check_encrypted_label(const EncryptedLabel &encrypted_label, size_t byte_count)
+            {
+                if (encrypted_label.size() != byte_count) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert an encrypted label of "
+                        << encrypted_label.size()
+                        << " bytes but this SenderDB holds encrypted labels of " << byte_count
+                        << " bytes, nonce included");
+                    throw invalid_argument("failed to insert data: encrypted label has wrong size");
+                }
+            }
+
+            /**
+            Throws std::invalid_argument unless the match tag has felt_count field elements, each
+            below 2^bits_per_felt, as util::compute_match_tag gives them. A tag of another length
+            would give the item more or fewer label parts than its bin bundles hold, and a field
+            element out of range is one no receiver derives.
+            */
+            void check_match_tag(
+                const vector<felt_t> &tag, size_t felt_count, uint32_t bits_per_felt)
+            {
+                if (tag.size() != felt_count) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert a match tag of "
+                        << tag.size() << " field elements but this SenderDB holds tags of "
+                        << felt_count << " field elements");
+                    throw invalid_argument("failed to insert data: match tag has wrong size");
+                }
+                for (felt_t felt : tag) {
+                    if ((bits_per_felt < 64) && (felt >> bits_per_felt)) {
+                        APSI_LOG_ERROR(
+                            "Attempted to insert a match tag with a field element of more than "
+                            << bits_per_felt << " bits");
+                        throw invalid_argument(
+                            "failed to insert data: match tag field element is out of range");
+                    }
+                }
+            }
+
+            /**
+            Records that the item is in the batch, and throws std::invalid_argument if it was
+            already: two labels for one item cannot both be meant, so neither is chosen.
+            */
+            void check_unique_in_batch(
+                unordered_set<HashedItem> &batch_items, const HashedItem &item)
+            {
+                if (!batch_items.insert(item).second) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert the same item twice in one batch, so the intended "
+                        "label is ambiguous");
+                    throw invalid_argument("failed to insert data: duplicate item in batch");
+                }
+            }
+
+            /**
+            Throws std::logic_error unless a SenderDB that is stripped or not, labeled or not, and
+            with parameters that use match tags or not, can take items hashed already with or
+            without labels and match tags.
+            */
+            void check_hashed_insertion(
+                bool stripped, bool labeled, bool uses_tags, bool data_labeled, bool data_tagged)
+            {
+                if (stripped) {
+                    APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
+                    throw logic_error("failed to insert data");
+                }
+                if (labeled != data_labeled) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert "
+                        << (data_labeled ? "labeled" : "unlabeled") << " data but this is "
+                        << (labeled ? "a labeled" : "an unlabeled") << " SenderDB");
+                    throw logic_error("failed to insert data");
+                }
+                if (uses_tags != data_tagged) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert items " << (data_tagged ? "with" : "without")
+                                                     << " match tags but the parameters of this "
+                                                        "SenderDB "
+                                                     << (uses_tags ? "use" : "do not use")
+                                                     << " match tags");
+                    throw logic_error("failed to insert data");
+                }
+            }
+
+            /**
             Converts each given item, with its encrypted label and its match tag, into the form a
             SenderDB with match tags stores it in: its HashedItem, and its field elements with
             label parts that begin with the parts of its tag. Also computes each item's cuckoo
@@ -1701,13 +1801,27 @@ namespace apsi {
             }
 
             if (params_.uses_tags()) {
-                insert_or_assign_with_tags(data);
+                // Compute the hashes and encrypt the labels as without match tags, and derive each
+                // item's match tag from its label key as well
+                insert_tagged_labeled(
+                    OPRFSender::ComputeHashesAndMatchTags(
+                        data,
+                        oprf_key_,
+                        label_byte_count_,
+                        nonce_byte_count_,
+                        tag_felt_count(params_),
+                        params_.item_bit_count_per_felt()));
                 return;
             }
 
             // Compute the hashes for the input data
-            auto hashed_data =
-                OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_);
+            insert_hashed_labeled(
+                OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_));
+        }
+
+        void SenderDB::insert_hashed_labeled(vector<pair<HashedItem, EncryptedLabel>> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
 
             // We need to know which items are new and which are old, since we have to tell
             // dispatch_insert_or_assign when to have an overwrite-on-collision versus
@@ -1794,7 +1908,7 @@ namespace apsi {
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
         }
 
         void SenderDB::insert_or_assign(const vector<Item> &data)
@@ -1831,12 +1945,24 @@ namespace apsi {
             }
 
             if (params_.uses_tags()) {
-                insert_or_assign_with_tags(data);
+                // Compute the hashes as without match tags, and derive each item's match tag from
+                // its label key as well
+                insert_tagged_unlabeled(
+                    OPRFSender::ComputeHashesAndMatchTags(
+                        data,
+                        oprf_key_,
+                        tag_felt_count(params_),
+                        params_.item_bit_count_per_felt()));
                 return;
             }
 
             // Compute the hashes for the input data
-            auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
+            insert_hashed_unlabeled(OPRFSender::ComputeHashes(data, oprf_key_));
+        }
+
+        void SenderDB::insert_hashed_unlabeled(vector<HashedItem> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
 
             // We are not going to insert items that already appear in the database. Partition
             // without recording anything: an item registered in hashed_items_ before it is
@@ -1904,23 +2030,12 @@ namespace apsi {
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
         }
 
-        void SenderDB::insert_or_assign_with_tags(const vector<pair<Item, Label>> &data)
+        void SenderDB::insert_tagged_labeled(vector<TaggedHashedItem> hashed_data)
         {
-            // Compute the hashes and encrypt the labels as without match tags, and derive each
-            // item's match tag from its label key as well
-            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
-            size_t tag_felt_count =
-                mul_safe<size_t>(params_.tag_part_count(), params_.item_params().felts_per_item);
-            vector<TaggedHashedItem> hashed_data = OPRFSender::ComputeHashesAndMatchTags(
-                data,
-                oprf_key_,
-                label_byte_count_,
-                nonce_byte_count_,
-                tag_felt_count,
-                bits_per_felt);
+            size_t item_count = hashed_data.size();
 
             // As without match tags, partition the new items from the ones to overwrite without
             // recording anything yet
@@ -1999,19 +2114,12 @@ namespace apsi {
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
         }
 
-        void SenderDB::insert_or_assign_with_tags(const vector<Item> &data)
+        void SenderDB::insert_tagged_unlabeled(vector<pair<HashedItem, vector<felt_t>>> tagged_data)
         {
-            // Compute the hashes as without match tags, and derive each item's match tag from its
-            // label key as well
-            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
-            size_t tag_felt_count =
-                mul_safe<size_t>(params_.tag_part_count(), params_.item_params().felts_per_item);
-            vector<pair<HashedItem, vector<felt_t>>> tagged_data =
-                OPRFSender::ComputeHashesAndMatchTags(
-                    data, oprf_key_, tag_felt_count, bits_per_felt);
+            size_t item_count = tagged_data.size();
 
             // As without match tags, repeats within the batch are collapsed, and items already in
             // the database are left as they are: there is no label to update, and the tag of an
@@ -2064,7 +2172,7 @@ namespace apsi {
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
         }
 
         void SenderDB::remove(const vector<Item> &data)
@@ -2082,7 +2190,12 @@ namespace apsi {
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
             // Compute the hashes for the input data
-            auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
+            remove_hashed_items(OPRFSender::ComputeHashes(data, oprf_key_));
+        }
+
+        void SenderDB::remove_hashed_items(vector<HashedItem> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
 
             // Removing an item twice in one batch is the same as removing it once, so repeats are
             // collapsed. remove_if applies its predicate exactly once per element, which is what
@@ -2142,7 +2255,168 @@ namespace apsi {
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
+            APSI_LOG_INFO("Finished removing " << item_count << " items from SenderDB");
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<HashedItem> &data)
+        {
+            // Lock the database for writing, as insert_or_assign does
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<HashedItem> &data)
+        {
+            // Lock the database for writing, as set_data does
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<HashedItem> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), false, false);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (unlabeled)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_hashed_unlabeled(data);
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<pair<HashedItem, EncryptedLabel>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<pair<HashedItem, EncryptedLabel>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<pair<HashedItem, EncryptedLabel>> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), true, false);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (labeled)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            // Validate the whole batch before anything is modified, as insert_or_assign does
+            size_t encrypted_label_byte_count = label_byte_count_ + nonce_byte_count_;
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(data.size());
+            for (const auto &[item, encrypted_label] : data) {
+                check_encrypted_label(encrypted_label, encrypted_label_byte_count);
+                check_unique_in_batch(batch_items, item);
+            }
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_hashed_labeled(data);
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<pair<HashedItem, vector<felt_t>>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<pair<HashedItem, vector<felt_t>>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<pair<HashedItem, vector<felt_t>>> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), false, true);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (unlabeled, tagged)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            // Validate the whole batch before anything is modified. An item given again with the
+            // same tag is collapsed, as when the tags are derived here; with another tag, which of
+            // them was meant cannot be known.
+            size_t felt_count = tag_felt_count(params_);
+            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
+            unordered_map<HashedItem, const vector<felt_t> *> batch_tags;
+            batch_tags.reserve(data.size());
+            for (const auto &[item, tag] : data) {
+                check_match_tag(tag, felt_count, bits_per_felt);
+                auto [where, inserted] = batch_tags.emplace(item, &tag);
+                if (!inserted && (*where->second != tag)) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert the same item twice in one batch with different "
+                        "match tags, so the intended tag is ambiguous");
+                    throw invalid_argument("failed to insert data: duplicate item in batch");
+                }
+            }
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_tagged_unlabeled(data);
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<TaggedHashedItem> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<TaggedHashedItem> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<TaggedHashedItem> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), true, true);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (labeled, tagged)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            // Validate the whole batch before anything is modified, as insert_or_assign does
+            size_t encrypted_label_byte_count = label_byte_count_ + nonce_byte_count_;
+            size_t felt_count = tag_felt_count(params_);
+            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(data.size());
+            for (const auto &[item, encrypted_label, tag] : data) {
+                check_encrypted_label(encrypted_label, encrypted_label_byte_count);
+                check_match_tag(tag, felt_count, bits_per_felt);
+                check_unique_in_batch(batch_items, item);
+            }
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_tagged_labeled(data);
+        }
+
+        void SenderDB::remove_hashed(const vector<HashedItem> &data)
+        {
+            // Lock the database for writing, as remove does
+            auto lock = get_writer_lock();
+
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot remove data from a stripped SenderDB");
+                throw logic_error("failed to remove data");
+            }
+
+            STOPWATCH(sender_stopwatch, "SenderDB::remove_hashed");
+            APSI_LOG_INFO("Start removing " << data.size() << " hashed items from SenderDB");
+
+            remove_hashed_items(data);
         }
 
         bool SenderDB::has_item(const Item &item) const

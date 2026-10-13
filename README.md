@@ -860,6 +860,7 @@ It is recommended to construct the `SenderDB` directly into a `std::shared_ptr`,
 
 1. The sender's data must be loaded into the `SenderDB` with `SenderDB::set_data`.
 More data can always be added later with `SenderDB::insert_or_assign`, or removed with `SenderDB::remove`, as long as the `SenderDB` has not been stripped (see `SenderDB::strip`).
+Items hashed already with the OPRF key, wherever the key is kept, can be loaded, added and removed with `SenderDB::set_data_hashed`, `SenderDB::insert_or_assign_hashed` and `SenderDB::remove_hashed` instead (see [SenderDB](#senderdb)).
 
 1. (optional) Receive a parameter request with `network::Channel::receive_operation`.
 The received `Request` object must be converted to the right type (`ParamsRequest`) with the `to_params_request` function.
@@ -897,12 +898,21 @@ It is possible to optionally specify the size of the nonce used in encrypting th
 An unlabeled `SenderDB` uses no nonce, whatever nonce byte count is given.
 
 With [match tags](#match-tags), a `SenderDB` stores the tag of every item, labeled or not, as the item's first label parts.
-It derives the tag from the item's label key, which it does not keep, so a `SenderDB` with match tags must be built from the original items.
+It derives the tag from the item's label key, which it does not keep, so a `SenderDB` with match tags must be built from the original items, or from the tags that `oprf::OPRFSender::ComputeHashesAndMatchTags` computes from them (see below).
 Since two items can then share their field elements in a bin, it also keeps the full `HashedItem` of every item until it is stripped.
 
 With match tags and one field element per item, the items inserted at a bundle index that has no bin bundles, as `SenderDB::set_data` inserts them, are placed all at once in as few bin bundles as any placement could use: no bin bundle can hold more than `max_items_per_bin` items in a bin or one field element twice there, and the items of each bin are spread evenly over the bin bundles.
 Items inserted later go into the newest bin bundle that has room for them, as in APSI 1.x.
 An item whose field element is already in every bin bundle with room at its location can take the place of a stored item, which moves to a bin bundle with room, but only if the same update already changes both bin bundles: otherwise the move would make the update regenerate their caches as well, and the item goes into a new bin bundle instead.
+
+A `SenderDB` can also be built without its OPRF key.
+`SenderDB::insert_or_assign_hashed`, `SenderDB::set_data_hashed` and `SenderDB::remove_hashed` take items hashed already, as `oprf::OPRFSender::ComputeHashes` computes them, with encrypted labels in a labeled `SenderDB`, or as `oprf::OPRFSender::ComputeHashesAndMatchTags` computes them for parameters with match tags, and otherwise work as `SenderDB::insert_or_assign`, `SenderDB::set_data` and `SenderDB::remove` do.
+The label keys, which encrypt the labels and give the tags, stay where the items are hashed, and the labels must be encrypted there with the `SenderDB`'s label byte count and nonce byte count.
+Those two functions refuse a longer label, as `SenderDB::insert_or_assign` does, but APSI cannot tell how an encrypted label of the right size divides into nonce and label, and one encrypted with another nonce byte count decrypts wrongly.
+Nor can it tell which key the items were hashed with: items hashed with any key other than the one the sender answers OPRF requests with match nothing.
+
+Such a `SenderDB` holds an OPRF key of its own, which `SenderDB::get_oprf_key` and `SenderDB::strip` return, and with which the functions that take an `Item`, such as `SenderDB::has_item` and `SenderDB::get_label`, hash it, so they answer correctly only if that is the key the items were hashed with.
+Unless it is, strip the `SenderDB` before serving it with the key the items were hashed with: `ZMQSenderDispatcher` refuses a key other than the one a `SenderDB` that is not stripped holds, and answers with that one if given none.
 
 The `SenderDB` requires substantially more memory than the raw data would.
 Part of that memory can automatically be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing the `SenderDB`.
