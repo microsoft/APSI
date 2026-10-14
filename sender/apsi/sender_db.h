@@ -82,8 +82,10 @@ namespace apsi::sender {
     In many cases the SenderDB does not need to be modified after having been constructed, or
     loaded from disk. The function SenderDB::strip can be called to remove all data that is not
     strictly needed to serve query requests. A SenderDB that has been stripped cannot be modified,
-    cannot be checked for the presence of specific items, and labels cannot be retrieved from it.
-    A stripped SenderDB can be serialized and deserialized.
+    cannot be checked for the presence of specific items, and labels cannot be retrieved from it:
+    every function that would do so throws std::logic_error, apart from SenderDB::clear, which
+    makes it as a newly constructed SenderDB, with a new OPRF key. A stripped SenderDB can be
+    serialized and deserialized.
 
     SenderDB::Load reads the header and each bin bundle as one buffer of at most about 2 GiB, and
     the header of a SenderDB that is not stripped holds a 16-byte HashedItem for each item, which
@@ -111,7 +113,8 @@ namespace apsi::sender {
             bool compressed = true);
 
         /**
-        Creates a new SenderDB.
+        Creates a new SenderDB with the given OPRF key. Throws std::invalid_argument if the key is
+        zero, as SenderDB::strip leaves it, since every item would hash to the same value under it.
         */
         SenderDB(
             const PSIParams &params,
@@ -140,7 +143,9 @@ namespace apsi::sender {
         SenderDB(const SenderDB &copy) = delete;
 
         /**
-        Clears the database. Every item and label will be removed. The OPRF key is unchanged.
+        Clears the database. Every item and label will be removed. The OPRF key is unchanged,
+        except in a stripped SenderDB, whose key SenderDB::strip has removed: such a SenderDB gets
+        a new OPRF key, as a newly constructed SenderDB does, and is no longer stripped.
         */
         void clear();
 
@@ -187,7 +192,8 @@ namespace apsi::sender {
 
         /**
         Strips the SenderDB of all information not needed for serving a query. Returns a copy of
-        the OPRF key and clears it from the SenderDB.
+        the OPRF key and clears it from the SenderDB, leaving zeros in its place. Throws
+        std::logic_error if the SenderDB is stripped already, as it then has no key to return.
         */
         oprf::OPRFKey strip();
 
@@ -236,23 +242,20 @@ namespace apsi::sender {
 
         /**
         Clears the database and inserts the given data. This function can be used only on a
-        labeled SenderDB instance.
+        labeled SenderDB instance. It checks the SenderDB and the data as insert_or_assign does
+        before clearing anything, so if it refuses them, with std::logic_error for a stripped
+        SenderDB or unlabeled data or with std::invalid_argument for a batch that does not fit, the
+        database is left as it was.
         */
-        void set_data(const std::vector<std::pair<Item, Label>> &data)
-        {
-            clear();
-            insert_or_assign(data);
-        }
+        void set_data(const std::vector<std::pair<Item, Label>> &data);
 
         /**
         Clears the database and inserts the given data. This function can be used only on an
-        unlabeled SenderDB instance.
+        unlabeled SenderDB instance. It checks the SenderDB as insert_or_assign does before
+        clearing anything, so if it refuses it, with std::logic_error for a stripped or labeled
+        SenderDB, the database is left as it was.
         */
-        void set_data(const std::vector<Item> &data)
-        {
-            clear();
-            insert_or_assign(data);
-        }
+        void set_data(const std::vector<Item> &data);
 
         /**
         Removes the given data from the database. An item given more than once is removed once.
@@ -439,7 +442,10 @@ namespace apsi::sender {
         std::size_t save(std::ostream &out, PlaintextSaveMode mode) const;
 
         /**
-        Reads the SenderDB from a stream.
+        Reads the SenderDB from a stream. Throws std::runtime_error for a SenderDB that is not
+        stripped but holds an OPRF key of zero, which APSI 1.1.0 could save after clearing a
+        stripped SenderDB or setting its data: every item it holds hashed to the same value, so it
+        must be rebuilt.
         */
         static std::pair<SenderDB, std::size_t> Load(std::istream &in);
 
@@ -471,6 +477,21 @@ namespace apsi::sender {
         exception from generate_caches is dropped, as the caller passes on the update's own.
         */
         void generate_caches_after_failure() noexcept;
+
+        /**
+        Does the work of insert_or_assign and set_data for a labeled SenderDB: checks the SenderDB
+        and the batch, clears the database if clear_first is true, and inserts the data. The caller
+        holds the writer lock.
+        */
+        void insert_or_assign_locked(
+            const std::vector<std::pair<Item, Label>> &data, bool clear_first);
+
+        /**
+        Does the work of insert_or_assign and set_data for an unlabeled SenderDB: checks the
+        SenderDB, clears the database if clear_first is true, and inserts the data. The caller
+        holds the writer lock.
+        */
+        void insert_or_assign_locked(const std::vector<Item> &data, bool clear_first);
 
         /**
         Does the work of insert_or_assign for a labeled SenderDB whose parameters use match tags.

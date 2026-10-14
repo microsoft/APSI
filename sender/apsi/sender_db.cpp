@@ -53,6 +53,16 @@ namespace apsi {
 
         namespace {
             /**
+            Returns whether every byte of the OPRF key is zero, as SenderDB::strip leaves it. Under
+            a zero key every item hashes to the same value.
+            */
+            bool is_zero_key(const OPRFKey &oprf_key)
+            {
+                auto key = oprf_key.key_span();
+                return all_of(key.begin(), key.end(), [](unsigned char b) { return b == 0; });
+            }
+
+            /**
             Creates and returns the vector of hash functions similarly to how Kuku 2.x sets them
             internally.
             */
@@ -1345,6 +1355,11 @@ namespace apsi {
             bool compressed)
             : SenderDB(params, label_byte_count, nonce_byte_count, compressed)
         {
+            if (is_zero_key(oprf_key)) {
+                APSI_LOG_ERROR("Cannot create a SenderDB with an OPRF key of zero");
+                throw invalid_argument("oprf_key is zero");
+            }
+
             // Initialize oprf key with the one given to this constructor
             oprf_key_ = std::move(oprf_key);
         }
@@ -1503,6 +1518,13 @@ namespace apsi {
             // Lock the database for writing
             auto lock = get_writer_lock();
 
+            // A stripped SenderDB has no OPRF key: strip() zeroed it, and every item would hash to
+            // the same value under it. Clearing makes the SenderDB as a newly constructed one,
+            // with a new key of its own.
+            if (stripped_) {
+                oprf_key_ = OPRFKey();
+            }
+
             if (!hashed_items_.empty()) {
                 APSI_LOG_INFO("Removing " << hashed_items_.size() << " items pairs from SenderDB");
             }
@@ -1555,6 +1577,12 @@ namespace apsi {
         {
             // Lock the database for writing
             auto lock = get_writer_lock();
+
+            // A stripped SenderDB holds no OPRF key, only the zeros strip() left in its place
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot strip a SenderDB that is stripped already");
+                throw logic_error("failed to strip SenderDB");
+            }
 
             stripped_ = true;
 
@@ -1612,7 +1640,21 @@ namespace apsi {
             // outside it can read a key that is being destroyed, and items hashed under a key
             // the database no longer holds would be committed under hashes no receiver can match.
             auto lock = get_writer_lock();
+            insert_or_assign_locked(data, false);
+        }
 
+        void SenderDB::set_data(const vector<pair<Item, Label>> &data)
+        {
+            // Lock the database for writing, as insert_or_assign does, and keep it locked from the
+            // checks to the end of the insertion, so that nothing is cleared for a batch that is
+            // then refused
+            auto lock = get_writer_lock();
+            insert_or_assign_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_locked(
+            const vector<pair<Item, Label>> &data, bool clear_first)
+        {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
                 throw logic_error("failed to insert data");
@@ -1652,6 +1694,10 @@ namespace apsi {
                         throw invalid_argument("failed to insert data: duplicate item in batch");
                     }
                 }
+            }
+
+            if (clear_first) {
+                clear_internal();
             }
 
             if (params_.uses_tags()) {
@@ -1756,7 +1802,18 @@ namespace apsi {
             // Lock the database for writing. See the labeled overload above for why the lock must
             // span the stripped_ check, the hashing and the insertion.
             auto lock = get_writer_lock();
+            insert_or_assign_locked(data, false);
+        }
 
+        void SenderDB::set_data(const vector<Item> &data)
+        {
+            // Lock the database for writing; see the labeled overload above
+            auto lock = get_writer_lock();
+            insert_or_assign_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_locked(const vector<Item> &data, bool clear_first)
+        {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
                 throw logic_error("failed to insert data");
@@ -1768,6 +1825,10 @@ namespace apsi {
 
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
+
+            if (clear_first) {
+                clear_internal();
+            }
 
             if (params_.uses_tags()) {
                 insert_or_assign_with_tags(data);
@@ -2459,6 +2520,15 @@ namespace apsi {
             // Copy over the OPRF key
             sender_db->oprf_key_.load(oprf_key_span_const_type(
                 reinterpret_cast<const unsigned char *>(sdb->oprf_key()->data()), oprf_key_size));
+
+            // A SenderDB that is not stripped needs its OPRF key. APSI 1.1.0 could save one with
+            // the zeros that SenderDB::strip leaves, once a stripped SenderDB had been cleared or
+            // given new data, and under them every item hashes to the same value.
+            if (!stripped && is_zero_key(sender_db->oprf_key_)) {
+                APSI_LOG_ERROR(
+                    "The loaded SenderDB is not stripped but its OPRF key is zero; rebuild it");
+                throw runtime_error("failed to load SenderDB");
+            }
 
             // Load the hashed items if this SenderDB is not stripped
             if (!stripped) {

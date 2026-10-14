@@ -916,7 +916,7 @@ Where that matters, build the new state separately and direct later queries at i
 
 In many cases the `SenderDB` does not need to be modified after having been constructed, or loaded from disk.
 The function `SenderDB::strip` can be called to remove all data that is not strictly needed to serve query requests.
-A `SenderDB` that has been stripped cannot be modified, cannot be checked for the presence of specific items, and labels cannot be retrieved from it.
+A `SenderDB` that has been stripped cannot be modified, cannot be checked for the presence of specific items, and labels cannot be retrieved from it: every function that would do so throws `std::logic_error`, apart from `SenderDB::clear`, which makes it as a newly constructed `SenderDB`, with a new OPRF key.
 A stripped `SenderDB` can be serialized and deserialized.
 
 `SenderDB::Load` reads the header and each bin bundle as one buffer of at most about 2 GiB, and the header of a `SenderDB` that is not stripped holds a 16-byte `HashedItem` for each item, which limits it to about 134 million items.

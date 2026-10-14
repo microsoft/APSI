@@ -4619,4 +4619,149 @@ namespace APSITests {
             }
         }
     }
+
+    namespace {
+        /**
+        Returns the bytes the SenderDB saves as.
+        */
+        string saved(const SenderDB &sender_db)
+        {
+            stringstream ss;
+            sender_db.save(ss);
+            return ss.str();
+        }
+
+        /**
+        Returns the items, each with a label of label_byte_count bytes.
+        */
+        vector<pair<Item, Label>> with_labels(const vector<Item> &items, size_t label_byte_count)
+        {
+            vector<pair<Item, Label>> data;
+            for (size_t i = 0; i < items.size(); i++) {
+                data.emplace_back(
+                    items[i], create_label(static_cast<unsigned char>(i), label_byte_count));
+            }
+            return data;
+        }
+    } // namespace
+
+    TEST(SenderDBTests, ClearingAStrippedSenderDBGivesItANewKey)
+    {
+        // strip() zeroes the OPRF key, under which every item hashes to the same value. A cleared
+        // stripped SenderDB becomes as a newly constructed one, with a new key of its own.
+        // set_data, like insert_or_assign and remove, refuses a stripped SenderDB and leaves it as
+        // it was. With match tags and without them, labeled and not.
+        oprf::OPRFKey zero_key;
+        zero_key.clear();
+        for (bool tags : { false, true }) {
+            PSIParams params = tags ? create_tag_params() : *get_params1();
+            for (size_t label_byte_count : { 0U, 8U }) {
+                SCOPED_TRACE(
+                    string(tags ? "with" : "without") + " match tags, label_byte_count " +
+                    to_string(label_byte_count));
+                SenderDB sender_db(params, label_byte_count, 16);
+                vector<Item> items = make_items(1, 10);
+                vector<pair<Item, Label>> data = with_labels(items, label_byte_count);
+                auto set_data = [&]() {
+                    if (label_byte_count) {
+                        sender_db.set_data(data);
+                    } else {
+                        sender_db.set_data(items);
+                    }
+                };
+                set_data();
+                oprf::OPRFKey old_key = sender_db.strip();
+                string before = saved(sender_db);
+
+                ASSERT_THROW(set_data(), logic_error);
+                ASSERT_THROW(static_cast<void>(sender_db.strip()), logic_error);
+                ASSERT_TRUE(sender_db.is_stripped());
+                ASSERT_THROW(static_cast<void>(sender_db.get_oprf_key()), logic_error);
+                ASSERT_TRUE(before == saved(sender_db));
+
+                sender_db.clear();
+                ASSERT_FALSE(sender_db.is_stripped());
+                ASSERT_EQ(size_t(0), sender_db.get_item_count());
+                oprf::OPRFKey new_key = sender_db.get_oprf_key();
+                ASSERT_TRUE(new_key != zero_key);
+                ASSERT_TRUE(new_key != old_key);
+
+                set_data();
+                ASSERT_EQ(items.size(), sender_db.get_item_count());
+                ASSERT_EQ(items.size(), sender_db.get_hashed_items().size());
+                for (const auto &item : items) {
+                    ASSERT_TRUE(sender_db.has_item(item));
+                }
+                ASSERT_FALSE(sender_db.has_item(Item(999, 999)));
+                ASSERT_EQ(
+                    size_t(1),
+                    sender_db.get_hashed_items().count(
+                        oprf::OPRFSender::ComputeHashes(vector<Item>{ items[0] }, new_key)[0]));
+            }
+        }
+    }
+
+    TEST(SenderDBTests, AZeroOPRFKeyIsRefused)
+    {
+        // Under a zero OPRF key every item hashes to the same value. A SenderDB is not created
+        // with one, and one that is not stripped but holds one, as APSI 1.1.0 could save, is not
+        // loaded. A stripped SenderDB holds the zeros that strip() left, and loads.
+        auto params = get_params1();
+        oprf::OPRFKey zero_key;
+        zero_key.clear();
+        ASSERT_THROW(SenderDB(*params, zero_key, 0), invalid_argument);
+        ASSERT_THROW(SenderDB(*params, zero_key, 8, 16), invalid_argument);
+
+        SenderDB sender_db(*params, fixed_oprf_key(), 0);
+        sender_db.set_data(make_items(1, 10));
+        string bytes = saved(sender_db);
+        {
+            stringstream ss(bytes);
+            ASSERT_NO_THROW(SenderDB::Load(ss));
+        }
+        const auto *sdb = fbs::GetSizePrefixedSenderDB(bytes.data());
+        auto key_offset = reinterpret_cast<const char *>(sdb->oprf_key()->data()) - bytes.data();
+        fill_n(bytes.begin() + key_offset, oprf::oprf_key_size, '\0');
+        stringstream zeroed(bytes);
+        ASSERT_THROW(SenderDB::Load(zeroed), runtime_error);
+
+        sender_db.strip();
+        stringstream stripped(saved(sender_db));
+        SenderDB loaded = SenderDB::Load(stripped).first;
+        ASSERT_TRUE(loaded.is_stripped());
+        ASSERT_THROW(static_cast<void>(loaded.strip()), logic_error);
+    }
+
+    TEST(SenderDBTests, SetDataLeavesTheDatabaseAsItWasWhenItRefusesTheBatch)
+    {
+        // set_data checks the SenderDB and the batch, as insert_or_assign does, before it clears
+        // anything
+        auto params = get_params1();
+        vector<Item> items = make_items(1, 10);
+        vector<pair<Item, Label>> data = with_labels(items, 8);
+
+        SenderDB labeled(*params, 8, 16);
+        labeled.set_data(data);
+        string labeled_before = saved(labeled);
+        vector<pair<Item, Label>> duplicated{ { Item(7, 7), create_label(1, 8) },
+                                              { Item(7, 7), create_label(2, 8) } };
+        ASSERT_THROW(labeled.set_data(duplicated), invalid_argument);
+        vector<pair<Item, Label>> too_long{ { Item(3, 3), create_label(3, 9) } };
+        ASSERT_THROW(labeled.set_data(too_long), invalid_argument);
+        ASSERT_THROW(labeled.set_data(items), logic_error);
+        ASSERT_TRUE(labeled_before == saved(labeled));
+        ASSERT_EQ(data.size(), labeled.get_item_count());
+
+        SenderDB unlabeled(*params, 0);
+        unlabeled.set_data(items);
+        string unlabeled_before = saved(unlabeled);
+        ASSERT_THROW(unlabeled.set_data(data), logic_error);
+        ASSERT_TRUE(unlabeled_before == saved(unlabeled));
+
+        // A batch that is taken replaces everything
+        labeled.set_data(vector<pair<Item, Label>>{ { Item(100, 100), create_label(1, 8) } });
+        ASSERT_EQ(size_t(1), labeled.get_item_count());
+        ASSERT_TRUE(labeled.has_item(Item(100, 100)));
+        ASSERT_FALSE(labeled.has_item(items[0]));
+    }
 } // namespace APSITests
