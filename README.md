@@ -953,7 +953,7 @@ To query such a sender, use `seal::compr_mode_type::zstd`.
 The in-memory compression of a `SenderDB` is a separate feature.
 It bit-packs each plaintext the sender computes with when that saves at least an eighth of its size, and otherwise, as with primes of 56 bits or more, keeps it uncompressed.
 The sender reads the coefficients of an uncompressed plaintext in place rather than loading it, in a compressed `SenderDB` as in an uncompressed one.
-APSI 1.x used Zstandard, which takes several times longer to load, so with the shipped parameter sets of up to a million items other than `1M-256-288`, a query against a compressed `SenderDB` takes 8% to 76% less of the sender's CPU time than with Zstandard, for about the same memory, as measured with Microsoft SEAL 4.6.1.
+APSI 1.x used Zstandard, which takes several times longer to load, so a query against a compressed `SenderDB` takes less of the sender's CPU time than it did, and with some parameter sets much less, for about the same memory.
 A `SenderDB` loads plaintexts in any mode, but software built with Microsoft SEAL 4.0, 4.4 or 4.5, as APSI 1.x usually is, cannot use a compressed `SenderDB` that APSI 2.0 saves with its plaintexts as it holds them.
 It reads the plaintexts only to answer a query, so it loads such a `SenderDB` without complaint and then fails every query against it, or may even crash.
 To write a `SenderDB` that APSI 1.x can serve, see [With Matching Polynomials](#with-matching-polynomials).
@@ -1611,8 +1611,8 @@ Older SEAL releases carry known vulnerabilities, including in the deserializatio
 #### Note on Microsoft SEAL and Intel HEXL
 
 [Intel HEXL](https://GitHub.com/IntelLabs/hexl) is an optional dependency of Microsoft SEAL that accelerates low-level arithmetic with AVX-512, and we recommend it for a sender on an x86-64 processor that has AVX-512.
-On an Intel Xeon 6973P-C with Microsoft SEAL 4.7.0 and a million items, a sender answering on one thread spent 19% to 24% less CPU time per query with `1M-256`, `1M-1-32`, `1M-4096-com` and `1M-11041`, which compute powers or use Paterson-Stockmeyer, and 2% to 7% less with `1M-1`, `1M-512-cmp` and `1M-4096-cmp`, whose queries go mostly to the sums of products that APSI computes itself, without Intel HEXL.
-With these sets, a receiver spent 14% to 35% less CPU time processing a result.
+With it, a sender answering on one thread spends noticeably less CPU time per query with the parameter sets that compute powers or use Paterson-Stockmeyer, such as `1M-256` and `1M-11041`, and a little less with sets such as `1M-1`, `1M-512-cmp` and `1M-4096-cmp`, whose queries go mostly to the sums of products that APSI computes itself, without Intel HEXL.
+A receiver spends less CPU time processing a result.
 To enable, configure with `-DVCPKG_MANIFEST_FEATURES=hexl` (in addition to any other features), which adds `seal[hexl]` to the manifest-mode resolution.
 
 ## Command-Line Interface (CLI)
