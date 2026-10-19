@@ -744,9 +744,9 @@ This same text appears in the [receiver.h](receiver/apsi/receiver.h) header file
 This is needed when the receiver does not know what parameters it is supposed to use with a specific sender.
 In other cases the receiver would know the parameters ahead of time, and can skip this step.
 In any case, once the receiver has an appropriate `PSIParams` object, an `Receiver` can be instantiated.
-The `Receiver` constructor automatically creates Microsoft SEAL public and private keys.
-The public keys are sent to the sender along with every query request, and the private keys are held internally by the Receiver object for decrypting query responses.
-`Receiver::request_query` draws a new key pair for each query it sends, so two queries made through it never carry the same public keys and a sender cannot recognize them as coming from one receiver.
+The `Receiver` constructor automatically creates a Microsoft SEAL secret key, which the `Receiver` keeps to encrypt queries and decrypt their results, and, where the parameters use key switching, relinearization keys, which are sent to the sender with every query.
+With a single `coeff_modulus` prime, a query carries no keys.
+`Receiver::request_query` draws new keys for each query it sends, so two queries made through it never carry the same relinearization keys and a sender cannot recognize them as coming from one receiver.
 A caller using the advanced API instead is responsible for calling `Receiver::reset_keys` between queries, at a point where no query is still in flight: the result of a query in flight is encrypted under the key that rotating would discard.
 
 Queries are saved in the compression mode set with `Receiver::set_compr_mode` (see [Compression](#compression)).
@@ -906,9 +906,12 @@ Items inserted later go into the newest bin bundle that has room for them, as in
 An item whose field element is already in every bin bundle with room at its location can take the place of a stored item, which moves to a bin bundle with room, but only if the same update already changes both bin bundles: otherwise the move would make the update regenerate their caches as well, and the item goes into a new bin bundle instead.
 
 A `SenderDB` can also be built without its OPRF key.
-`SenderDB::insert_or_assign_hashed`, `SenderDB::set_data_hashed` and `SenderDB::remove_hashed` take items hashed already, as `oprf::OPRFSender::ComputeHashes` computes them, with encrypted labels in a labeled `SenderDB`, or as `oprf::OPRFSender::ComputeHashesAndMatchTags` computes them for parameters with match tags, and otherwise work as `SenderDB::insert_or_assign`, `SenderDB::set_data` and `SenderDB::remove` do.
+`SenderDB::insert_or_assign_hashed` and `SenderDB::set_data_hashed` take items hashed already, as `oprf::OPRFSender::ComputeHashes` computes them, with encrypted labels in a labeled `SenderDB`, or, for parameters with match tags, as `oprf::OPRFSender::ComputeHashesAndMatchTags` computes them with a `tag_felt_count` of `tag_part_count * felts_per_item` and a `bits_per_felt` of `PSIParams::item_bit_count_per_felt`.
+`SenderDB::remove_hashed` takes the hashed items alone.
+They otherwise work as `SenderDB::insert_or_assign`, `SenderDB::set_data` and `SenderDB::remove` do.
 The label keys, which encrypt the labels and give the tags, stay where the items are hashed, and the labels must be encrypted there with the `SenderDB`'s label byte count and nonce byte count.
-Those two functions refuse a longer label, as `SenderDB::insert_or_assign` does, but APSI cannot tell how an encrypted label of the right size divides into nonce and label, and one encrypted with another nonce byte count decrypts wrongly.
+The two functions of `oprf::OPRFSender` refuse a label longer than the label byte count, as `SenderDB::insert_or_assign` does, and `SenderDB::insert_or_assign_hashed` and `SenderDB::set_data_hashed` refuse with `std::invalid_argument` an encrypted label that does not take exactly the two byte counts together.
+But APSI cannot tell how an encrypted label of the right size divides into nonce and label, and one encrypted with another nonce byte count decrypts wrongly.
 Nor can it tell which key the items were hashed with: items hashed with any key other than the one the sender answers OPRF requests with match nothing.
 
 Such a `SenderDB` holds an OPRF key of its own, which `SenderDB::get_oprf_key` and `SenderDB::strip` return, and with which the functions that take an `Item`, such as `SenderDB::has_item` and `SenderDB::get_label`, hash it, so they answer correctly only if that is the key the items were hashed with.
@@ -1435,7 +1438,7 @@ Moving to new parameters means rebuilding the `SenderDB` from the original items
 ### With Matching Polynomials
 
 APSI 2.0 writes `PSIParams`, `SenderDB`s, and responses in the format APSI 1.1.0 does, apart from the Microsoft SEAL version recorded in them and the plaintexts of a compressed `SenderDB`, which it bit-packs or keeps uncompressed rather than compressing them with Zstandard (see [Compression](#compression)).
-It loads the `SenderDB`s APSI 1.1.0 saves.
+It loads the `SenderDB`s APSI 1.1.0 saves, except one that is not stripped but holds an OPRF key of zero, which APSI 1.1.0 saves after `SenderDB::clear` or `SenderDB::set_data` on a stripped `SenderDB`, and which must be rebuilt.
 APSI 1.1.0 built with Microsoft SEAL older than 4.6, as it usually is, can serve an uncompressed `SenderDB` that APSI 2.0 saves, but not a compressed one that `SenderDB::save` writes by default, which it loads and then fails every query against.
 
 To write a `SenderDB` that APSI 1.x can serve, pass `SenderDB::PlaintextSaveMode::apsi_1x` to `SenderDB::save`.
@@ -1471,6 +1474,8 @@ The overload without the `PSIParams` no longer refuses a package without a `psi_
 - `network::SenderOperationQuery::load` holds the ciphertexts of a query in serialized form, so code that reads them itself must load them with `SEALObject::extract` and a `seal::SEALContext`.
 It also refuses relinearization keys other than the single key set `seal::KeyGenerator::create_relin_keys` makes, which is what every APSI receiver sends.
 - `SenderDB::insert_or_assign` no longer stores an item a second time when it replaces its label, and `SenderDB::remove` removes all of a batch or nothing (see [SenderDB](#senderdb)).
+- `SenderDB::set_data` throws `std::logic_error` for a stripped `SenderDB`, and so does `SenderDB::strip` for one that is stripped already.
+The constructor that takes an OPRF key throws `std::invalid_argument` for a key of zero.
 
 ## Building APSI
 
@@ -1535,7 +1540,7 @@ cmake --build --preset linux-debug
 The same pattern works for `macos-arm64-debug`, `macos-arm64-release`, `macos-x64-debug`, and `macos-x64-release`.
 The Windows presets separate the two steps: configure with `win-vs2022-x64`, `win-vs2022-arm64`, `win-vs2026-x64`, or `win-vs2026-arm64`, then build with the matching `-debug` or `-release` build preset, for example `win-vs2022-x64-release`.
 The `win-vs2026-*` presets require CMake ≥ 4.2 (see the [Requirements](#requirements) note); all others work with CMake ≥ 3.25.
-The base preset enables both tests and CLI; binaries land under `out/build/<preset>/bin/`.
+The base preset enables both tests and CLI; binaries land under `out/build/<preset>/bin/`, and with the Windows presets in its `Debug` or `Release` subdirectory.
 
 To run the tests:
 ```sh
@@ -1581,9 +1586,10 @@ The remaining flags are selected by platform and target rather than probed.
 | GCC, Clang | Stack protection; position-independent code; bounds-checked standard library containers outside `Debug` (`_GLIBCXX_ASSERTIONS`, `_LIBCPP_HARDENING_MODE`) |
 | GCC, Clang, except Apple | Stack-clash protection; fortified libc calls outside `Debug` (`_FORTIFY_SOURCE=2`) |
 | GCC, Clang on Linux and Android | Full RELRO, immediate binding, and a non-executable stack |
-| MSVC | Control Flow Guard; the Spectre variant 1 mitigation; EH continuation metadata on a 64-bit target; shadow-stack marking (`/CETCOMPAT`) on x64 |
+| MSVC | Control Flow Guard; the Spectre variant 1 mitigation; shadow-stack marking (`/CETCOMPAT`) on x64 |
 
 Apple platforms are excluded from two of these deliberately: Clang there accepts `-fstack-clash-protection` and ignores it, and Apple's libc does not implement the fortified entry points.
+MSVC does not get EH continuation metadata (`/guard:ehcont`): the linker then rejects every module built without it, and the dependencies vcpkg builds lack it.
 The standard library hardening is applied to APSI's own translation units, not to a consumer's, so a consumer that wants it enables it for its own build.
 
 These options apply to the code built in this tree and are not part of the installed target's interface, so a consumer chooses its own.
@@ -1658,12 +1664,12 @@ Note that in other applications the receiver may already know the parameters, an
 
 | <div style="width:190px">Parameter</div> | Explanation |
 |-----------|-------------|
-| `-d` \| `--dbFile` | Path to a CSV file describing the sender's dataset (an item-label pair on each row) or a file containing a serialized `SenderDB`, which must be trusted (see [SenderDB](#senderdb)); the CLI will first attempt to load the data as a serialized `SenderDB`, and &ndash; upon failure &ndash; will proceed to attempt to read it as a CSV file |
+| `-d` \| `--dbFile` | Path to a CSV file describing the sender's dataset (an item-label pair on each row) or a file that `--sdbOutFile` wrote, which must be trusted (see [SenderDB](#senderdb)); the CLI will first attempt to load the data as such a file, and &ndash; upon failure &ndash; will proceed to attempt to read it as a CSV file |
 | `-p` \| `--paramsFile` | Path to a JSON file [describing the parameters](#loading-from-json) to be used by the sender
 | `--port` | TCP port to bind to (default is 1212) |
 | `-n` \| `--nonceByteCount` | Number of bytes used for the nonce in labeled mode (default is 16) |
 | `-c` \| `--compress` | Whether to compress the SenderDB in memory; this will make the memory footprint smaller at the cost of increased computation |
-| `-o` \| `--sdbOutFile` | Save the `SenderDB` in the given file |
+| `-o` \| `--sdbOutFile` | Save the `SenderDB` in the given file, as `SenderDB::save` writes it by default, followed by its OPRF key |
 
 **Note:** The first row of the CSV file provided to `--dbFile` determines whether APSI will be used in unlabeled or labeled mode.
 If the first row contains two values, the first will be interpreted as the item and the rest will be interpreted as the label data.

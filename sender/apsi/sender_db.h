@@ -65,18 +65,22 @@ namespace apsi::sender {
     update already changes both bin bundles: otherwise the move would make the update regenerate
     their caches as well, and the item goes into a new bin bundle instead.
 
-    A SenderDB can also be built without its OPRF key. SenderDB::insert_or_assign_hashed,
-    SenderDB::set_data_hashed and SenderDB::remove_hashed take items hashed already, as
-    oprf::OPRFSender::ComputeHashes computes them, with encrypted labels in a labeled SenderDB, or
-    as oprf::OPRFSender::ComputeHashesAndMatchTags computes them for parameters with match tags,
-    and otherwise work as SenderDB::insert_or_assign, SenderDB::set_data and SenderDB::remove do.
-    The label keys, which encrypt the labels and give the tags, stay where the items are hashed,
-    and the labels must be encrypted there with the SenderDB's label byte count and nonce byte
-    count. Those two functions refuse a longer label, as SenderDB::insert_or_assign does, but APSI
-    cannot tell how an encrypted label of the right size divides into nonce and label, and one
-    encrypted with another nonce byte count decrypts wrongly. Nor can it tell which key the items
-    were hashed with: items hashed with any key other than the one the sender answers OPRF requests
-    with match nothing.
+    A SenderDB can also be built without its OPRF key. SenderDB::insert_or_assign_hashed and
+    SenderDB::set_data_hashed take items hashed already, as oprf::OPRFSender::ComputeHashes
+    computes them, with encrypted labels in a labeled SenderDB, or, for parameters with match
+    tags, as oprf::OPRFSender::ComputeHashesAndMatchTags computes them with a tag_felt_count of
+    tag_part_count * felts_per_item and a bits_per_felt of PSIParams::item_bit_count_per_felt.
+    SenderDB::remove_hashed takes the hashed items alone. They otherwise work as
+    SenderDB::insert_or_assign, SenderDB::set_data and SenderDB::remove do. The label keys, which
+    encrypt the labels and give the tags, stay where the items are hashed, and the labels must be
+    encrypted there with the SenderDB's label byte count and nonce byte count. The two functions
+    of oprf::OPRFSender refuse a label longer than the label byte count, as
+    SenderDB::insert_or_assign does, and SenderDB::insert_or_assign_hashed and
+    SenderDB::set_data_hashed refuse with std::invalid_argument an encrypted label that does not
+    take exactly the two byte counts together. But APSI cannot tell how an encrypted label of the
+    right size divides into nonce and label, and one encrypted with another nonce byte count
+    decrypts wrongly. Nor can it tell which key the items were hashed with: items hashed with any
+    key other than the one the sender answers OPRF requests with match nothing.
 
     Such a SenderDB holds an OPRF key of its own, which SenderDB::get_oprf_key and SenderDB::strip
     return, and with which the functions that take an Item, such as SenderDB::has_item and

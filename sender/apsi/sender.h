@@ -52,7 +52,10 @@ namespace apsi::sender {
 
     (2) The sender's data must be loaded into the SenderDB with SenderDB::set_data. More data
     can always be added later with SenderDB::insert_or_assign, or removed with SenderDB::remove,
-    as long as the SenderDB has not been stripped (see SenderDB::strip).
+    as long as the SenderDB has not been stripped (see SenderDB::strip). Items hashed already
+    with the OPRF key, wherever the key is kept, can be loaded, added and removed with
+    SenderDB::set_data_hashed, SenderDB::insert_or_assign_hashed and SenderDB::remove_hashed
+    instead (see SenderDB).
 
     (3 -- optional) Receive a parameter request with network::Channel::receive_operation. The
     received Request object must be converted to the right type (ParamsRequest) with the
@@ -76,7 +79,8 @@ namespace apsi::sender {
     SenderDB, and if it is not the constructor still returns successfully but the Query is
     marked as invalid (Query::is_valid() returns false) and cannot be used in the next step.
     Among other things, the constructor checks the query's parameter fingerprint, and loads and
-    checks its ciphertexts, which network::SenderOperationQuery::load leaves in serialized form.
+    checks its ciphertexts, which network::SenderOperationQuery::load leaves in serialized form,
+    with up to as many tasks on the thread pool as ThreadPoolMgr::GetThreadCount gives.
     Once a valid Query object is created, the RunQuery function can be used to perform the query
     and respond on the given channel. Optionally, two lambda functions can be given to RunQuery
     to provide custom logic for sending the QueryResponse and the ResultPart objects on the
