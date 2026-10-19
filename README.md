@@ -1492,7 +1492,6 @@ APSI is C++17. Only static builds are supported; the build configuration fails f
 ### Installing APSI with vcpkg
 
 The easiest way to obtain APSI for downstream use is via [vcpkg](https://github.com/microsoft/vcpkg).
-Installing APSI 2.0 with vcpkg needs Microsoft SEAL 4.7.0 in the vcpkg registry; where the registry does not have it, [build APSI from source](#building-apsi-from-source).
 
 On Linux and macOS, first follow [Quick Start on Unix](https://github.com/microsoft/vcpkg#quick-start-unix), and then run:
 ```sh
@@ -1515,26 +1514,14 @@ There is no separate "install dependencies" step.
 
 - A C++17 toolchain (see [Requirements](#requirements) above).
 - CMake ≥ 3.25.
-- A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path.
-- If the vcpkg registry does not have Microsoft SEAL 4.7.0, a vcpkg overlay port for it, as the next section describes.
+- A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path. It has to contain the vcpkg commit that `vcpkg.json` names as its `builtin-baseline`, so `git pull` an older clone.
 
 #### Microsoft SEAL 4.7.0
 
 `CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.7.0 or a later 4.x release.
 Bit-packed serialization (see [Compression](#compression)) is new in Microsoft SEAL 4.6.0, 4.6.1 corrects the 64-bit multiplication with which 4.3.0 to 4.6.0 compute wrong results when built with MSVC for ARM64, 4.6.2 can be configured with an installed Microsoft GSL 5 (`SEAL_BUILD_DEPS=OFF`, as vcpkg builds it), and 4.7.0 makes the NTT, BFV multiplication and key switching, which a query uses throughout, faster.
 `vcpkg.json` asks for it with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query uses.
-
-If the vcpkg registry does not have Microsoft SEAL 4.7.0, configuring stops with `error: no version database entry for seal at 4.7.0`.
-Supply the port through a vcpkg *overlay*: a directory, not part of this repository, whose `seal` subdirectory is a vcpkg port for Microsoft SEAL 4.7.0.
-Pass the directory to the configure step, either as a CMake variable or in the environment:
-```sh
-cmake --preset linux-release -DVCPKG_OVERLAY_PORTS=/path/to/overlay
-# or
-export VCPKG_OVERLAY_PORTS=/path/to/overlay
-cmake --preset linux-release
-```
-The configure step then reports `Microsoft SEAL: found (4.7.0; zlib: ON, Zstandard: ON)`.
-No overlay is needed when the vcpkg registry has Microsoft SEAL 4.7.0.
+Its `builtin-baseline` is a vcpkg commit with Microsoft SEAL 4.7.0, so the configure step reports `Microsoft SEAL: found (4.7.0; zlib: ON, Zstandard: ON)`.
 
 #### Configuring and building with CMake presets
 
