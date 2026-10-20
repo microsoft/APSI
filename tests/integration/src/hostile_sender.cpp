@@ -1087,20 +1087,18 @@ namespace APSITests {
         VerifyResults(honest, query_result);
     }
 
-    TEST(HostileSenderTests, ProcessResultIgnoresNullPackages)
+    TEST(HostileSenderTests, ProcessResultRefusesNullPackages)
     {
-        // As with OutOfRangeBundleIdxIsIgnored, a behaviour contract rather than a crash
-        // guard. A null part is caught in more than one place -- process_result_part reports
-        // an empty vector for it, and process_result skips any part whose size does not match
-        // -- so it is never dereferenced. This test keeps that agreement from drifting.
+        // A caller driving the channel by hand can easily end up with a null part, because
+        // Channel::receive_result returns nullptr when nothing is available yet. The package it
+        // stands for could hold a match, so process_result and process_result_part refuse it
+        // rather than report the query without it.
         SetUpTestLoggingAndThreads();
 
         PSIParams params = create_params1();
         Receiver receiver(params);
         HonestQuery honest = RunHonestQuery(receiver, params, 1000, 20, 10);
 
-        // A caller driving the channel by hand can easily end up with a null part, because
-        // Channel::receive_result returns nullptr when nothing is available yet.
         vector<ResultPart> rps;
         rps.reserve(honest.packages.size() + 1);
         rps.push_back(nullptr);
@@ -1108,10 +1106,11 @@ namespace APSITests {
             rps.push_back(make_unique<ResultPackage>(rp));
         }
 
-        vector<MatchRecord> query_result;
-        ASSERT_NO_THROW(query_result = receiver.process_result(honest.label_keys, honest.itt, rps));
-
-        VerifyResults(honest, query_result);
+        ASSERT_THROW(
+            (void)receiver.process_result(honest.label_keys, honest.itt, rps), runtime_error);
+        ASSERT_THROW(
+            (void)receiver.process_result_part(honest.label_keys, honest.itt, nullptr),
+            runtime_error);
     }
 
     // The tests below cover what happens when the sender's messages cannot be used at all,

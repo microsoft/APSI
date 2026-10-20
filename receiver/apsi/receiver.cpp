@@ -669,9 +669,10 @@ namespace apsi {
                 return process_tagged_result_part(label_keys, itt, result_part, match_tags);
             }
 
+            // A missing package could hold a match, so it is refused rather than skipped
             if (!result_part) {
                 APSI_LOG_ERROR("Failed to process result: result_part is null");
-                return {};
+                throw runtime_error("result part is null");
             }
 
             // Without match tags every result package has a PSI result. The schema does not require
@@ -860,13 +861,13 @@ namespace apsi {
             vector<MatchRecord> mrs(itt.item_count());
 
             for (const auto &result_part : result) {
-                // With match tags, a package that cannot be a result of this query aborts it
-                check_tagged_result_part(result_part);
-
+                // A missing package could hold a match, so it aborts the query, and with match
+                // tags, so does a package that cannot be a result of this query
                 if (!result_part) {
                     APSI_LOG_ERROR("Failed to process result: result_part is null");
-                    continue;
+                    throw runtime_error("result part is null");
                 }
+                check_tagged_result_part(result_part);
 
                 if (!bundle_idx_in_range(result_part->bundle_idx, params_.bundle_idx_count())) {
                     continue;

@@ -101,10 +101,10 @@ namespace apsi::receiver {
     Receiver::request_query, Receiver::process_result_part, and Receiver::process_result then throw
     std::invalid_argument unless there is a label key for every item. The same functions also throw
     std::runtime_error on a result package that is null or cannot be a result for these parameters.
-    With matching polynomials, a null result package is logged and skipped, as in APSI 1.x, and one
-    without a psi_result throws std::runtime_error. Either way, a lost package could hide a match,
-    so a caller collecting packages itself should treat a failed receive as a failed query, as the
-    simple API does.
+    With matching polynomials, Receiver::process_result_part and Receiver::process_result throw
+    std::runtime_error on a result package that is null or has no psi_result. A lost package could
+    hide a match, so a caller collecting packages itself should treat a failed receive as a failed
+    query, as the simple API does.
     */
     class Receiver {
     public:
@@ -329,8 +329,8 @@ namespace apsi::receiver {
         data, the results for each received ResultPart must be checked. Processing decrypts the
         ciphertexts in result_part, which cannot be processed again.
 
-        Without match tags, a null result_part is logged and yields an empty vector, and one
-        without a PSI result throws std::runtime_error. With parameters that use match tags, an
+        Without match tags, this throws std::runtime_error if result_part is null or has no PSI
+        result. With parameters that use match tags, an
         item matches when the result holds its match tag in the item's slots. Every ciphertext in
         result_part is decrypted either way, and with match tags and labels, the label of every
         queried item at the package's bundle index is decoded and decrypted as well, whether or not
@@ -351,8 +351,8 @@ namespace apsi::receiver {
         two ResultParts both match an item, the first match is kept and an error is logged.
 
         This throws as Receiver::process_result_part does, for any one of the ResultParts, so that
-        a package that cannot be a result aborts the whole query: with match tags, a null or
-        malformed one, and without them, one without a PSI result.
+        a package that cannot be a result aborts the whole query: a null one, and with match tags
+        a malformed one, or without them one without a PSI result.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result(
             const LabelKeyVector &label_keys,
@@ -453,7 +453,7 @@ namespace apsi::receiver {
         /**
         With match tags, throws std::runtime_error, aborting the query, if result_part is null or
         does not have the structure network::ResultPackage::check_tag_structure describes. Does
-        nothing without match tags, where a null package is skipped instead.
+        nothing without match tags.
         */
         void check_tagged_result_part(const ResultPart &result_part) const;
 

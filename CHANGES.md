@@ -12,6 +12,7 @@
 - `SenderDB::set_data` throws `std::logic_error` for a stripped `SenderDB`, and so does `SenderDB::strip` for one that is stripped already. The `SenderDB` constructor that takes an OPRF key throws `std::invalid_argument` for a key of zero, and `SenderDB::Load` refuses a `SenderDB` that is not stripped but holds a key of zero, which APSI 1.1.0 could save after `SenderDB::clear` or `SenderDB::set_data` on a stripped `SenderDB`; such a `SenderDB` must be rebuilt.
 - `network::Channel` has a new virtual member function, `receive_result_for`, so code built against the headers of APSI 1.x must be recompiled.
 - `network::ResultPackage::psi_result` is optional, since results with match tags have none. Code that loads result packages itself should use `network::Channel::receive_result_for`, or the overload of `network::ResultPackage::load` that takes the `PSIParams`.
+- `Receiver::process_result` and `Receiver::process_result_part` throw `std::runtime_error` for a null result package, which they used to skip, as a lost package could hide a match.
 - `network::SenderOperationQuery::load` keeps the ciphertexts of a query serialized, for `sender::Query` to load and check, so code that reads them itself must load them with `SEALObject::extract` and a `seal::SEALContext`. It refuses relinearization keys other than the single key set that `seal::KeyGenerator::create_relin_keys` makes, which is what every APSI receiver sends.
 
 ### Added

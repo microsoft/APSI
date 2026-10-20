@@ -802,8 +802,8 @@ Both `Receiver::process_result_part` and `Receiver::process_result` require the 
 With [match tags](#match-tags), the receiver derives the tags of its items from their label keys, so it needs the `LabelKeyVector` even when the sender's items have no labels.
 `Receiver::request_query`, `Receiver::process_result_part`, and `Receiver::process_result` then throw `std::invalid_argument` unless there is a label key for every item.
 The same functions also throw `std::runtime_error` on a result package that is null or cannot be a result for these parameters.
-With matching polynomials, a null result package is logged and skipped, as in APSI 1.x, and one without a `psi_result` throws `std::runtime_error`.
-Either way, a lost package could hide a match, so a caller collecting packages itself should treat a failed receive as a failed query, as the simple API does.
+With matching polynomials, `Receiver::process_result_part` and `Receiver::process_result` throw `std::runtime_error` on a result package that is null or has no `psi_result`.
+A lost package could hide a match, so a caller collecting packages itself should treat a failed receive as a failed query, as the simple API does.
 
 Note that the advanced API gives you the receive loop, and with it the responsibility the simple API handles on your behalf.
 `network::Channel::receive_response`, `network::Channel::receive_result`, and `network::Channel::receive_result_for` return `nullptr` for two different reasons: nothing has arrived yet, or a message arrived and was rejected.
