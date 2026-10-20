@@ -1421,7 +1421,7 @@ For the same reason, avoid APSI-dependent logging in your own static or global d
 ## Upgrading from APSI 1.x
 
 For parameters without match tags, APSI 2.0 adds only optional fields to the formats of APSI 1.x and older, and the OPRF is unchanged for both methods.
-[CHANGES.md](CHANGES.md) lists every change.
+[CHANGES.md](CHANGES.md) lists the changes.
 The following table shows which receivers and senders work together.
 
 | Receiver | Sender | Result |
