@@ -30,6 +30,9 @@
   - [With Match Tags](#with-match-tags)
   - [Building and Interfaces](#building-and-interfaces)
 - [Building APSI](#building-apsi)
+  - [Requirements](#requirements)
+  - [Installing APSI with vcpkg](#installing-apsi-with-vcpkg)
+  - [Building APSI from Source](#building-apsi-from-source)
 - [Command-Line Interface (CLI)](#command-line-interface-cli)
   - [Common Arguments](#common-arguments)
   - [Receiver](#receiver-1)
@@ -1060,7 +1063,7 @@ The hash functions are seeded identically on every call, so an item's candidate 
 
 `PSIParams::SEALParams` wraps a Microsoft SEAL `seal::EncryptionParameters` object, with the scheme always set to `seal::scheme_type::bfv`.
 [Encryption Parameters](#encryption-parameters) covers what these mean; the Microsoft SEAL [examples](https://github.com/microsoft/SEAL/tree/main/native/examples) cover them in depth.
-`plain_modulus` also drives the false-positive probability, as [False Positives](#false-positives) describes.
+`plain_modulus` also drives the false-positive probability, as [False Positives](#false-positives-1) describes.
 
 Two things about `coeff_modulus` are specific to how APSI uses Microsoft SEAL, and neither is visible from the SEAL examples alone.
 
@@ -1087,7 +1090,7 @@ The item length (in bits) is a product of `felts_per_item` and `floor(log_2(plai
 
 `tag_part_count` selects how APSI decides a match.
 If it is zero, the default, APSI uses matching polynomials as APSI 1.x does.
-`felts_per_item` then has a significant impact on the false-positive probability, as described in [False Positives](#false-positives).
+`felts_per_item` then has a significant impact on the false-positive probability, as described in [False Positives](#false-positives-1).
 The `PSIParams` constructor will verify that the item length is bounded between 80 and 128 bits, and will throw an exception otherwise.
 `felts_per_item` must be at least 2 and can be at most 32.
 Most realistic parameterizations use some number between 4 and 8.
