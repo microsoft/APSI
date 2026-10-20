@@ -82,7 +82,7 @@ namespace apsi {
         poly_modulus_degree, by contrast, enlarges every ciphertext while proportionally reducing
         bundle_idx_count(), leaving the total unchanged, so it is not an inflation this bound need
         reject. The most demanding parameter set in parameters/, 256M-4096.json, is charged
-        18.75 MiB, leaving this bound a factor of more than 27 of headroom. The most demanding set
+        17 MiB, leaving this bound a factor of more than 30 of headroom. The most demanding set
         APSI 1.x shipped, its 16M-11041.json, is charged 33 MiB, a factor of more than 15.
         */
         constexpr static std::uint64_t query_byte_count_max = static_cast<std::uint64_t>(512) << 20;

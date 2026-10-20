@@ -10,12 +10,12 @@
         "tag_part_count": 1
     },
     "query_params": {
-        "ps_low_degree": 46,
-        "query_powers": [ 1, 2, 3, 7, 11, 15, 19, 21, 22, 24, 47, 141, 517, 705, 1504 ]
+        "ps_low_degree": 76,
+        "query_powers": [ 1, 2, 3, 4, 5, 6, 7, 8, 17, 26, 34, 44, 53, 59, 69, 77, 231, 847, 1386 ]
     },
     "seal_params": {
-        "plain_modulus": 17179967489,
+        "plain_modulus": 2147565569,
         "poly_modulus_degree": 8192,
-        "coeff_modulus_bits": [ 55, 43, 43, 43, 20 ]
+        "coeff_modulus_bits": [ 56, 58, 58, 20 ]
     }
 }

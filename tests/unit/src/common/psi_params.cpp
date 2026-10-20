@@ -245,8 +245,8 @@ namespace APSITests {
     TEST(PSIParamsTest, MostDemandingShippedParamsAreAccepted)
     {
         // parameters/256M-4096.json builds the largest query of any parameter set in parameters/:
-        // two bundle indices of fifteen query powers each, at four data primes and a special
-        // prime, which PSIParams charges 18.75 MiB. That is under a twenty-seventh of
+        // two bundle indices of seventeen query powers each, at three data primes and a special
+        // prime, which PSIParams charges 17 MiB. That is under a thirtieth of
         // query_byte_count_max.
         string json = "{"
                       "    \"version\": 2,"
@@ -260,14 +260,14 @@ namespace APSITests {
                       "        \"tag_part_count\": 1"
                       "    },"
                       "    \"query_params\": {"
-                      "        \"ps_low_degree\": 46,"
-                      "        \"query_powers\": [ 1, 2, 3, 7, 11, 15, 19, 21, 22, 24, 47, 141,"
-                      "            517, 705, 1504 ]"
+                      "        \"ps_low_degree\": 65,"
+                      "        \"query_powers\": [ 1, 3, 4, 9, 11, 16, 20, 25, 27, 32, 33, 35, 36,"
+                      "            66, 198, 726, 1188 ]"
                       "    },"
                       "    \"seal_params\": {"
-                      "        \"plain_modulus\": 17179967489,"
+                      "        \"plain_modulus\": 2147565569,"
                       "        \"poly_modulus_degree\": 8192,"
-                      "        \"coeff_modulus_bits\": [ 55, 43, 43, 43, 20 ]"
+                      "        \"coeff_modulus_bits\": [ 56, 58, 58, 28 ]"
                       "    }"
                       "}";
 
@@ -283,8 +283,8 @@ namespace APSITests {
                    p.seal_params().poly_modulus_degree() * p.seal_params().coeff_modulus().size() *
                    sizeof(uint64_t);
         };
-        ASSERT_EQ(static_cast<uint64_t>(19660800), charge(params));
-        ASSERT_LT(charge(params) * 27, PSIParams::query_byte_count_max);
+        ASSERT_EQ(static_cast<uint64_t>(17825792), charge(params));
+        ASSERT_LT(charge(params) * 30, PSIParams::query_byte_count_max);
 
         // And no shipped set is charged more
         namespace fs = std::filesystem;
