@@ -675,7 +675,7 @@ Matching polynomials are also the only choice for receivers of APSI 1.x and olde
 Finally, since a sender answers a query in parallel over its bin bundles, a query against the fewer bin bundles of match tags can take longer on many threads, although it may cost less computation in total.
 The two methods also differ in what a forged response or a curious peer can achieve, as [Trust Model](#trust-model) describes.
 
-Of the sets in [parameters/](parameters/), five labeled ones use matching polynomials: `100K-1-16`, `1M-1-32` and `16M-1-32`, which query a single item, `1M-256-288`, whose labels are long, and `16M-4096-32`, for which matching polynomials take fewer bytes while keeping a full bin bundle small enough for `SenderDB::Load` to read (see [SenderDB](#senderdb)).
+Of the sets in [parameters/](parameters/), four labeled ones use matching polynomials: `100K-1-16`, `1M-1-32` and `16M-1-32`, which query a single item, and `1M-256-288`, whose labels are long.
 All the others use match tags.
 
 ### Trust Model
