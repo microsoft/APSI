@@ -516,52 +516,17 @@ namespace apsi::sender {
         }
 
         /**
-        How SenderDB::save writes the plaintexts with which the sender answers queries.
-        */
-        enum class PlaintextSaveMode : std::uint8_t {
-            /**
-            As the SenderDB holds them. A compressed SenderDB holds bit-packed plaintexts, which
-            Microsoft SEAL older than 4.6 cannot load.
-            */
-            as_stored,
-
-            /**
-            As APSI 1.x saves them: compressed with Zstandard in a compressed SenderDB, and
-            uncompressed otherwise.
-            */
-            apsi_1x
-        };
-
-        /**
-        Writes the SenderDB to a stream, with its plaintexts as it holds them; see
-        PlaintextSaveMode. Throws std::length_error, and writes nothing, if SenderDB::Load might
-        not read what this would write; see the overload taking a PlaintextSaveMode.
-        */
-        std::size_t save(std::ostream &out) const;
-
-        /**
-        Writes the SenderDB to a stream, with its plaintexts in the given mode. With
-        PlaintextSaveMode::apsi_1x, every plaintext is saved again as it is written, compressed with
-        Zstandard if the SenderDB is compressed and uncompressed otherwise, while the SenderDB keeps
-        it as it is, so that the SenderDB is written as APSI 1.x writes it. Software built with
-        Microsoft SEAL 4.1 to 4.3 cannot load it even so, as those versions load only objects that
-        record their own version. A compressed SenderDB loaded from such a file holds its plaintexts
-        compressed with Zstandard, which take longer to load for every query.
-
-        Throws std::logic_error for PlaintextSaveMode::apsi_1x if the parameters use match tags,
-        which APSI 1.x cannot use, and std::invalid_argument if the SenderDB is compressed and
-        Microsoft SEAL was built without Zstandard, or if the mode is not a PlaintextSaveMode.
-        Nothing is written then.
+        Writes the SenderDB to a stream, with its plaintexts as it holds them: a compressed
+        SenderDB holds bit-packed plaintexts, which Microsoft SEAL older than 4.6 cannot load.
 
         SenderDB::Load reads the header, and then each bin bundle, as one buffer of at most
         apsi::util::max_buffer_size bytes, just under 2 GiB. Throws std::length_error, giving the
         size, and writes nothing, if either might take more: a bin bundle, named by its bundle
         index, or the header, which holds the 16-byte HashedItem of every item until SenderDB::strip
         removes them, and so is too large for more than about 134 million items. The check is
-        conservative (see BinBundle::save), more so with PlaintextSaveMode::apsi_1x for a compressed
-        SenderDB, as each plaintext is then taken to be as large as Zstandard could make it.
+        conservative (see BinBundle::save).
         */
-        std::size_t save(std::ostream &out, PlaintextSaveMode mode) const;
+        std::size_t save(std::ostream &out) const;
 
         /**
         Reads the SenderDB from a stream. Throws std::runtime_error for a SenderDB that is not

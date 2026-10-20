@@ -960,9 +960,8 @@ The in-memory compression of a `SenderDB` is a separate feature.
 It bit-packs each plaintext the sender computes with when that saves at least an eighth of its size, and otherwise, as with primes of 56 bits or more, keeps it uncompressed.
 The sender reads the coefficients of an uncompressed plaintext in place rather than loading it, in a compressed `SenderDB` as in an uncompressed one.
 APSI 1.x used Zstandard, which takes several times longer to load, so a query against a compressed `SenderDB` takes less of the sender's CPU time than it did, and with some parameter sets much less, for about the same memory.
-A `SenderDB` loads plaintexts in any mode, but software built with Microsoft SEAL 4.0, 4.4 or 4.5, as APSI 1.x usually is, cannot use a compressed `SenderDB` that APSI 2.0 saves with its plaintexts as it holds them.
+A `SenderDB` loads plaintexts in any mode, but software built with Microsoft SEAL 4.0, 4.4 or 4.5, as APSI 1.x usually is, cannot use a compressed `SenderDB` that APSI 2.0 saves.
 It reads the plaintexts only to answer a query, so it loads such a `SenderDB` without complaint and then fails every query against it, or may even crash.
-To write a `SenderDB` that APSI 1.x can serve, see [With Matching Polynomials](#with-matching-polynomials).
 
 ### Parameter Fingerprints
 
@@ -1442,17 +1441,9 @@ Moving to new parameters means rebuilding the `SenderDB` from the original items
 
 APSI 2.0 writes `PSIParams`, `SenderDB`s, and responses in the format APSI 1.1.0 does, apart from the Microsoft SEAL version recorded in them and the plaintexts of a compressed `SenderDB`, which it bit-packs or keeps uncompressed rather than compressing them with Zstandard (see [Compression](#compression)).
 It loads the `SenderDB`s APSI 1.1.0 saves, except one that is not stripped but holds an OPRF key of zero, which APSI 1.1.0 saves after `SenderDB::clear` or `SenderDB::set_data` on a stripped `SenderDB`, and which must be rebuilt.
-APSI 1.1.0 built with Microsoft SEAL older than 4.6, as it usually is, can serve an uncompressed `SenderDB` that APSI 2.0 saves, but not a compressed one that `SenderDB::save` writes by default, which it loads and then fails every query against.
-
-To write a `SenderDB` that APSI 1.x can serve, pass `SenderDB::PlaintextSaveMode::apsi_1x` to `SenderDB::save`.
-It writes every plaintext as APSI 1.x stores it, compressed with Zstandard if the `SenderDB` is compressed and uncompressed otherwise, without changing the `SenderDB` in memory, so that the `SenderDB` is written as APSI 1.x writes it.
-APSI 1.1.0 built with Microsoft SEAL 4.4.5 answers queries from such a file.
+A compressed `SenderDB` loaded from a file of APSI 1.x keeps its plaintexts compressed with Zstandard, which take several times longer to load for every query than bit-packed ones, until an update makes the plaintexts of a bin bundle again or the `SenderDB` is rebuilt.
+APSI 1.1.0 built with Microsoft SEAL older than 4.6, as it usually is, can serve an uncompressed `SenderDB` that APSI 2.0 saves, but not a compressed one, which it loads and then fails every query against.
 Microsoft SEAL 4.1 to 4.3 load only objects that record their own version, so software built with them cannot load any `SenderDB` that APSI 2.0 saves.
-The mode is refused for parameters with match tags, which APSI 1.x cannot use, and for a compressed `SenderDB` if Microsoft SEAL was built without Zstandard.
-An uncompressed `SenderDB` holds its plaintexts uncompressed, as APSI 1.x does, so the mode writes the same bytes for it as `SenderDB::save`, and APSI 2.0 serves it as fast from either file.
-A compressed `SenderDB` that APSI 2.0 loads from such a file keeps its plaintexts compressed with Zstandard, which take several times longer to load for every query than bit-packed ones, until an update makes the plaintexts of a bin bundle again.
-To serve a compressed `SenderDB` from APSI 2.0, load a file written with `SenderDB::PlaintextSaveMode::as_stored`, which `SenderDB::save` uses by default.
-A deployment that may have to go back to APSI 1.x should therefore also save each compressed `SenderDB` with `SenderDB::PlaintextSaveMode::apsi_1x`.
 
 Serving from APSI 1.x also gives up hardening that APSI 2.0 adds: a sender of APSI 1.x ignores the [fingerprint](#parameter-fingerprints) of a query, so it answers queries created for other parameters of the same shape, and it loads the ciphertexts and relinearization keys of a query before checking them against the parameters.
 A `SenderDB` in which APSI 1.x updated labels may hold stale copies of items, with their old labels, which a query can still match.

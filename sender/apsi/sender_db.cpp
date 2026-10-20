@@ -2530,42 +2530,8 @@ namespace apsi {
 
         size_t SenderDB::save(ostream &out) const
         {
-            return save(out, PlaintextSaveMode::as_stored);
-        }
-
-        size_t SenderDB::save(ostream &out, PlaintextSaveMode mode) const
-        {
-            if ((mode != PlaintextSaveMode::as_stored) && (mode != PlaintextSaveMode::apsi_1x)) {
-                throw invalid_argument("unknown plaintext save mode");
-            }
-
             // Lock the database for reading
             auto lock = get_reader_lock();
-
-            // APSI 1.x cannot use match tags. It stores the plaintexts of a compressed SenderDB
-            // compressed with Zstandard, and those of an uncompressed one uncompressed.
-            optional<compr_mode_type> plaintext_compr_mode;
-            if (mode == PlaintextSaveMode::apsi_1x) {
-                if (params_.uses_tags()) {
-                    APSI_LOG_ERROR(
-                        "Cannot save a SenderDB with match tags as APSI 1.x saves it: APSI 1.x "
-                        "cannot use match tags");
-                    throw logic_error("failed to save SenderDB: the parameters use match tags");
-                }
-                if (compressed_) {
-#ifdef SEAL_USE_ZSTD
-                    plaintext_compr_mode = compr_mode_type::zstd;
-#else
-                    APSI_LOG_ERROR(
-                        "Cannot save a compressed SenderDB as APSI 1.x saves it: Microsoft SEAL "
-                        "was built without Zstandard");
-                    throw invalid_argument(
-                        "failed to save SenderDB: Microsoft SEAL was built without Zstandard");
-#endif
-                } else {
-                    plaintext_compr_mode = compr_mode_type::none;
-                }
-            }
 
             STOPWATCH(sender_stopwatch, "SenderDB::save");
             APSI_LOG_DEBUG("Start saving SenderDB");
@@ -2609,10 +2575,7 @@ namespace apsi {
                 const auto &bundles = bin_bundles_[bundle_idx];
                 for (size_t i = 0; i < bundles.size(); i++) {
                     util::SaveSizeBounds bounds = util::bin_bundle_save_size_bounds(
-                        bundles[i],
-                        static_cast<uint32_t>(bundle_idx),
-                        plaintext_compr_mode,
-                        *seal_context);
+                        bundles[i], static_cast<uint32_t>(bundle_idx), nullopt, *seal_context);
                     if (bounds.upper <= max_size) {
                         continue;
                     }
@@ -2685,9 +2648,7 @@ namespace apsi {
             size_t bin_bundle_data_size = 0;
             for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++) {
                 for (const auto &bb : bin_bundles_[bundle_idx]) {
-                    auto idx = static_cast<uint32_t>(bundle_idx);
-                    size_t size = plaintext_compr_mode ? bb.save(out, idx, *plaintext_compr_mode)
-                                                       : bb.save(out, idx);
+                    size_t size = bb.save(out, static_cast<uint32_t>(bundle_idx));
                     APSI_LOG_DEBUG(
                         "Saved BinBundle at bundle index " << bundle_idx << " (" << size
                                                            << " bytes)");
