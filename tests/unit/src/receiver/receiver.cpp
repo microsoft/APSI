@@ -563,7 +563,7 @@ namespace APSITests {
         {
             return apsi::util::compute_match_tag(
                 key,
-                params.tag_part_count() * params.item_params().felts_per_item,
+                static_cast<size_t>(params.tag_part_count()) * params.item_params().felts_per_item,
                 params.item_bit_count_per_felt());
         }
 

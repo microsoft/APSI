@@ -2109,7 +2109,7 @@ namespace APSITests {
                 hashed_item, params.item_bit_count(), params.seal_params().plain_modulus());
             view.tag = apsi::util::compute_match_tag(
                 label_key,
-                params.tag_part_count() * params.item_params().felts_per_item,
+                static_cast<size_t>(params.tag_part_count()) * params.item_params().felts_per_item,
                 params.item_bit_count_per_felt());
             view.places = places_of(hashed_item, params);
             return view;
@@ -4588,7 +4588,8 @@ namespace APSITests {
         */
         size_t tag_felt_count(const PSIParams &params)
         {
-            return params.tag_part_count() * params.item_params().felts_per_item;
+            return static_cast<size_t>(params.tag_part_count()) *
+                   params.item_params().felts_per_item;
         }
     } // namespace
 
