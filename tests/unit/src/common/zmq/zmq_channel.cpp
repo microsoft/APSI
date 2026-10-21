@@ -3,9 +3,12 @@
 
 // STD
 #include <chrono>
+#include <cstdint>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 // SEAL
 #include "seal/keygenerator.h"
@@ -88,6 +91,22 @@ namespace APSITests {
             }
 
             return context;
+        }
+
+        /**
+        Receives an operation on the channel, waiting for one as long as no receive fails, for at
+        most 30 seconds. Returns null if a receive fails or none arrives in time.
+        */
+        unique_ptr<ZMQSenderOperation> receive_operation_in_time(ZMQSenderChannel &svr)
+        {
+            auto end = chrono::steady_clock::now() + 30s;
+            uint64_t failure_count = svr.receive_failure_count();
+            unique_ptr<ZMQSenderOperation> nsop;
+            while (!(nsop = svr.receive_network_operation(get_context()->seal_context(), true)) &&
+                   (svr.receive_failure_count() == failure_count) &&
+                   (chrono::steady_clock::now() < end)) {
+            }
+            return nsop;
         }
     } // namespace
 
@@ -252,6 +271,54 @@ namespace APSITests {
         unique_ptr<ZMQSenderOperation> honest;
         ASSERT_NO_THROW(
             honest = svr.receive_network_operation(get_context()->seal_context(), true));
+        ASSERT_NE(nullptr, honest);
+        ASSERT_EQ(SenderOperationType::sop_parms, honest->sop->type());
+    }
+
+    TEST_F(ZMQChannelTests, FramesTooShortForASizePrefixAreReportedAsFailure)
+    {
+        // Each frame is read as a size-prefixed buffer. A frame that ends before its size prefix
+        // does holds no message, even if the bytes it holds would read as a size of zero, and is
+        // reported like any other unreadable message.
+        ZMQSenderChannel svr;
+        svr.bind(any_port_bind_address());
+
+        zmq::context_t ctx;
+        zmq::socket_t peer(ctx, zmq::socket_type::dealer);
+        peer.set(zmq::sockopt::linger, 0);
+        peer.connect(connect_address(svr));
+
+        SenderOperationHeader header;
+        header.type = SenderOperationType::sop_parms;
+        stringstream header_ss;
+        header.save(header_ss);
+
+        // An empty or short header, and a valid header with an empty or short operation
+        vector<vector<string>> messages{ { "", "" },
+                                         { string(2, '\0'), "" },
+                                         { header_ss.str(), "" },
+                                         { header_ss.str(), string(3, '\0') } };
+        for (const auto &frames : messages) {
+            zmq::multipart_t msg;
+            for (const auto &frame : frames) {
+                msg.addstr(frame);
+            }
+            ASSERT_TRUE(msg.send(peer));
+
+            uint64_t failures = svr.receive_failure_count();
+            unique_ptr<ZMQSenderOperation> nsop;
+            ASSERT_NO_THROW(nsop = receive_operation_in_time(svr));
+            ASSERT_EQ(nullptr, nsop);
+            ASSERT_EQ(failures + 1, svr.receive_failure_count());
+        }
+
+        // The channel goes on serving
+        ZMQReceiverChannel clt;
+        clt.connect(connect_address(svr));
+        clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
+
+        unique_ptr<ZMQSenderOperation> honest;
+        ASSERT_NO_THROW(honest = receive_operation_in_time(svr));
         ASSERT_NE(nullptr, honest);
         ASSERT_EQ(SenderOperationType::sop_parms, honest->sop->type());
     }
@@ -451,12 +518,14 @@ namespace APSITests {
 
             // Receive two packages
             auto rp = clt.receive_result(get_context()->seal_context());
+            ASSERT_NE(nullptr, rp);
             ASSERT_EQ(0, rp->bundle_idx);
             ASSERT_EQ(0, rp->label_byte_count);
             ASSERT_EQ(0, rp->nonce_byte_count);
             ASSERT_TRUE(rp->label_result.empty());
 
             rp = clt.receive_result(get_context()->seal_context());
+            ASSERT_NE(nullptr, rp);
             ASSERT_EQ(123, rp->bundle_idx);
             ASSERT_EQ(80, rp->label_byte_count);
             ASSERT_EQ(4, rp->nonce_byte_count);
@@ -495,16 +564,19 @@ namespace APSITests {
         // Are we able to extract the relinearization keys?
         ASSERT_NO_THROW(auto rlk = sop_query->relin_keys.extract_if_local());
 
-        // Check for query ciphertexts
+        // Check for query ciphertexts. They are received in serialized form, and loaded only when
+        // they are extracted.
         ASSERT_EQ(2, sop_query->data.size());
 
         ASSERT_FALSE(sop_query->data.at(0).empty());
         ASSERT_EQ(1, sop_query->data[0].size());
-        auto query_ct0 = sop_query->data[0][0].extract_if_local();
+        ASSERT_TRUE(sop_query->data[0][0].is_serialized());
+        auto query_ct0 = sop_query->data[0][0].extract(get_context()->seal_context());
 
         ASSERT_FALSE(sop_query->data.at(123).empty());
         ASSERT_EQ(1, sop_query->data[123].size());
-        auto query_ct123 = sop_query->data[123][0].extract_if_local();
+        ASSERT_TRUE(sop_query->data[123][0].is_serialized());
+        auto query_ct123 = sop_query->data[123][0].extract(get_context()->seal_context());
 
         // Create a parms response
         auto rsop_parms = make_unique<SenderOperationResponseParms>();
@@ -545,7 +617,11 @@ namespace APSITests {
         nrsop->sop_response = std::move(rsop_query);
         svr.send(std::move(nrsop));
 
-        // Finally send two ZMQResultPackages
+        // Finally send two ZMQResultPackages. The query ciphertexts stand in for results, so they
+        // are taken to the last level of the modulus chain, where a sender's results are.
+        auto last_parms_id = get_context()->seal_context()->last_parms_id();
+        get_context()->evaluator()->mod_switch_to_inplace(query_ct0, last_parms_id);
+        get_context()->evaluator()->mod_switch_to_inplace(query_ct123, last_parms_id);
         auto rp = make_unique<ResultPackage>();
         rp->bundle_idx = 0;
         rp->label_byte_count = 0;
@@ -566,6 +642,82 @@ namespace APSITests {
         nrp->client_id = std::move(client_id);
         nrp->rp = std::move(rp);
         svr.send(std::move(nrp));
+
+        clientth.join();
+    }
+
+    TEST_F(ZMQChannelTests, ReceiveResultForChecksTheStructureOfTagResults)
+    {
+        ZMQSenderChannel svr;
+        ZMQReceiverChannel clt;
+
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
+
+        // Parameters with match tags and the same encryption parameters as get_params: three tag
+        // parts, one field element per item
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 1;
+        item_params.tag_part_count = 3;
+        PSIParams::TableParams table_params = get_params()->table_params();
+        table_params.table_size = 4096;
+        PSIParams tag_params(
+            item_params, table_params, get_params()->query_params(), get_params()->seal_params());
+
+        // A package, or null once a receive has failed or none has arrived in 30 seconds
+        auto receive = [&clt](const PSIParams &params) {
+            auto end = chrono::steady_clock::now() + 30s;
+            unique_ptr<ResultPackage> rp;
+            while (!(rp = clt.receive_result_for(get_context()->seal_context(), params)) &&
+                   !clt.receive_failed() && (chrono::steady_clock::now() < end)) {
+                this_thread::sleep_for(10ms);
+            }
+            return rp;
+        };
+
+        thread clientth([&] {
+            this_thread::sleep_for(50ms);
+
+            // Let the server know where to send the packages
+            clt.send(make_unique<SenderOperationParms>());
+
+            // A package with the structure the parameters call for is received, and one with a
+            // PSI result, which parameters with match tags rule out, is a failed receive
+            auto rp = receive(tag_params);
+            ASSERT_NE(nullptr, rp);
+            ASSERT_EQ(3, rp->label_result.size());
+            ASSERT_FALSE(clt.receive_failed());
+
+            ASSERT_EQ(nullptr, receive(tag_params));
+            ASSERT_TRUE(clt.receive_failed());
+        });
+
+        // The server's part returns early if an assertion fails, and the client then stops
+        // waiting within its deadline, so that the client thread is joined on every path
+        auto serve = [&] {
+            auto nsop = receive_operation_in_time(svr);
+            ASSERT_NE(nullptr, nsop);
+            ASSERT_EQ(SenderOperationType::sop_parms, nsop->sop->type());
+            auto client_id = nsop->client_id;
+
+            Ciphertext ct;
+            get_context()->encryptor()->encrypt_zero_symmetric(
+                get_context()->seal_context()->last_parms_id(), ct);
+            for (bool with_psi_result : { false, true }) {
+                auto rp = make_unique<ResultPackage>();
+                if (with_psi_result) {
+                    rp->psi_result = ct;
+                }
+                for (int i = 0; i < 3; i++) {
+                    rp->label_result.emplace_back(ct);
+                }
+                auto nrp = make_unique<ZMQResultPackage>();
+                nrp->client_id = client_id;
+                nrp->rp = std::move(rp);
+                svr.send(std::move(nrp));
+            }
+        };
+        serve();
 
         clientth.join();
     }

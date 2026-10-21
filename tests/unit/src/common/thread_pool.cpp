@@ -414,6 +414,29 @@ namespace APSITests {
         ASSERT_EQ(42, fut.get());
     }
 
+    TEST(ThreadPoolTests, PoolWorkersAreIdentifiedAsSuch)
+    {
+        // The nested-use guard rests on a pool being able to recognize its own workers, and on
+        // not mistaking another pool's. Waiting on a different pool from a worker is safe, so
+        // confusing the two would either miss real deadlocks or reject sound code.
+        ThreadPool pool_a(1);
+        ThreadPool pool_b(1);
+
+        ASSERT_FALSE(pool_a.is_worker_thread());
+        ASSERT_FALSE(pool_b.is_worker_thread());
+
+        auto from_a = pool_a.enqueue([&pool_a, &pool_b] {
+            return make_pair(pool_a.is_worker_thread(), pool_b.is_worker_thread());
+        });
+
+        auto seen = from_a.get();
+        ASSERT_TRUE(seen.first);   // its own pool
+        ASSERT_FALSE(seen.second); // an unrelated pool
+
+        // The marker must not outlive the worker: this thread never becomes a worker.
+        ASSERT_FALSE(pool_a.is_worker_thread());
+    }
+
     TEST(ThreadPoolMgrTests, IsNeitherCopyableNorMovable)
     {
         // A copy takes no reference on the shared pool but its destructor releases one, so the

@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 1.1.0 LANGUAGES CXX C)
+project(APSI VERSION 2.0.0 LANGUAGES CXX C)
 
 # This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
 cmake_policy(SET CMP0077 NEW)
@@ -121,7 +121,7 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 # Microsoft SEAL
 # The version range is checked here rather than passed to find_package, because SEAL installs a
 # SameMinorVersion config file that would reject any minor version other than its own.
-set(APSI_SEAL_MINIMUM_VERSION 4.4.5)
+set(APSI_SEAL_MINIMUM_VERSION 4.7.0)
 set(APSI_SEAL_MAXIMUM_VERSION_EXCLUSIVE 5.0.0)
 find_package(SEAL CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)
@@ -132,7 +132,8 @@ elseif(SEAL_VERSION VERSION_LESS APSI_SEAL_MINIMUM_VERSION
         "Microsoft SEAL: found ${SEAL_VERSION}, but APSI requires at least "
         "${APSI_SEAL_MINIMUM_VERSION} and older than ${APSI_SEAL_MAXIMUM_VERSION_EXCLUSIVE}")
 else()
-    message(STATUS "Microsoft SEAL: found (${SEAL_VERSION})")
+    message(STATUS "Microsoft SEAL: found (${SEAL_VERSION}; zlib: ${SEAL_USE_ZLIB}, "
+                   "Zstandard: ${SEAL_USE_ZSTD})")
 endif()
 
 # Microsoft GSL
@@ -342,6 +343,15 @@ elseif(APSI_FOURQ_ARM64 AND UNIX)
     message(STATUS "FourQlib optimization: arch=ARM64")
 else()
     target_compile_options(apsi PRIVATE -D_GENERIC_)
+    # FourQ.h takes the word size from an architecture macro even for the generic arithmetic,
+    # which uses nothing else of it. Where none was set above, set the one for the pointer size.
+    if(NOT APSI_FOURQ_ARM64 AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL x86)
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            target_compile_options(apsi PRIVATE -D_AMD64_)
+        else()
+            target_compile_options(apsi PRIVATE -D_X86_)
+        endif()
+    endif()
     message(STATUS "FourQlib optimization: arch=GENERIC")
 endif()
 

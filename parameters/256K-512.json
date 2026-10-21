@@ -1,19 +1,21 @@
 {
+    "version": 2,
     "table_params": {
         "hash_func_count": 3,
-        "table_size": 819,
-        "max_items_per_bin": 64
+        "table_size": 4096,
+        "max_items_per_bin": 62
     },
     "item_params": {
-        "felts_per_item": 5
+        "felts_per_item": 1,
+        "tag_part_count": 3
     },
     "query_params": {
         "ps_low_degree": 0,
         "query_powers": [ 1, 3, 4, 9, 11, 16, 21, 23, 28, 29, 31, 32 ]
     },
     "seal_params": {
-        "plain_modulus": 147457,
+        "plain_modulus": 270337,
         "poly_modulus_degree": 4096,
-        "coeff_modulus_bits": [ 40, 40, 24 ]
+        "coeff_modulus_bits": [ 40, 42, 20 ]
     }
 }

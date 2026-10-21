@@ -8,6 +8,7 @@
 #include <vector>
 
 // APSI
+#include "apsi/item.h"
 #include "apsi/util/db_encoding.h"
 
 // SEAL
@@ -161,5 +162,105 @@ namespace APSITests {
                     static_cast<char>(bs.data()[idx]), static_cast<char>(back_bs.data()[idx]));
             }
         }
+    }
+
+    TEST(DbEncodingTests, FieldEltsToBitsTakesOnlyTheLowBitsOfEachFieldElement)
+    {
+        // Each field element contributes its low bits_per_felt bits, in order, and nothing else:
+        // not its higher bits, which a decrypted value can have, and nothing past bit_count in the
+        // last byte. Every bit position within a byte, and every way the bits of a field element
+        // can fall across byte boundaries, is covered by going through bits_per_felt from 1 to 20
+        // and every bit_count the field elements allow.
+        mt19937_64 rng(1);
+        for (uint32_t bits_per_felt = 1; bits_per_felt <= 20; bits_per_felt++) {
+            Modulus mod((uint64_t(1) << bits_per_felt) + 1);
+            uniform_int_distribution<felt_t> felt_dist(0, mod.value() - 1);
+            for (uint32_t felt_count = 1; felt_count <= 5; felt_count++) {
+                uint32_t min_bit_count = ((felt_count - 1) * bits_per_felt) + 1;
+                uint32_t max_bit_count = felt_count * bits_per_felt;
+                for (uint32_t bit_count = min_bit_count; bit_count <= max_bit_count; bit_count++) {
+                    for (int rep = 0; rep < 4; rep++) {
+                        vector<felt_t> felts(felt_count);
+                        for (auto &felt : felts) {
+                            felt = felt_dist(rng);
+                        }
+
+                        vector<unsigned char> expected((bit_count + 7) / 8, 0);
+                        for (uint32_t bit_idx = 0; bit_idx < bit_count; bit_idx++) {
+                            felt_t bit =
+                                (felts[bit_idx / bits_per_felt] >> (bit_idx % bits_per_felt)) & 1;
+                            expected[bit_idx / 8] |=
+                                static_cast<unsigned char>(bit << (bit_idx % 8));
+                        }
+
+                        Bitstring bits = field_elts_to_bits(felts, bit_count, mod);
+                        ASSERT_EQ(bit_count, bits.bit_count());
+                        ASSERT_EQ(expected, bits.release())
+                            << "bits_per_felt " << bits_per_felt << ", bit_count " << bit_count;
+                    }
+                }
+            }
+        }
+    }
+
+    TEST(DbEncodingTests, AlgebraizeItemTagLabel)
+    {
+        Modulus mod(65537);
+        HashedItem item(0x0123456789abcdefULL, 0xfedcba9876543210ULL);
+
+        // Two field elements of 16 bits per item and a tag of three parts, in the part-major
+        // layout of compute_match_tag: part p in slot s is tag[p * 2 + s]
+        size_t item_bit_count = 32;
+        size_t felts_per_item = 2;
+        size_t tag_part_count = 3;
+        vector<felt_t> tag{ 11, 12, 21, 22, 31, 32 };
+        AlgItem alg_item = algebraize_item(item, item_bit_count, mod);
+        ASSERT_EQ(felts_per_item, alg_item.size());
+
+        // Without a label, the label parts are the tag parts alone
+        AlgItemLabel unlabeled = algebraize_item_tag_label(item, tag, {}, item_bit_count, mod);
+        ASSERT_EQ(felts_per_item, unlabeled.size());
+        for (size_t s = 0; s < felts_per_item; s++) {
+            ASSERT_EQ(alg_item[s], unlabeled[s].first);
+            ASSERT_EQ(tag_part_count, unlabeled[s].second.size());
+            for (size_t p = 0; p < tag_part_count; p++) {
+                ASSERT_EQ(tag[(p * felts_per_item) + s], unlabeled[s].second[p]);
+            }
+        }
+
+        // With one, the parts of the label follow the tag parts, exactly as algebraize_item_label
+        // lays them out
+        for (size_t label_byte_count : { 1U, 4U, 5U, 13U }) {
+            EncryptedLabel label(label_byte_count);
+            for (size_t i = 0; i < label_byte_count; i++) {
+                label[i] = static_cast<unsigned char>(0x5a + 17 * i);
+            }
+            AlgItemLabel expected_label = algebraize_item_label(item, label, item_bit_count, mod);
+            AlgItemLabel labeled = algebraize_item_tag_label(item, tag, label, item_bit_count, mod);
+            ASSERT_EQ(felts_per_item, labeled.size());
+            for (size_t s = 0; s < felts_per_item; s++) {
+                ASSERT_EQ(alg_item[s], labeled[s].first);
+                size_t label_part_count = expected_label[s].second.size();
+                ASSERT_EQ(tag_part_count + label_part_count, labeled[s].second.size());
+                for (size_t p = 0; p < tag_part_count; p++) {
+                    ASSERT_EQ(tag[(p * felts_per_item) + s], labeled[s].second[p]);
+                }
+                for (size_t p = 0; p < label_part_count; p++) {
+                    ASSERT_EQ(expected_label[s].second[p], labeled[s].second[tag_part_count + p]);
+                }
+            }
+        }
+
+        // The tag must have a whole number of parts, and at least one
+        ASSERT_THROW(
+            algebraize_item_tag_label(item, {}, {}, item_bit_count, mod), invalid_argument);
+        vector<felt_t> ragged_tag{ 1, 2, 3 };
+        ASSERT_THROW(
+            algebraize_item_tag_label(item, ragged_tag, {}, item_bit_count, mod), invalid_argument);
+
+        // One field element per item takes a tag of any length
+        AlgItemLabel one_felt = algebraize_item_tag_label(item, ragged_tag, {}, 16, mod);
+        ASSERT_EQ(1, one_felt.size());
+        ASSERT_EQ(ragged_tag, one_felt[0].second);
     }
 } // namespace APSITests

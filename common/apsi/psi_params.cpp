@@ -4,9 +4,12 @@
 // STD
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
 // APSI
 #include "apsi/log.h"
@@ -18,6 +21,7 @@
 // SEAL
 #include "seal/context.h"
 #include "seal/modulus.h"
+#include "seal/util/blake2.h"
 #include "seal/util/common.h"
 #include "seal/util/defines.h"
 
@@ -32,7 +36,7 @@ using namespace seal::util;
 
 #ifndef APSI_DISABLE_JSON
 namespace {
-    const Json::Value &get_non_null_json_value(const Json::Value &parent, const string &name)
+    const Json::Value &get_non_null_json_value(const Json::Value &parent, const char *name)
     {
         const auto &value = parent[name];
         if (value.isNull()) {
@@ -55,13 +59,13 @@ namespace {
         return value.asUInt();
     }
 
-    uint32_t json_value_ui32(const Json::Value &parent, const string &name)
+    uint32_t json_value_ui32(const Json::Value &parent, const char *name)
     {
         const auto &value = get_non_null_json_value(parent, name);
         return json_value_ui32(value);
     }
 
-    uint64_t json_value_ui64(const Json::Value &parent, const string &name)
+    uint64_t json_value_ui64(const Json::Value &parent, const char *name)
     {
         const auto &value = get_non_null_json_value(parent, name);
 
@@ -85,7 +89,7 @@ namespace {
         return value.asInt();
     }
 
-    int json_value_int(const Json::Value &parent, const string &name)
+    int json_value_int(const Json::Value &parent, const char *name)
     {
         const auto &value = get_non_null_json_value(parent, name);
         return json_value_int(value);
@@ -113,7 +117,15 @@ namespace apsi {
             table_params_.hash_func_count > TableParams::hash_func_count_max) {
             throw invalid_argument("hash_func_count is too large or too small");
         }
-        if (item_params_.felts_per_item < ItemParams::felts_per_item_min ||
+        if (item_params_.tag_part_count > ItemParams::tag_part_count_max) {
+            throw invalid_argument("tag_part_count is too large");
+        }
+
+        // Match tags, not the item bits, decide whether an item matches, so an item may then be a
+        // single field element
+        uint32_t felts_per_item_min =
+            uses_tags() ? ItemParams::felts_per_item_min_with_tags : ItemParams::felts_per_item_min;
+        if (item_params_.felts_per_item < felts_per_item_min ||
             item_params_.felts_per_item > ItemParams::felts_per_item_max) {
             throw invalid_argument("felts_per_item is too large or too small");
         }
@@ -165,7 +177,30 @@ namespace apsi {
             static_cast<uint32_t>(seal_params_.plain_modulus().bit_count() - 1);
         item_bit_count_ = item_bit_count_per_felt_ * item_params_.felts_per_item;
 
-        if (item_bit_count_ < item_bit_count_min || item_bit_count_ > item_bit_count_max) {
+        if (uses_tags()) {
+            if (item_bit_count_ < item_bit_count_min_with_tags ||
+                item_bit_count_ > item_bit_count_max) {
+                throw invalid_argument(
+                    "parameters result in too large or too small item_bit_count");
+            }
+
+            // Both factors are bounded above, so this cannot overflow
+            tag_bit_count_ = item_params_.tag_part_count * item_bit_count_;
+            if (tag_bit_count_ < tag_bit_count_min) {
+                throw invalid_argument("parameters result in too small tag_bit_count");
+            }
+
+            // A bin may hold max_items_per_bin items, and its label polynomials interpolate
+            // through their field elements, which must therefore be distinct; there are only
+            // 2^item_bit_count_per_felt of them. The plain modulus has at most 61 bits, so the
+            // shift cannot overflow.
+            if (table_params_.max_items_per_bin >
+                (static_cast<uint64_t>(1) << item_bit_count_per_felt_)) {
+                throw invalid_argument(
+                    "max_items_per_bin cannot be larger than 2^item_bit_count_per_felt with match "
+                    "tags");
+            }
+        } else if (item_bit_count_ < item_bit_count_min || item_bit_count_ > item_bit_count_max) {
             throw invalid_argument("parameters result in too large or too small item_bit_count");
         }
 
@@ -237,11 +272,19 @@ namespace apsi {
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
-        psi_params_builder.add_version(apsi_serialization_version);
+
+        // Parameters without match tags must serialize exactly as in APSI 1.x, so they leave the
+        // tag part count out. A version only APSI 2.0 and later accept marks the parameters that
+        // use match tags; see tag_serialization_version.
+        psi_params_builder.add_version(
+            uses_tags() ? tag_serialization_version : apsi_serialization_version);
         psi_params_builder.add_item_params(&item_params);
         psi_params_builder.add_table_params(&table_params);
         psi_params_builder.add_query_params(query_params);
         psi_params_builder.add_seal_params(seal_params);
+        if (uses_tags()) {
+            psi_params_builder.add_tag_part_count(item_params_.tag_part_count);
+        }
         auto psi_params = psi_params_builder.Finish();
         fbs_builder.FinishSizePrefixed(psi_params);
 
@@ -250,6 +293,64 @@ namespace apsi {
             safe_cast<streamsize>(fbs_builder.GetSize()));
 
         return fbs_builder.GetSize();
+    }
+
+    PSIParams::Fingerprint PSIParams::fingerprint() const
+    {
+        // Hash the canonical encoding the declaration describes. Senders and receivers of other
+        // versions must compute the same fingerprint, so changing the encoding needs a new domain.
+        vector<unsigned char> bytes;
+        auto append_le = [&bytes](uint64_t value, size_t byte_count) {
+            for (size_t i = 0; i < byte_count; i++) {
+                bytes.push_back(static_cast<unsigned char>(value >> (8 * i)));
+            }
+        };
+        auto append_u8 = [&append_le](uint8_t value) {
+            append_le(value, 1);
+        };
+        auto append_u32 = [&append_le](uint32_t value) {
+            append_le(value, 4);
+        };
+        auto append_u64 = [&append_le](uint64_t value) {
+            append_le(value, 8);
+        };
+
+        // The domain, without a terminating null
+        static constexpr string_view domain = "apsi.params.fingerprint.v1";
+        bytes.insert(bytes.end(), domain.begin(), domain.end());
+
+        // The format version and the item parameters; tag_part_count is 0 without match tags
+        append_u32(uses_tags() ? tag_serialization_version : apsi_serialization_version);
+        append_u32(item_params_.felts_per_item);
+        append_u32(item_params_.tag_part_count);
+
+        // The table parameters
+        append_u32(table_params_.table_size);
+        append_u32(table_params_.max_items_per_bin);
+        append_u32(table_params_.hash_func_count);
+
+        // The query parameters, with the powers in increasing order, as the set holds them
+        append_u32(query_params_.ps_low_degree);
+        append_u32(safe_cast<uint32_t>(query_params_.query_powers.size()));
+        for (uint32_t power : query_params_.query_powers) {
+            append_u32(power);
+        }
+
+        // The Microsoft SEAL parameters
+        append_u8(static_cast<uint8_t>(seal_params_.scheme()));
+        append_u64(safe_cast<uint64_t>(seal_params_.poly_modulus_degree()));
+        append_u64(seal_params_.plain_modulus().value());
+        append_u32(safe_cast<uint32_t>(seal_params_.coeff_modulus().size()));
+        for (const auto &prime : seal_params_.coeff_modulus()) {
+            append_u64(prime.value());
+        }
+
+        Fingerprint result{};
+        if (APSI_blake2b(result.data(), result.size(), bytes.data(), bytes.size(), nullptr, 0)) {
+            throw runtime_error("blake2b failed");
+        }
+
+        return result;
     }
 
     pair<PSIParams, size_t> PSIParams::Load(istream &in)
@@ -265,14 +366,30 @@ namespace apsi {
 
         const auto *psi_params = fbs::GetSizePrefixedPSIParams(in_data.data());
 
-        if (!same_serialization_version(psi_params->version())) {
+        // Parameters without match tags carry apsi_serialization_version and no tag part count;
+        // parameters with match tags carry tag_serialization_version and a non-zero tag part
+        // count. A buffer must be one or the other: in particular, version 1 with a tag part
+        // count is refused rather than read as either kind, since APSI 1.x would read it as
+        // parameters without them.
+        uint32_t version = psi_params->version();
+        uint32_t tag_part_count = psi_params->tag_part_count();
+        if (!same_serialization_version(version) && (version != tag_serialization_version)) {
             // Check that the serialization version numbers match
             APSI_LOG_ERROR(
                 "Loaded PSIParams data indicates a serialization version number ("
-                << psi_params->version()
-                << ") incompatible with the current serialization version number ("
-                << apsi_serialization_version << ")");
+                << version << ") incompatible with the current serialization version numbers ("
+                << apsi_serialization_version << " without match tags and "
+                << tag_serialization_version << " with them)");
             throw runtime_error("failed to load parameters: incompatible serialization version");
+        }
+        if ((version == tag_serialization_version) != (tag_part_count != 0)) {
+            APSI_LOG_ERROR(
+                "Loaded PSIParams data indicates a serialization version number ("
+                << version << ") that does not match its tag part count (" << tag_part_count
+                << "); parameters with match tags must have version " << tag_serialization_version
+                << " and parameters without them version " << apsi_serialization_version);
+            throw runtime_error(
+                "failed to load parameters: serialization version does not match tag part count");
         }
 
         // The schema marks each of these required, so a buffer reaching this point has already
@@ -289,6 +406,7 @@ namespace apsi {
 
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = psi_params->item_params()->felts_per_item();
+        item_params.tag_part_count = tag_part_count;
 
         PSIParams::TableParams table_params;
         table_params.table_size = psi_params->table_params()->table_size();
@@ -353,18 +471,23 @@ namespace apsi {
         stringstream ss(in);
         ss >> root;
 
-        // A parameter file may name the serialization version it was written for. The key is
-        // optional, so that a file written before it existed still loads, but a file that names
-        // a version this build does not implement is refused here rather than at the first
-        // exchange with a peer, where the mismatch would otherwise first appear.
+        // A parameter file may name the version of the serialized parameters it describes. The key
+        // is optional for parameters without match tags, as the parameter files of APSI 1.x leave
+        // it out, but a file that names a version this build does not implement is refused here
+        // rather than at the first exchange with a peer, where the mismatch would otherwise first
+        // appear. Whether the version agrees with the tag part count is checked once item_params
+        // has been read.
         const auto &json_version = root["version"];
-        if (!json_version.isNull()) {
-            uint32_t version = json_value_ui32(json_version);
-            if (!same_serialization_version(version)) {
+        bool has_version = !json_version.isNull();
+        uint32_t version = 0;
+        if (has_version) {
+            version = json_value_ui32(json_version);
+            if (!same_serialization_version(version) && (version != tag_serialization_version)) {
                 stringstream err;
                 err << "parameters are written for serialization version " << version
-                    << ", which is incompatible with the serialization version this build "
-                    << "implements (" << apsi_serialization_version << ")";
+                    << ", which is incompatible with the serialization versions this build "
+                    << "implements (" << apsi_serialization_version << " without match tags and "
+                    << tag_serialization_version << " with them)";
                 throw runtime_error(err.str());
             }
         }
@@ -387,9 +510,33 @@ namespace apsi {
         try {
             const auto &json_item_params = get_non_null_json_value(root, "item_params");
             item_params.felts_per_item = json_value_ui32(json_item_params, "felts_per_item");
+
+            // Optional: leaving it out, or setting it to zero, selects parameters without match
+            // tags
+            const auto &json_tag_part_count = json_item_params["tag_part_count"];
+            if (!json_tag_part_count.isNull()) {
+                item_params.tag_part_count = json_value_ui32(json_tag_part_count);
+            }
         } catch (const exception &ex) {
             APSI_LOG_ERROR("Failed to load item_params from JSON string: " << ex.what());
             throw;
+        }
+
+        // A file with match tags must name tag_serialization_version, and a file without them must
+        // not; see the declaration for why
+        bool tag_version = has_version && (version == tag_serialization_version);
+        if (tag_version != (item_params.tag_part_count != 0)) {
+            stringstream err;
+            err << "parameters with tag_part_count " << item_params.tag_part_count;
+            if (has_version) {
+                err << " name serialization version " << version;
+            } else {
+                err << " name no serialization version";
+            }
+            err << "; parameters with match tags must name version " << tag_serialization_version
+                << " and parameters without them version " << apsi_serialization_version
+                << " or none";
+            throw runtime_error(err.str());
         }
 
         // Load QueryParams
@@ -462,8 +609,14 @@ namespace apsi {
     string PSIParams::to_string() const
     {
         stringstream ss;
-        ss << "item_params.felts_per_item: " << item_params_.felts_per_item
-           << "; table_params.table_size: " << table_params_.table_size
+        ss << "item_params.felts_per_item: " << item_params_.felts_per_item;
+
+        // Parameters without match tags describe themselves exactly as in APSI 1.x
+        if (uses_tags()) {
+            ss << "; item_params.tag_part_count: " << item_params_.tag_part_count;
+        }
+
+        ss << "; table_params.table_size: " << table_params_.table_size
            << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
            << "; table_params.hash_func_count: " << table_params_.hash_func_count
            << "; query_params.ps_low_degree: " << query_params_.ps_low_degree

@@ -5,8 +5,10 @@
 
 // STD
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -103,14 +105,28 @@ namespace apsi::util {
     This function reads a given number of bytes from a stream in small parts, writing the result
     to the end of a given vector. This can avoid issues where a large number of bytes is
     requested incorrectly to be read from a stream, causing a larger than necessary memory
-    allocation.
+    allocation. Throws std::runtime_error if the stream ends before byte_count bytes have been
+    read.
     */
     void read_from_stream(
         std::istream &in, std::uint32_t byte_count, std::vector<unsigned char> &destination);
 
     /**
+    The size in bytes of the largest buffer, with its four-byte size prefix, that read_from_stream
+    reads: INT32_MAX - 1, just under 2 GiB. The FlatBuffers verifier accepts only a buffer smaller
+    than FLATBUFFERS_MAX_BUFFER_SIZE, which is INT32_MAX. A size-prefixed FlatBuffer any larger
+    cannot be loaded, and sender::SenderDB::save and sender::BinBundle::save refuse to write one.
+    */
+    // NOLINTBEGIN(readability-redundant-parentheses): windows.h defines max
+    constexpr std::size_t max_buffer_size =
+        static_cast<std::size_t>((std::numeric_limits<std::int32_t>::max)()) - 1;
+    // NOLINTEND(readability-redundant-parentheses)
+
+    /**
     This function reads a size-prefixed number of bytes from a stream and returns the result in
-    a vector.
+    a vector. Throws std::runtime_error if the stream ends before the size prefix or the bytes
+    it announces have been read in full, or if the bytes with their size prefix would make a
+    buffer larger than max_buffer_size.
     */
     std::vector<unsigned char> read_from_stream(std::istream &in);
 

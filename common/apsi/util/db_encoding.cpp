@@ -2,7 +2,9 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
 #include <array>
+#include <iterator>
 #include <stdexcept>
 
 // APSI
@@ -170,10 +172,10 @@ namespace apsi::util {
                 uint32_t dest_begin = dest_bit_offset >> 3U;
                 uint32_t dest_offset = dest_bit_offset & 7U;
                 uint32_t src_offset = src_bit_offset & 7U;
-                uint32_t high_diff = src_offset + diff - 8U;
                 unsigned char &dest_val = dest[dest_begin];
 
-                if (high_diff <= 0) {
+                // The diff bits either all lie in src[src_begin] or continue into the next byte
+                if (src_offset + diff <= 8U) {
                     unsigned char mask =
                         static_cast<unsigned char>((static_cast<uint32_t>(1) << diff) - 1);
                     unsigned char mid = static_cast<unsigned char>(
@@ -187,6 +189,7 @@ namespace apsi::util {
                         (static_cast<uint32_t>(dest_val) & static_cast<uint32_t>(mask)) |
                         static_cast<uint32_t>(mid));
                 } else {
+                    uint32_t high_diff = src_offset + diff - 8U;
                     uint32_t low_diff = diff - high_diff;
 
                     unsigned char low_mask =
@@ -371,6 +374,50 @@ namespace apsi::util {
         BitstringView<const unsigned char> item_bsw(
             item.value().data(), safe_cast<uint32_t>(item_bit_count));
         return bits_to_field_elts(item_bsw, mod);
+    }
+
+    AlgItemLabel algebraize_item_tag_label(
+        const HashedItem &item,
+        gsl::span<const felt_t> tag,
+        const EncryptedLabel &encrypted_label,
+        size_t item_bit_count,
+        const Modulus &mod)
+    {
+        // The item and, if there is one, the encrypted label are converted exactly as they are
+        // without match tags, so that the label parts following the tag parts are laid out as the
+        // receiver expects labels to be
+        AlgItemLabel ret;
+        if (encrypted_label.empty()) {
+            AlgItem alg_item = algebraize_item(item, item_bit_count, mod);
+            ret.reserve(alg_item.size());
+            for (felt_t felt : alg_item) {
+                ret.emplace_back(felt, vector<felt_t>());
+            }
+        } else {
+            ret = algebraize_item_label(item, encrypted_label, item_bit_count, mod);
+        }
+
+        size_t felts_per_item = ret.size();
+        if (tag.empty() || (tag.size() % felts_per_item)) {
+            throw invalid_argument("tag size must be a non-zero multiple of felts per item");
+        }
+        size_t tag_part_count = tag.size() / felts_per_item;
+
+        // Put the tag parts first. Part p of the tag in slot s is tag[p * felts_per_item + s].
+        for (size_t felt_item_idx = 0; felt_item_idx < felts_per_item; felt_item_idx++) {
+            vector<felt_t> label_parts;
+            label_parts.reserve(add_safe(tag_part_count, ret[felt_item_idx].second.size()));
+            for (size_t tag_idx = 0; tag_idx < tag_part_count; tag_idx++) {
+                label_parts.push_back(tag[(felts_per_item * tag_idx) + felt_item_idx]);
+            }
+            copy(
+                ret[felt_item_idx].second.cbegin(),
+                ret[felt_item_idx].second.cend(),
+                back_inserter(label_parts));
+            ret[felt_item_idx].second = std::move(label_parts);
+        }
+
+        return ret;
     }
 
     HashedItem dealgebraize_item(const AlgItem &item, size_t item_bit_count, const Modulus &mod)

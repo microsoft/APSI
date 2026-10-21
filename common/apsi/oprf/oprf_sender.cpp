@@ -3,12 +3,14 @@
 
 // STD
 #include <array>
+#include <tuple>
 
 // APSI
 #include "apsi/log.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/match_tag.h"
 #include "apsi/util/stopwatch.h"
 #include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
@@ -162,6 +164,22 @@ namespace apsi::oprf {
         return get_item_hash(item, oprf_key);
     }
 
+    namespace {
+        /**
+        Throws std::invalid_argument if a label is longer than label_byte_count. util::encrypt_label
+        would truncate it, and the receiver cannot tell a truncated label from a correct one.
+        */
+        void check_label_sizes(
+            const gsl::span<const pair<Item, Label>> &item_labels, size_t label_byte_count)
+        {
+            for (const auto &item_label : item_labels) {
+                if (item_label.second.size() > label_byte_count) {
+                    throw invalid_argument("a label is longer than label_byte_count");
+                }
+            }
+        }
+    } // namespace
+
     vector<HashedItem> OPRFSender::ComputeHashes(
         const gsl::span<const Item> &oprf_items, const OPRFKey &oprf_key)
     {
@@ -205,6 +223,7 @@ namespace apsi::oprf {
         if (nonce_byte_count > max_nonce_byte_count) {
             throw invalid_argument("nonce_byte_count is too large");
         }
+        check_label_sizes(oprf_item_labels, label_byte_count);
 
         STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashes (labeled)");
         APSI_LOG_DEBUG(
@@ -247,6 +266,107 @@ namespace apsi::oprf {
         APSI_LOG_DEBUG(
             "Finished computing OPRF hashes and encrypted labels for " << oprf_item_labels.size()
                                                                        << " item-label pairs");
+
+        return oprf_hashes;
+    }
+
+    vector<pair<HashedItem, vector<felt_t>>> OPRFSender::ComputeHashesAndMatchTags(
+        const gsl::span<const Item> &oprf_items,
+        const OPRFKey &oprf_key,
+        size_t tag_felt_count,
+        uint32_t bits_per_felt)
+    {
+        STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashesAndMatchTags (unlabeled)");
+        APSI_LOG_DEBUG(
+            "Start computing OPRF hashes and match tags for " << oprf_items.size() << " items");
+
+        ThreadPoolMgr tpm;
+        vector<pair<HashedItem, vector<felt_t>>> oprf_hashes(oprf_items.size());
+        size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), oprf_items.size());
+        TaskGroup tasks(tpm.thread_pool());
+
+        auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
+            StackScrubGuard scrub_guard;
+
+            for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
+                auto [hashed_item, key] = get_item_hash(oprf_items[idx], oprf_key);
+
+                // The tag is all this needs the label key for; wipe it however this iteration
+                // ends.
+                SecureZeroGuard key_guard(key.data(), key.size());
+
+                oprf_hashes[idx] =
+                    make_pair(hashed_item, compute_match_tag(key, tag_felt_count, bits_per_felt));
+            }
+        };
+
+        for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
+            tasks.add(ComputeHashesLambda, thread_idx, task_count);
+        }
+
+        tasks.join();
+
+        APSI_LOG_DEBUG(
+            "Finished computing OPRF hashes and match tags for " << oprf_items.size() << " items");
+
+        return oprf_hashes;
+    }
+
+    vector<tuple<HashedItem, EncryptedLabel, vector<felt_t>>> OPRFSender::ComputeHashesAndMatchTags(
+        const gsl::span<const pair<Item, Label>> &oprf_item_labels,
+        const OPRFKey &oprf_key,
+        size_t label_byte_count,
+        size_t nonce_byte_count,
+        size_t tag_felt_count,
+        uint32_t bits_per_felt)
+    {
+        if (nonce_byte_count > max_nonce_byte_count) {
+            throw invalid_argument("nonce_byte_count is too large");
+        }
+        check_label_sizes(oprf_item_labels, label_byte_count);
+
+        STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashesAndMatchTags (labeled)");
+        APSI_LOG_DEBUG(
+            "Start computing OPRF hashes, encrypted labels and match tags for "
+            << oprf_item_labels.size() << " item-label pairs");
+
+        ThreadPoolMgr tpm;
+        vector<tuple<HashedItem, EncryptedLabel, vector<felt_t>>> oprf_hashes(
+            oprf_item_labels.size());
+        size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), oprf_item_labels.size());
+        TaskGroup tasks(tpm.thread_pool());
+
+        auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
+            StackScrubGuard scrub_guard;
+
+            for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
+                const Item &item = oprf_item_labels[idx].first;
+                const Label &label = oprf_item_labels[idx].second;
+
+                auto [hashed_item, key] = get_item_hash(item, oprf_key);
+
+                // Wipe the per-item label encryption key however this iteration ends: the
+                // encryption below draws a nonce, and that can fail.
+                SecureZeroGuard key_guard(key.data(), key.size());
+
+                EncryptedLabel encrypted_label =
+                    encrypt_label(label, key, label_byte_count, nonce_byte_count);
+                vector<felt_t> tag = compute_match_tag(key, tag_felt_count, bits_per_felt);
+
+                oprf_hashes[idx] =
+                    make_tuple(hashed_item, std::move(encrypted_label), std::move(tag));
+            }
+        };
+
+        for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
+            tasks.add(ComputeHashesLambda, thread_idx, task_count);
+        }
+
+        tasks.join();
+
+        APSI_LOG_DEBUG(
+            "Finished computing OPRF hashes, encrypted labels and match tags for "
+            << oprf_item_labels.size() << " item-label pairs");
 
         return oprf_hashes;
     }

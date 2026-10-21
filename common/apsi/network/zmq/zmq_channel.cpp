@@ -71,11 +71,12 @@ namespace apsi {
             //
             // What the number bounds is the serialized payload ZeroMQ holds for a peer that has
             // stopped reading, since it keeps a queued message until that peer reads it rather
-            // than until the query ends, and keeps a queue per peer. A result package measures
-            // 443 KB at the largest shipped parameter set and 97 KB at a typical one, which puts
-            // one stalled peer on the order of a hundred megabytes where a high water mark of
-            // 70000 allowed tens of gigabytes. It does not bound what the sender itself holds:
-            // a result computed but not yet handed over is the sender's own memory.
+            // than until the query ends, and keeps a queue per peer. Bit-packed, a result package
+            // of the shipped parameter sets comes to about 120 KB at the median and up to about
+            // 1.5 MB, in 1M-4096-32 (about 0.8 MB with the parameter sets of APSI 1.x), which puts
+            // one stalled peer at up to about 380 MB, where a high water mark of 70000 allowed over
+            // a hundred gigabytes. It does not bound what the sender itself holds: a result
+            // computed but not yet handed over is the sender's own memory.
             //
             // The value is a conservative operating choice rather than one the protocol dictates.
             // A peer that stalls long enough to fill the queue and keep it full for
@@ -104,6 +105,22 @@ namespace apsi {
                     static_cast<streamsize>(data.size()));
                 istream stream(&agbuf);
                 return obj.load(stream, std::move(context));
+            }
+
+            // context is taken by value to match the by-value SEALContext convention of the
+            // Channel interface this helper serves.
+            // NOLINTNEXTLINE(performance-unnecessary-value-param)
+            size_t load_result_from_string(
+                string data,
+                shared_ptr<SEALContext> context,
+                const PSIParams &params,
+                ResultPackage &rp)
+            {
+                ArrayGetBuffer agbuf(
+                    reinterpret_cast<const char *>(data.data()),
+                    static_cast<streamsize>(data.size()));
+                istream stream(&agbuf);
+                return rp.load(stream, context, params);
             }
 
             template <typename T>
@@ -583,6 +600,18 @@ namespace apsi {
 
         unique_ptr<ResultPackage> ZMQChannel::receive_result(shared_ptr<SEALContext> context)
         {
+            return receive_result_package(std::move(context), nullptr);
+        }
+
+        unique_ptr<ResultPackage> ZMQChannel::receive_result_for(
+            shared_ptr<SEALContext> context, const PSIParams &params)
+        {
+            return receive_result_package(std::move(context), &params);
+        }
+
+        unique_ptr<ResultPackage> ZMQChannel::receive_result_package(
+            shared_ptr<SEALContext> context, const PSIParams *params)
+        {
             throw_if_not_connected();
 
             bool valid_context = context && context->parameters_set();
@@ -616,19 +645,25 @@ namespace apsi {
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
             try {
-                bytes_received = load_from_string(msg[0].to_string(), std::move(context), *rp);
+                bytes_received =
+                    params ? load_result_from_string(
+                                 msg[0].to_string(), std::move(context), *params, *rp)
+                           : load_from_string(msg[0].to_string(), std::move(context), *rp);
                 bytes_received_ += bytes_received;
             } catch (const invalid_argument &ex) {
-                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
                 set_receive_failed();
                 return nullptr;
             } catch (const runtime_error &ex) {
-                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
                 set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
-                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
                 set_receive_failed();
                 return nullptr;
             }

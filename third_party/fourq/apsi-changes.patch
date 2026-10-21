@@ -6,7 +6,7 @@ upstream sources exactly, which is the check to run afterwards:
 
     git apply --check --reverse third_party/fourq/apsi-changes.patch
 
-Nine changes, in descending order of how much they matter.
+Ten changes, in descending order of how much they matter.
 
   * AMD64/fp_x64.h and ARM64/fp_arm64.h move field elements between felm_t and uint128_t with
     memcpy rather than through a cast. A field element is an array of digit_t, which neither
@@ -65,6 +65,11 @@ Nine changes, in descending order of how much they matter.
     unit that includes both, which is why ecpoint.cpp failed under GCC and Clang. MSVC
     defines no __SIZEOF_INT128__ and SEAL's MSVC header declares no uint128_t, so the
     ARM64 Windows build keeps the pair of digits and the branch it already took.
+
+  * crypto_util.c negates the x-coordinate in decode one component at a time with fpneg1271,
+    which is what fp2neg1271 does, rather than through fp2neg1271 itself. GCC 13 at -O3 warns
+    that fp2neg1271(P->x) accesses 32 bytes in a region of size 16, although P->x is a whole
+    f2elm_t of 32 bytes, so the change only lets APSI build without warnings.
 
 To regenerate: check out the pinned commit, copy this tree and the upstream tree into two
 directories that share the third_party/fourq/ prefix, and diff them with git diff
@@ -484,7 +489,7 @@ index 8a064d6..bcdc069 100644
  
  // Encoding of field elements, elements over Z_r and elements over GF(p^2):
 diff --git a/third_party/fourq/crypto_util.c b/third_party/fourq/crypto_util.c
-index 6a63402..d9b0644 100644
+index 6a63402..2800b44 100644
 --- a/third_party/fourq/crypto_util.c
 +++ b/third_party/fourq/crypto_util.c
 @@ -6,8 +6,8 @@
@@ -510,6 +515,18 @@ index 6a63402..d9b0644 100644
      if (is_zero_ct((digit_t*)P->x, NWORDS_FIELD) == true) {
          sign_dec = ((digit_t*)&P->x[1])[NWORDS_FIELD-1] >> (sizeof(digit_t)*8 - 2);
      } else {
+@@ -111,7 +115,10 @@ ECCRYPTO_STATUS decode(const unsigned char* Pencoded, point_t P)
+     }
+ 
+     if (sign != (unsigned int)sign_dec) {           // If sign of x-coordinate decoded != input sign bit, then negate x-coordinate
+-        fp2neg1271(P->x);
++        // APSI: negate the two components one by one, as fp2neg1271 does. GCC 13 warns that
++        // fp2neg1271(P->x) accesses 32 bytes in a region of 16, although P->x has 32.
++        fpneg1271(P->x[0]);
++        fpneg1271(P->x[1]);
+     }
+ 
+     point_setup(P, R);
 diff --git a/third_party/fourq/eccp2.c b/third_party/fourq/eccp2.c
 index 6b50b9a..eb931b8 100644
 --- a/third_party/fourq/eccp2.c

@@ -2,6 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
+#include <cassert>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -9,6 +11,7 @@
 
 // APSI
 #include "apsi/thread_pool_mgr.h"
+#include "apsi/util/task_group.h"
 
 using namespace std;
 using namespace apsi;
@@ -74,6 +77,13 @@ namespace {
         }
         return pool_worker_count;
     }
+
+    // The parallelism limit in effect on this thread, or zero for none, and the innermost
+    // ScopedParallelismLimit alive on it. Only a ScopedParallelismLimit changes them, and only on
+    // its own thread.
+    thread_local size_t thread_limit = 0;
+
+    thread_local const ScopedParallelismLimit *innermost_limit = nullptr;
 } // namespace
 
 ThreadPoolMgr::ThreadPoolMgr()
@@ -167,7 +177,8 @@ size_t ThreadPoolMgr::GetThreadCount()
 {
     unique_lock<mutex> lock(tp_mutex);
 
-    return thread_count_locked();
+    const size_t width = thread_count_locked();
+    return thread_limit ? min(thread_limit, width) : width;
 }
 
 size_t ThreadPoolMgr::GetPoolWorkerCount()
@@ -181,4 +192,30 @@ size_t ThreadPoolMgr::GetPoolWorkerCount()
     }
 
     return pool_worker_count_locked();
+}
+
+ScopedParallelismLimit::ScopedParallelismLimit(size_t max_tasks) noexcept
+    : outer_limit_(thread_limit), outer_(innermost_limit)
+{
+    if (max_tasks && (!thread_limit || max_tasks < thread_limit)) {
+        thread_limit = max_tasks;
+    }
+    innermost_limit = this;
+}
+
+ScopedParallelismLimit::~ScopedParallelismLimit()
+{
+    // Restoring is right only for the innermost limit of the thread that created it. Anywhere
+    // else this would put back a state that later limits have changed, or another thread's.
+    assert(
+        innermost_limit == this &&
+        "ScopedParallelismLimit destroyed out of order or on another thread");
+
+    thread_limit = outer_limit_;
+    innermost_limit = outer_;
+}
+
+size_t util::parallelism_limit() noexcept
+{
+    return thread_limit;
 }

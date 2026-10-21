@@ -7,12 +7,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <limits>
 #include <sstream>
 #include <stdexcept>
 
 // APSI
 #include "apsi/util/utils.h"
+
+// FlatBuffers
+#include "flatbuffers/base.h"
 
 // SEAL
 #include "seal/randomgen.h"
@@ -33,6 +35,11 @@ using namespace seal::util;
 #endif
 
 namespace apsi::util {
+    // A buffer that read_from_stream reads must pass the FlatBuffers verifier
+    static_assert(
+        max_buffer_size == static_cast<size_t>(FLATBUFFERS_MAX_BUFFER_SIZE) - 1,
+        "max_buffer_size must be one byte less than FLATBUFFERS_MAX_BUFFER_SIZE");
+
     vector<uint64_t> conversion_to_digits(const uint64_t input, const uint64_t base)
     {
         vector<uint64_t> result;
@@ -101,13 +108,19 @@ namespace apsi::util {
     {
         uint32_t size = 0;
         in.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
+        if (!in) {
+            // The stream ended, or had already failed, before the size prefix was read in full.
+            // Going on would take whatever was read for the size, often zero, so a caller reading
+            // many buffers could go on reading empty ones from a stream that has nothing left.
+            throw runtime_error("read_from_stream: size prefix is missing or truncated");
+        }
 
-        // Cap the size accepted from the wire: a malicious peer could otherwise send a
-        // size prefix of UINT32_MAX (~4 GiB) and force a comparable allocation. The
-        // FlatBuffers verifier rejects any buffer larger than INT32_MAX bytes, so anything
-        // beyond that is guaranteed to fail verification later anyway.
-        // NOLINTNEXTLINE(readability-redundant-parentheses): windows.h defines max
-        constexpr uint32_t max_byte_count = static_cast<uint32_t>((numeric_limits<int32_t>::max)());
+        // Cap the size accepted from the wire: a malicious peer could otherwise send a size prefix
+        // of UINT32_MAX (~4 GiB) and force a comparable allocation. The FlatBuffers verifier
+        // accepts only a buffer smaller than FLATBUFFERS_MAX_BUFFER_SIZE, and asserts that it is in
+        // debug builds, so a size that would make the buffer, with its size prefix, larger than
+        // max_buffer_size is refused here.
+        constexpr auto max_byte_count = static_cast<uint32_t>(max_buffer_size - sizeof(uint32_t));
         if (size > max_byte_count) {
             throw runtime_error("read_from_stream: size prefix exceeds maximum allowed");
         }

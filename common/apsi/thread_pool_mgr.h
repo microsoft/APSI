@@ -88,7 +88,9 @@ namespace apsi {
         /**
         Get the fan-out width: the number of tasks a single APSI operation splits itself into.
         Guaranteed to be at least one and never larger than the pool's cap. This is not
-        necessarily the pool's worker count -- see SetPoolWorkerCount.
+        necessarily the pool's worker count -- see SetPoolWorkerCount. While a
+        ScopedParallelismLimit is in effect on the calling thread, the width reported to that
+        thread is at most the limit.
         */
         static std::size_t GetThreadCount();
 
@@ -98,5 +100,61 @@ namespace apsi {
         count the next one will be created with.
         */
         static std::size_t GetPoolWorkerCount();
+    };
+
+    /**
+    Limits the parallelism of the APSI operations that the calling thread begins while this
+    object exists. Each fan-out such an operation makes runs at most max_tasks of its tasks at
+    once on the shared thread pool. Operations take turns on the workers between tasks, never
+    within one: when one of its tasks finishes, a fan-out's next task queues behind whatever other
+    operations have queued on the pool meanwhile, but a task that has started runs to completion.
+    ThreadPoolMgr::GetThreadCount reports at most max_tasks on this thread, so the fan-outs it
+    sizes, the OPRF computations, PowersDag::parallel_apply and the loading of a query's
+    ciphertexts in the sender::Query constructor, have at most max_tasks tasks, and
+    receiver::Receiver::request_query starts at most max_tasks result threads, which are not on the
+    pool. With a limit of one, a sender::Query loads the ciphertexts on the thread that creates it.
+    The pool is neither resized nor reserved, so a limit above its worker count has no further
+    effect. Operations begun on other threads are unaffected: concurrent operations with different
+    limits share the pool without coordinating or serializing.
+
+    The limit is per operation, not per SenderDB: two operations on one SenderDB begun on two
+    threads each run under the limit of their own thread. To keep one SenderDB, or one server,
+    within a single budget, run its operations one at a time.
+
+    The limit belongs to the calling thread and does not follow work handed to other threads, so
+    create it on the thread that runs the operation; for sender::ZMQSenderDispatcher, that is the
+    thread that calls run.
+
+    Limits nest. The smallest nonzero max_tasks among those alive on a thread is in effect, a
+    max_tasks of zero adds no limit, and destroying a limit restores what was in effect before
+    it. A limit must be destroyed on the thread that created it, in the reverse order of
+    creation, as a local variable is; debug builds check this.
+    */
+    class ScopedParallelismLimit {
+    public:
+        /**
+        Limit the operations this thread begins to max_tasks tasks at once in each fan-out, or,
+        with zero, leave the limit as it is.
+        */
+        explicit ScopedParallelismLimit(std::size_t max_tasks) noexcept;
+
+        /**
+        Restore the limit that was in effect on this thread when this object was created.
+        */
+        ~ScopedParallelismLimit();
+
+        ScopedParallelismLimit(const ScopedParallelismLimit &) = delete;
+
+        ScopedParallelismLimit(ScopedParallelismLimit &&) = delete;
+
+        ScopedParallelismLimit &operator=(const ScopedParallelismLimit &) = delete;
+
+        ScopedParallelismLimit &operator=(ScopedParallelismLimit &&) = delete;
+
+    private:
+        // The limit, and the innermost ScopedParallelismLimit, on this thread before this one
+        std::size_t outer_limit_;
+
+        const ScopedParallelismLimit *outer_;
     };
 } // namespace apsi

@@ -244,28 +244,63 @@ namespace APSITests {
 
     TEST(PSIParamsTest, MostDemandingShippedParamsAreAccepted)
     {
-        // parameters/16M-11041.json builds the largest query of any parameter set in parameters/
+        // parameters/256M-4096.json builds the largest query of any parameter set in parameters/:
+        // two bundle indices of seventeen query powers each, at three data primes and a special
+        // prime, which PSIParams charges 17 MiB. That is under a thirtieth of
+        // query_byte_count_max.
         string json = "{"
+                      "    \"version\": 2,"
                       "    \"table_params\": {"
                       "        \"hash_func_count\": 3,"
-                      "        \"table_size\": 16380,"
-                      "        \"max_items_per_bin\": 1304"
+                      "        \"table_size\": 8192,"
+                      "        \"max_items_per_bin\": 2939"
                       "    },"
-                      "    \"item_params\": { \"felts_per_item\": 5 },"
+                      "    \"item_params\": {"
+                      "        \"felts_per_item\": 2,"
+                      "        \"tag_part_count\": 1"
+                      "    },"
                       "    \"query_params\": {"
-                      "        \"ps_low_degree\": 44,"
-                      "        \"query_powers\": [ 1, 3, 11, 18, 45, 225 ]"
+                      "        \"ps_low_degree\": 65,"
+                      "        \"query_powers\": [ 1, 3, 4, 9, 11, 16, 20, 25, 27, 32, 33, 35, 36,"
+                      "            66, 198, 726, 1188 ]"
                       "    },"
                       "    \"seal_params\": {"
-                      "        \"plain_modulus_bits\": 22,"
+                      "        \"plain_modulus\": 2147565569,"
                       "        \"poly_modulus_degree\": 8192,"
-                      "        \"coeff_modulus_bits\": [ 56, 56, 56, 50 ]"
+                      "        \"coeff_modulus_bits\": [ 56, 58, 58, 28 ]"
                       "    }"
                       "}";
 
         PSIParams params = PSIParams::Load(json);
-        ASSERT_EQ(16380, params.table_params().table_size);
-        ASSERT_EQ(10, params.bundle_idx_count());
+        ASSERT_EQ(8192, params.table_params().table_size);
+        ASSERT_EQ(2, params.bundle_idx_count());
+
+        // The charge PSIParams validates against query_byte_count_max: every query power of every
+        // bundle index, each a ciphertext of 2 * poly_modulus_degree * |coeff_modulus| words
+        auto charge = [](const PSIParams &p) {
+            return static_cast<uint64_t>(p.bundle_idx_count()) *
+                   p.query_params().query_powers.size() * 2 *
+                   p.seal_params().poly_modulus_degree() * p.seal_params().coeff_modulus().size() *
+                   sizeof(uint64_t);
+        };
+        ASSERT_EQ(static_cast<uint64_t>(17825792), charge(params));
+        ASSERT_LT(charge(params) * 30, PSIParams::query_byte_count_max);
+
+        // And no shipped set is charged more
+        namespace fs = std::filesystem;
+        size_t checked = 0;
+        for (const auto &entry : fs::directory_iterator(fs::path(APSI_PARAMETERS_DIR))) {
+            if (entry.path().extension() != ".json") {
+                continue;
+            }
+            ifstream file(entry.path());
+            ASSERT_TRUE(file.is_open()) << entry.path();
+            stringstream shipped;
+            shipped << file.rdbuf();
+            ASSERT_LE(charge(PSIParams::Load(shipped.str())), charge(params)) << entry.path();
+            checked++;
+        }
+        ASSERT_LE(size_t(36), checked) << "expected to find the shipped parameter sets";
     }
 
     TEST(PSIParamsTest, Constructor2)
@@ -431,8 +466,8 @@ namespace APSITests {
 
     TEST(PSIParamsTest, LoadAcceptsAFrozenBufferFromAnEarlierVersion)
     {
-        // A serialized PSIParams captured from parameters/1M-1-32.json, held here as bytes so it
-        // cannot drift with the code that produced it.
+        // A serialized PSIParams captured from APSI 1.x's parameters/1M-1-32.json, held here as
+        // bytes so it cannot drift with the code that produced it.
         //
         // Marking fields required in psi_params.fbs changes what the verifier rejects, not what
         // the writer emits: a buffer built with and without those attributes is byte-identical,
@@ -475,12 +510,28 @@ namespace APSITests {
         ASSERT_EQ(static_cast<size_t>(8), loaded.first.query_params().query_powers.size());
 
         // Round-tripping it must reproduce the same bytes, so a future change to the writer is
-        // caught here rather than by whoever tries to read this version's output later.
+        // caught here rather than by whoever tries to read this version's output later. The one
+        // difference is in the minor version of the five SEALHeaders, one for the encryption
+        // parameters and one for each of the moduli in them: Microsoft SEAL 4.4, which wrote this
+        // buffer, recorded its library version 4.4 there, and Microsoft SEAL 4.5 and later record
+        // the serialization format version 4.0.
+        vector<unsigned char> expected(begin(frozen), end(frozen));
+        size_t seal_header_count = 0;
+        for (size_t i = 0; i + 5 <= expected.size(); i++) {
+            // Magic number 0xA15E, header size 0x10, version 4.4
+            if (expected[i] == 0x5e && expected[i + 1] == 0xa1 && expected[i + 2] == 0x10 &&
+                expected[i + 3] == 0x04 && expected[i + 4] == 0x04) {
+                expected[i + 4] = 0x00;
+                seal_header_count++;
+            }
+        }
+        ASSERT_EQ(size_t(5), seal_header_count);
+
         stringstream out;
         loaded.first.save(out);
         string written = out.str();
-        ASSERT_EQ(sizeof(frozen), written.size());
-        ASSERT_EQ(0, memcmp(frozen, written.data(), sizeof(frozen)));
+        ASSERT_EQ(expected.size(), written.size());
+        ASSERT_EQ(0, memcmp(expected.data(), written.data(), expected.size()));
     }
 
     TEST(PSIParamsTest, JSONLoadPSIParams)
@@ -1021,17 +1072,43 @@ namespace APSITests {
         ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
     namespace {
-        // Smallest load that a bin should not exceed: the smallest k for which the chance that
-        // any of the m bins holds k or more is below delta. A mean-plus-one-deviation estimate
-        // is not enough here, because it describes a typical maximum rather than bounding one,
-        // and under-predicts often enough to matter -- one bundle either way decides whether a
+        // APSI 1.x's parameters/100K-1.json, verbatim. Like every set APSI 1.x shipped, it predates
+        // the version key, and every version of APSI must keep loading it. The tests below load it
+        // and edit it.
+        string apsi1_100k_1_json()
+        {
+            return R"json({
+    "table_params": {
+        "hash_func_count": 1,
+        "table_size": 409,
+        "max_items_per_bin": 20
+    },
+    "item_params": {
+        "felts_per_item": 5
+    },
+    "query_params": {
+        "ps_low_degree": 0,
+        "query_powers": [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+    },
+    "seal_params": {
+        "plain_modulus": 65537,
+        "poly_modulus_degree": 2048,
+        "coeff_modulus_bits": [ 48 ]
+    }
+}
+)json";
+        }
+
+        // Smallest load that a bin should not reach: the smallest k for which the chance that any
+        // of the bins holds k or more is at most delta. A mean-plus-one-deviation estimate is not
+        // enough here, because it describes a typical maximum rather than bounding one, and
+        // under-predicts often enough to matter -- one bundle either way decides whether a
         // parameter set meets the bound.
-        double load_bound(double mean, double bins)
+        double load_bound(double mean, double bins, double delta)
         {
             if (mean <= 0.0) {
                 return 1.0;
             }
-            const double delta = 1e-3;
             double target = delta / bins;
             double log_p = -mean; // log P(X = 0)
             double tail = 1.0;    // P(X >= k)
@@ -1044,69 +1121,133 @@ namespace APSITests {
             return k;
         }
 
-        // How many bin bundles a bundle index may hold. Two things open a new one: a location
-        // filling its bin, and -- in labeled mode only -- two items whose field elements collide,
-        // since interpolation needs distinct points and BinBundle::multi_insert refuses the
-        // repeat. The second dominates when max_items_per_bin approaches the square root of the
-        // field element space, which is where a capacity-only estimate silently under-predicts.
+        // P(X >= k) for X ~ Poisson(mean), summed upward from k. The tails the multiplicity bound
+        // needs lie far below the rounding error of one minus the terms below k.
+        double poisson_tail(double mean, double k)
+        {
+            double log_term = -mean + k * log(mean) - lgamma(k + 1.0);
+            double tail = 0.0;
+            for (double j = k; j < k + 1000.0; j += 1.0) {
+                double term = exp(log_term);
+                tail += term;
+                if (j > mean && term <= tail * 1e-17) {
+                    break;
+                }
+                log_term += log(mean) - log(j + 1.0);
+            }
+            return tail;
+        }
+
+        // How many items at one location may share a field element: the smallest r for which the
+        // chance that more than r do is at most delta. An item has felts_per_item field elements,
+        // each in a bin of its own and uniform over its 2^b values, b = item_bit_count_per_felt,
+        // so the items at a location that share a value in one bin are Poisson(mean / 2^b), and
+        // the union runs over every location, bin and value. A bin holds a field element once,
+        // so each of those items needs a bin bundle of its own.
+        double multiplicity_bound(
+            double mean,
+            double item_bit_count_per_felt,
+            double felts_per_item,
+            double locations,
+            double delta)
+        {
+            double values = pow(2.0, item_bit_count_per_felt);
+            double cells = locations * felts_per_item * values;
+            double r = 1.0;
+            while (cells * poisson_tail(mean / values, r + 1.0) > delta) {
+                r += 1.0;
+            }
+            return r;
+        }
+
+        // How many bin bundles a bundle index is charged for: the design count that chose the sets
+        // in parameters/.
+        //
+        // A bin holds max_items_per_bin items with match tags and one fewer without, as SenderDB
+        // fills it. Without match tags or labels nothing else limits a bin bundle and the bundles
+        // fill one after another, so the capacity count, bounded with probability 1e-3, is exact.
+        // Otherwise a bin bundle also refuses an item whose field element it holds at the
+        // location already -- the tag parts are label parts whether or not the items have labels
+        // -- so the count is the larger of the capacity count and the multiplicity bound, each
+        // bounded with probability 5e-4, plus two for placement: in simulations that reproduce
+        // SenderDB's placement exactly, built in bulk or grown one item at a time, no bundle index
+        // of a set in parameters/ needed more.
         double bundle_bound(
             double sender_size,
             double hash_func_count,
             double table_size,
-            double max_items_per_bin,
+            double bin_capacity,
             double item_bit_count_per_felt,
-            double label_byte_count)
+            double felts_per_item,
+            bool collisions)
         {
             double mean = hash_func_count * sender_size / table_size;
-            double per_bin = load_bound(mean, table_size);
-            double bundles = max(1.0, ceil(per_bin / max_items_per_bin));
-
-            if (label_byte_count > 0.0) {
-                double in_bin = min(per_bin, max_items_per_bin);
-                double space = pow(2.0, item_bit_count_per_felt);
-                double colliding_pairs = in_bin * in_bin / (2.0 * space);
-                bundles = max(bundles, 1.0 + load_bound(colliding_pairs, table_size));
+            if (!collisions) {
+                return max(1.0, ceil(load_bound(mean, table_size, 1e-3) / bin_capacity));
             }
-            return bundles;
+            double bundles = max(1.0, ceil(load_bound(mean, table_size, 5e-4) / bin_capacity));
+            bundles =
+                max(bundles,
+                    multiplicity_bound(
+                        mean, item_bit_count_per_felt, felts_per_item, table_size, 5e-4));
+            return bundles + 2.0;
+        }
+
+        // The number of item-sized parts a nonce and label take together, as SenderDB counts
+        // them: zero without a label, and otherwise ceil(8 * (nonce + label) / item_bit_count),
+        // with the nonce the default 16 bytes. With match tags an item is one or two field
+        // elements in the shipped sets, and three to seven without them, so the same label takes
+        // more parts with match tags.
+        double label_part_count(double label_byte_count, double item_bit_count)
+        {
+            if (label_byte_count <= 0.0) {
+                return 0.0;
+            }
+            return ceil(8.0 * (label_byte_count + 16.0) / item_bit_count);
         }
 
         // Sender and receiver set sizes, and any label byte count, are encoded in the file name as
-        // the README describes: <sender>-<receiver>[-<label byte count>][-com|-cmp].
+        // the README describes: <sender>-<receiver>[-<label byte count>][-com|-cmp]. A name of any
+        // other form is not one this can check.
         bool parse_name(const string &stem, double &sender, double &receiver, double &label_bytes)
         {
-            size_t dash = stem.find('-');
-            if (dash == string::npos) {
+            vector<string> fields;
+            size_t start = 0;
+            for (size_t dash = stem.find('-'); dash != string::npos; dash = stem.find('-', start)) {
+                fields.push_back(stem.substr(start, dash - start));
+                start = dash + 1;
+            }
+            fields.push_back(stem.substr(start));
+            if (fields.size() < 2 || fields.size() > 4) {
                 return false;
             }
-            string s = stem.substr(0, dash);
+
+            auto is_number = [](const string &s) {
+                return !s.empty() && s.find_first_not_of("0123456789") == string::npos;
+            };
+
+            string s = fields[0];
             size_t mult = 1;
             if (!s.empty() && (s.back() == 'K' || s.back() == 'M')) {
                 mult = (s.back() == 'K') ? 1000 : 1000000;
                 s.pop_back();
             }
-            string rest = stem.substr(dash + 1);
-            string r = rest;
-            string tail;
-            size_t dash2 = rest.find('-');
-            if (dash2 != string::npos) {
-                r = rest.substr(0, dash2);
-                tail = rest.substr(dash2 + 1);
-            }
-            if (s.empty() || r.empty() || s.find_first_not_of("0123456789") != string::npos ||
-                r.find_first_not_of("0123456789") != string::npos) {
+            if (!is_number(s) || !is_number(fields[1])) {
                 return false;
             }
             sender = static_cast<double>(stoull(s)) * static_cast<double>(mult);
-            receiver = static_cast<double>(stoull(r));
+            receiver = static_cast<double>(stoull(fields[1]));
 
             label_bytes = 0.0;
-            if (!tail.empty()) {
-                string first = tail.substr(0, tail.find('-'));
-                if (first.find_first_not_of("0123456789") == string::npos) {
-                    label_bytes = static_cast<double>(stoull(first));
-                }
+            size_t next = 2;
+            if (next < fields.size() && is_number(fields[next])) {
+                label_bytes = static_cast<double>(stoull(fields[next]));
+                next++;
             }
-            return true;
+            if (next < fields.size() && (fields[next] == "com" || fields[next] == "cmp")) {
+                next++;
+            }
+            return next == fields.size();
         }
     } // namespace
 
@@ -1114,13 +1255,9 @@ namespace APSITests {
     {
         // A file may name the serialization version it was written for, so that one written for
         // a version this build does not implement is refused while loading rather than at the
-        // first exchange with a peer. The key is optional: files written before it existed, and
-        // the sets in parameters/, carry no version and must still load.
-        stringstream ss;
-        ifstream file(string(APSI_PARAMETERS_DIR) + "/100K-1.json");
-        ASSERT_TRUE(file.is_open());
-        ss << file.rdbuf();
-        string base = ss.str();
+        // first exchange with a peer. The key is optional: files written before it existed, such
+        // as the APSI 1.x sets, carry no version and must still load.
+        string base = apsi1_100k_1_json();
 
         ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(base)));
 
@@ -1135,10 +1272,12 @@ namespace APSITests {
             static_cast<void>(
                 PSIParams::Load(with_version(to_string(apsi_serialization_version)))));
 
-        // Any other is refused, in both directions.
+        // Any other is refused, in both directions: 0, and 3, the first version above both that
+        // this build implements. Version 2 is refused too, but by another rule, as this file has
+        // no match tags; see JSONTagPartCount.
         ASSERT_THROW(
             static_cast<void>(
-                PSIParams::Load(with_version(to_string(apsi_serialization_version + 1)))),
+                PSIParams::Load(with_version(to_string(PSIParams::tag_serialization_version + 1)))),
             runtime_error);
         ASSERT_THROW(static_cast<void>(PSIParams::Load(with_version("0"))), runtime_error);
 
@@ -1152,11 +1291,7 @@ namespace APSITests {
         // offending value by streaming it, which every Json::Value supports; reading it as a
         // string instead would hold only for a string, and jsoncpp answers the rest by throwing
         // a logic error or, when built without exceptions, by aborting.
-        stringstream ss;
-        ifstream file(string(APSI_PARAMETERS_DIR) + "/100K-1.json");
-        ASSERT_TRUE(file.is_open());
-        ss << file.rdbuf();
-        string base = ss.str();
+        string base = apsi1_100k_1_json();
 
         ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(base)));
 
@@ -1201,21 +1336,24 @@ namespace APSITests {
         // handle, and a receiver that visibly retries has told an observer something.
         //
         // Three-way cuckoo hashing carries a threshold near 91.8% occupancy, and insertion
-        // starts failing measurably well before it. The shipped sets hold to at least 1.6 times
-        // the receiver's item count, which is about 62% occupancy; this checks that a retune has
-        // not quietly taken one below that.
-        constexpr double min_ratio = 1.5996; // 1638/1024, the ratio the shipped sets realize
+        // starts failing measurably well before it. The shipped sets hold to at least 1.99 times
+        // the receiver's item count, about 50% occupancy, and APSI 1.x's to 1.6 times, about 62%;
+        // this checks that a retune has not quietly taken one below the latter.
+        constexpr double min_ratio = 1.5996; // 1638/1024, the ratio APSI 1.x's sets realize
 
         namespace fs = std::filesystem;
         fs::path dir(APSI_PARAMETERS_DIR);
         ASSERT_TRUE(fs::is_directory(dir)) << "cannot find " << dir;
 
+        size_t json_files = 0;
         size_t checked = 0;
         for (const auto &entry : fs::directory_iterator(dir)) {
             if (entry.path().extension() != ".json") {
                 continue;
             }
+            json_files++;
 
+            // The set sizes are in the name
             string stem = entry.path().stem().string();
             double sender = 0.0;
             double receiver = 0.0;
@@ -1244,7 +1382,9 @@ namespace APSITests {
             checked++;
         }
 
-        ASSERT_LE(size_t(20), checked) << "far fewer parameter sets checked than expected";
+        // 28 of the 36 shipped sets carry more than one query item
+        ASSERT_LE(size_t(36), json_files) << "expected to find the shipped parameter sets";
+        ASSERT_LE(size_t(28), checked) << "far fewer parameter sets checked than expected";
     }
 
     TEST(PSIParamsTests, ShippedParameterSetsHoldTheDocumentedFalsePositiveBound)
@@ -1253,11 +1393,18 @@ namespace APSITests {
         // returning at least one false positive below 2^-40, at the set sizes its file name
         // gives. That figure is not PSIParams::log2_fpp_per_bin_bundle, which describes one
         // bin bundle: it must also count the bundles a location spills into and the items in
-        // a query. Retuning a
-        // parameter file without carrying both terms is what this guards against.
+        // a query. Retuning a parameter file without carrying both terms is what this guards
+        // against.
+        //
+        // There is one file per set, <name>.json, with match tags or without them. Each must load
+        // and hold the bound with the bundle count of its kind. With match tags one bundle
+        // contributes -min(tag_bit_count, 128), and without them felts_per_item times
+        // (log2(max_items_per_bin) - item_bit_count_per_felt); log2_fpp_per_bin_bundle returns
+        // either.
         //
         // The bundle count is bounded rather than estimated, so the guard errs towards reporting
-        // a set as failing rather than passing.
+        // a set as failing rather than passing. The tightest set, 256M-1, comes to -41.4 with 24
+        // bundles; it would take 64 to reach -40.
         namespace fs = std::filesystem;
         fs::path dir(APSI_PARAMETERS_DIR);
         ASSERT_TRUE(fs::is_directory(dir)) << "cannot find " << dir;
@@ -1286,25 +1433,367 @@ namespace APSITests {
             json << file.rdbuf();
 
             PSIParams params = PSIParams::Load(json.str());
+
+            double h = static_cast<double>(params.table_params().hash_func_count);
+            double table_size = static_cast<double>(params.table_params().table_size);
+            double max_items_per_bin = static_cast<double>(params.table_params().max_items_per_bin);
             double bundles = bundle_bound(
                 sender,
-                static_cast<double>(params.table_params().hash_func_count),
-                static_cast<double>(params.table_params().table_size),
-                static_cast<double>(params.table_params().max_items_per_bin),
+                h,
+                table_size,
+                params.uses_tags() ? max_items_per_bin : max_items_per_bin - 1.0,
                 static_cast<double>(params.item_bit_count_per_felt()),
-                label_bytes);
+                static_cast<double>(params.item_params().felts_per_item),
+                params.uses_tags() || label_bytes > 0.0);
 
             double fpp = params.log2_fpp_per_bin_bundle() + log2(bundles) + log2(receiver);
+
+            // For the message: the ciphertexts every bin bundle answers with
+            double parts = params.uses_tags()
+                               ? params.tag_part_count() +
+                                     label_part_count(label_bytes, params.item_bit_count())
+                               : 1.0 + label_part_count(label_bytes, params.item_bit_count());
 
             ASSERT_LT(fpp, -40.0) << stem << ": per-execution log2(fpp) is " << fpp
                                   << ", which is not below -40. "
                                   << "One bundle gives " << params.log2_fpp_per_bin_bundle()
                                   << ", a location may fill " << bundles
-                                  << " bin bundles, and a query carries " << receiver << " items.";
+                                  << " bin bundles, each answering with " << parts
+                                  << " ciphertexts, and a query carries " << receiver << " items.";
             checked++;
         }
 
         ASSERT_EQ(json_files, checked) << "every parameter set must be checked";
-        ASSERT_LE(size_t(30), checked) << "expected to find the shipped parameter sets";
+        ASSERT_LE(size_t(36), checked) << "expected to find the 36 shipped parameter sets";
+    }
+
+    namespace {
+        /**
+        Parameters, with match tags unless tag_part_count is zero, whose single bundle index holds
+        poly_modulus_degree / felts_per_item items. The coefficient modulus is SEAL's default,
+        which is valid for every plain modulus used below.
+        */
+        PSIParams make_tag_params(
+            uint32_t felts_per_item,
+            uint32_t tag_part_count,
+            uint64_t plain_modulus = 65537,
+            uint32_t max_items_per_bin = 16,
+            size_t poly_modulus_degree = 4096)
+        {
+            PSIParams::ItemParams item_params;
+            item_params.felts_per_item = felts_per_item;
+            item_params.tag_part_count = tag_part_count;
+
+            PSIParams::TableParams table_params;
+            table_params.hash_func_count = 3;
+            table_params.max_items_per_bin = max_items_per_bin;
+            table_params.table_size = static_cast<uint32_t>(poly_modulus_degree / felts_per_item);
+
+            PSIParams::QueryParams query_params;
+            query_params.query_powers = { 1, 3, 5 };
+
+            PSIParams::SEALParams seal_params;
+            seal_params.set_poly_modulus_degree(poly_modulus_degree);
+            seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
+            seal_params.set_plain_modulus(plain_modulus);
+
+            return { item_params, table_params, query_params, seal_params };
+        }
+
+        /**
+        A JSON parameter file for parameters with match tags, with the item_params and version
+        given verbatim so that a test can leave either out.
+        */
+        string tag_json(const string &item_params, const string &version)
+        {
+            string json = "{";
+            if (!version.empty()) {
+                json += "\"version\": " + version + ",";
+            }
+            json += "\"table_params\": { \"hash_func_count\": 3, \"table_size\": 4096, "
+                    "\"max_items_per_bin\": 16 },"
+                    "\"item_params\": " +
+                    item_params +
+                    ","
+                    "\"query_params\": { \"ps_low_degree\": 0, \"query_powers\": [ 1, 3, 5 ] },"
+                    "\"seal_params\": { \"plain_modulus\": 65537, \"poly_modulus_degree\": 4096, "
+                    "\"coeff_modulus_bits\": [ 36, 36, 37 ] }"
+                    "}";
+            return json;
+        }
+
+        /**
+        Serializes parameters the way PSIParams::save does, but with a version and tag part count
+        of the caller's choosing, so that a test can produce combinations save never writes.
+        tag_part_count is left out entirely when has_tag_part_count is false.
+        */
+        string save_with(
+            const PSIParams &params,
+            uint32_t version,
+            bool has_tag_part_count,
+            uint32_t tag_part_count)
+        {
+            flatbuffers::FlatBufferBuilder fbs_builder(128);
+
+            vector<uint32_t> powers(
+                params.query_params().query_powers.cbegin(),
+                params.query_params().query_powers.cend());
+            auto query_powers = fbs_builder.CreateVector(powers);
+            auto query_params = fbs::CreateQueryParams(
+                fbs_builder, params.query_params().ps_low_degree, query_powers);
+
+            stringstream seal_ss;
+            params.seal_params().save(seal_ss, compr_mode_type::none);
+            string seal_str = seal_ss.str();
+            vector<uint8_t> seal_bytes(seal_str.cbegin(), seal_str.cend());
+            auto seal_data = fbs_builder.CreateVector(seal_bytes);
+            auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_data);
+
+            fbs::ItemParams item_params(params.item_params().felts_per_item);
+            fbs::TableParams table_params(
+                params.table_params().table_size,
+                params.table_params().max_items_per_bin,
+                params.table_params().hash_func_count);
+
+            fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
+            psi_params_builder.add_version(version);
+            psi_params_builder.add_item_params(&item_params);
+            psi_params_builder.add_table_params(&table_params);
+            psi_params_builder.add_query_params(query_params);
+            psi_params_builder.add_seal_params(seal_params);
+            if (has_tag_part_count) {
+                // add_tag_part_count leaves out a zero, as FlatBuffers leaves out every scalar
+                // equal to its default, so force it to be written
+                fbs_builder.ForceDefaults(true);
+                psi_params_builder.add_tag_part_count(tag_part_count);
+                fbs_builder.ForceDefaults(false);
+            }
+            auto root = psi_params_builder.Finish();
+            fbs_builder.FinishSizePrefixed(root);
+
+            return { reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
+                     fbs_builder.GetSize() };
+        }
+    } // namespace
+
+    TEST(PSIParamsTagTests, TagAccessors)
+    {
+        PSIParams untagged = make_tag_params(8, 0);
+        ASSERT_FALSE(untagged.uses_tags());
+        ASSERT_EQ(0, untagged.tag_part_count());
+        ASSERT_EQ(0, untagged.tag_bit_count());
+
+        PSIParams tagged = make_tag_params(1, 3);
+        ASSERT_TRUE(tagged.uses_tags());
+        ASSERT_EQ(3, tagged.tag_part_count());
+        ASSERT_EQ(16, tagged.item_bit_count());
+        ASSERT_EQ(48, tagged.tag_bit_count());
+        ASSERT_EQ(4096, tagged.items_per_bundle());
+        ASSERT_EQ(4096, tagged.bins_per_bundle());
+
+        PSIParams tagged2 = make_tag_params(2, 2);
+        ASSERT_EQ(32, tagged2.item_bit_count());
+        ASSERT_EQ(64, tagged2.tag_bit_count());
+
+        // The tag part count is described only when there is one, so that parameters without
+        // match tags describe themselves exactly as in APSI 1.x
+        ASSERT_EQ(string::npos, untagged.to_string().find("tag_part_count"));
+        ASSERT_NE(string::npos, tagged.to_string().find("item_params.tag_part_count: 3"));
+    }
+
+    TEST(PSIParamsTagTests, ValidationBoundaries)
+    {
+        // A single field element per item is allowed only with match tags, which also lift the
+        // 80-bit minimum on the item
+        ASSERT_THROW(make_tag_params(1, 0), invalid_argument);
+        ASSERT_THROW(make_tag_params(4, 0), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(5, 0));
+        ASSERT_NO_THROW(make_tag_params(1, 3));
+        ASSERT_NO_THROW(make_tag_params(4, 1));
+
+        // felts_per_item is still bounded above, and so is the item
+        ASSERT_THROW(make_tag_params(33, 1), invalid_argument);
+        ASSERT_THROW(make_tag_params(9, 1), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(8, 1));
+
+        // The tag must have at least tag_bit_count_min bits. With 16 bits per item, two parts
+        // are too few and three are enough; with 13, three parts are 39 bits and too few.
+        ASSERT_THROW(make_tag_params(1, 2), invalid_argument);
+        ASSERT_THROW(make_tag_params(1, 3, 12289, 16, 2048), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(1, 4, 12289, 16, 2048));
+
+        // Exactly tag_bit_count_min is enough: a 21-bit plain modulus gives 20 bits per item
+        uint64_t t21 = PlainModulus::Batching(4096, 21).value();
+        ASSERT_EQ(40, make_tag_params(1, 2, t21).tag_bit_count());
+        ASSERT_THROW(make_tag_params(1, 1, t21), invalid_argument);
+
+        // The part count is bounded
+        ASSERT_NO_THROW(make_tag_params(1, PSIParams::ItemParams::tag_part_count_max));
+        ASSERT_THROW(
+            make_tag_params(1, PSIParams::ItemParams::tag_part_count_max + 1), invalid_argument);
+        ASSERT_THROW(make_tag_params(1, 0xFFFFFFFF), invalid_argument);
+
+        // A bin holds at most max_items_per_bin items at distinct points, so there must be that
+        // many points: 2^13 with a 14-bit plain modulus. Without match tags this does not apply.
+        ASSERT_NO_THROW(make_tag_params(1, 4, 12289, 8192, 2048));
+        ASSERT_THROW(make_tag_params(1, 4, 12289, 8193, 2048), invalid_argument);
+        ASSERT_NO_THROW(make_tag_params(7, 0, 12289, 8193, 2048));
+    }
+
+    TEST(PSIParamsTagTests, FalsePositiveProbabilityPerBinBundle)
+    {
+        // Without match tags the figure depends on the bin size and the item, as in APSI 1.x
+        PSIParams untagged = make_tag_params(8, 0);
+        ASSERT_DOUBLE_EQ((-16.0 + log2(16.0)) * 8, untagged.log2_fpp_per_bin_bundle());
+
+        // With them it is the tag size, whatever the bin size
+        ASSERT_DOUBLE_EQ(-48.0, make_tag_params(1, 3).log2_fpp_per_bin_bundle());
+        ASSERT_DOUBLE_EQ(-48.0, make_tag_params(1, 3, 65537, 2000).log2_fpp_per_bin_bundle());
+        ASSERT_DOUBLE_EQ(-112.0, make_tag_params(7, 1).log2_fpp_per_bin_bundle());
+
+        // A tag comes from a 128-bit label key, so no tag gives more than 128 bits
+        ASSERT_EQ(1024, make_tag_params(8, 8).tag_bit_count());
+        ASSERT_DOUBLE_EQ(-128.0, make_tag_params(8, 8).log2_fpp_per_bin_bundle());
+    }
+
+    TEST(PSIParamsTagTests, SaveLoadWithTags)
+    {
+        for (const auto &params :
+             { make_tag_params(1, 3), make_tag_params(2, 2), make_tag_params(1, 64) }) {
+            stringstream ss;
+            size_t save_size = params.save(ss);
+            string bytes = ss.str();
+
+            // Parameters with match tags are written with version 2, which APSI 1.x refuses
+            auto loaded_fbs = fbs::GetSizePrefixedPSIParams(bytes.data());
+            ASSERT_EQ(PSIParams::tag_serialization_version, loaded_fbs->version());
+            ASSERT_EQ(params.tag_part_count(), loaded_fbs->tag_part_count());
+            ASSERT_NE(apsi_serialization_version, loaded_fbs->version());
+            ASSERT_FALSE(same_serialization_version(loaded_fbs->version()));
+
+            auto loaded = PSIParams::Load(ss);
+            ASSERT_EQ(save_size, loaded.second);
+            ASSERT_EQ(params.to_string(), loaded.first.to_string());
+            ASSERT_EQ(params.tag_part_count(), loaded.first.tag_part_count());
+            ASSERT_EQ(params.tag_bit_count(), loaded.first.tag_bit_count());
+
+            // And saving again reproduces the same bytes
+            stringstream ss2;
+            loaded.first.save(ss2);
+            ASSERT_EQ(bytes, ss2.str());
+        }
+    }
+
+    TEST(PSIParamsTagTests, SaveWithoutTagsIsAsInAPSI1x)
+    {
+        // Parameters without match tags are written exactly as APSI 1.x writes them: with version
+        // 1 and no tag part count at all, not even a zero. save_with writes the fields APSI 1.x
+        // writes, in the order it writes them, which is what this compares against.
+        PSIParams untagged = make_tag_params(8, 0);
+        stringstream ss;
+        untagged.save(ss);
+        ASSERT_EQ(save_with(untagged, apsi_serialization_version, false, 0), ss.str());
+
+        string bytes = ss.str();
+        auto loaded_fbs = fbs::GetSizePrefixedPSIParams(bytes.data());
+        ASSERT_EQ(apsi_serialization_version, loaded_fbs->version());
+        ASSERT_EQ(0, loaded_fbs->tag_part_count());
+
+        // Generated tables inherit privately from flatbuffers::Table, which is what can tell a
+        // field written as zero from one left out
+        const auto *table = reinterpret_cast<const flatbuffers::Table *>(loaded_fbs);
+        ASSERT_FALSE(table->CheckField(fbs::PSIParams::VT_TAG_PART_COUNT));
+    }
+
+    TEST(PSIParamsTagTests, LoadRequiresTheVersionToMatchTheTagPartCount)
+    {
+        PSIParams untagged = make_tag_params(8, 0);
+        PSIParams tagged = make_tag_params(1, 3);
+
+        auto load = [](const string &bytes) {
+            stringstream ss(bytes);
+            return PSIParams::Load(ss).first;
+        };
+
+        // The two combinations save writes load
+        ASSERT_EQ(untagged.to_string(), load(save_with(untagged, 1, false, 0)).to_string());
+        ASSERT_EQ(tagged.to_string(), load(save_with(tagged, 2, true, 3)).to_string());
+
+        // A zero tag part count written explicitly is the same as none
+        ASSERT_EQ(untagged.to_string(), load(save_with(untagged, 1, true, 0)).to_string());
+
+        // Version 1 with a tag part count would be read by APSI 1.x as parameters without match
+        // tags, so it is refused rather than read as either
+        ASSERT_THROW(load(save_with(tagged, 1, true, 3)), runtime_error);
+
+        // Version 2 needs a tag part count
+        ASSERT_THROW(load(save_with(untagged, 2, false, 0)), runtime_error);
+        ASSERT_THROW(load(save_with(untagged, 2, true, 0)), runtime_error);
+
+        // Other versions are refused whatever the tag part count. Version 3 without one is refused
+        // by the version check alone, the others by the tag part count rule as well.
+        ASSERT_THROW(load(save_with(tagged, 3, true, 3)), runtime_error);
+        ASSERT_THROW(load(save_with(untagged, 3, false, 0)), runtime_error);
+        ASSERT_THROW(load(save_with(untagged, 0, false, 0)), runtime_error);
+
+        // A tag part count the parameters do not allow is refused by validation
+        ASSERT_THROW(
+            load(save_with(tagged, 2, true, PSIParams::ItemParams::tag_part_count_max + 1)),
+            invalid_argument);
+        ASSERT_THROW(load(save_with(tagged, 2, true, 1)), invalid_argument);
+    }
+
+    TEST(PSIParamsTagTests, JSONTagPartCount)
+    {
+        auto load = [](const string &item_params, const string &version) {
+            return PSIParams::Load(tag_json(item_params, version));
+        };
+
+        // Absent or zero: parameters without match tags, with or without version 1
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8 }", "").uses_tags());
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8, \"tag_part_count\": 0 }", "").uses_tags());
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8, \"tag_part_count\": 0 }", "1").uses_tags());
+        ASSERT_FALSE(load("{ \"felts_per_item\": 8, \"tag_part_count\": null }", "").uses_tags());
+
+        // Non-zero, with version 2: match tags
+        PSIParams p = load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "2");
+        ASSERT_TRUE(p.uses_tags());
+        ASSERT_EQ(3, p.tag_part_count());
+        ASSERT_EQ(1, p.item_params().felts_per_item);
+        ASSERT_EQ(48, p.tag_bit_count());
+
+        // Match tags require version 2, and version 2 requires match tags. A version of APSI
+        // that predates match tags ignores tag_part_count but refuses version 2, so this is what
+        // makes it refuse a file meant for match tags rather than misread it.
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "")),
+            runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "1")),
+            runtime_error);
+        ASSERT_THROW(static_cast<void>(load("{ \"felts_per_item\": 8 }", "2")), runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 8, \"tag_part_count\": 0 }", "2")),
+            runtime_error);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 3 }", "3")),
+            runtime_error);
+
+        // A tag part count that is not an unsigned integer is refused
+        for (const string &value : vector<string>{ "-3", "1.5", "true", "\"3\"", "[]", "{}" }) {
+            ASSERT_THROW(
+                static_cast<void>(
+                    load("{ \"felts_per_item\": 1, \"tag_part_count\": " + value + " }", "2")),
+                runtime_error)
+                << value;
+        }
+
+        // And one the parameters do not allow is refused by validation
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 2 }", "2")),
+            invalid_argument);
+        ASSERT_THROW(
+            static_cast<void>(load("{ \"felts_per_item\": 1, \"tag_part_count\": 65 }", "2")),
+            invalid_argument);
     }
 } // namespace APSITests

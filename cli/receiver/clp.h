@@ -6,10 +6,18 @@
 // STD
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 // APSI
+#include "apsi/network/sender_operation.h"
 #include "apsi/receiver.h"
+
+// SEAL
+#include "seal/serialization.h"
 
 // Base
 #include "common/base_clp.h"
@@ -59,6 +67,7 @@ public:
         add(query_file_arg_);
         add(out_file_arg_);
         add(timeout_arg_);
+        add(compression_arg_);
     }
 
     void get_args() override
@@ -68,6 +77,7 @@ public:
         query_file_ = query_file_arg_.getValue();
         output_file_ = out_file_arg_.getValue();
         timeout_ = std::chrono::seconds(timeout_arg_.getValue());
+        compr_mode_ = compr_mode_from_name(compression_arg_.getValue());
     }
 
     [[nodiscard]] const std::string &net_addr() const
@@ -98,7 +108,48 @@ public:
         return timeout_;
     }
 
+    /**
+    The compression mode for the query, which the sender also uses for its response.
+    */
+    [[nodiscard]] seal::compr_mode_type compr_mode() const
+    {
+        return compr_mode_;
+    }
+
 private:
+    /**
+    Returns the names of the compression modes this build of Microsoft SEAL supports.
+    */
+    static std::vector<std::string> supported_compr_mode_names()
+    {
+        std::vector<std::string> names;
+        for (unsigned value = 0; value <= std::numeric_limits<std::uint8_t>::max(); value++) {
+            auto compr_mode = static_cast<seal::compr_mode_type>(value);
+            if (seal::Serialization::IsSupportedComprMode(compr_mode)) {
+                names.emplace_back(apsi::network::compr_mode_str(compr_mode));
+            }
+        }
+
+        return names;
+    }
+
+    /**
+    Returns the compression mode with the given name. The argument's constraint admits only the
+    names supported_compr_mode_names returns, so the name is always found.
+    */
+    static seal::compr_mode_type compr_mode_from_name(const std::string &name)
+    {
+        for (unsigned value = 0; value <= std::numeric_limits<std::uint8_t>::max(); value++) {
+            auto compr_mode = static_cast<seal::compr_mode_type>(value);
+            if (seal::Serialization::IsSupportedComprMode(compr_mode) &&
+                name == apsi::network::compr_mode_str(compr_mode)) {
+                return compr_mode;
+            }
+        }
+
+        throw std::invalid_argument("unknown compression mode " + name);
+    }
+
     // Kept in step with the library default rather than restated, so the two cannot drift.
     static constexpr std::size_t default_timeout_seconds =
         static_cast<std::size_t>(std::chrono::duration_cast<std::chrono::seconds>(
@@ -152,6 +203,22 @@ private:
         default_timeout_seconds,
         &timeout_constraint_);
 
+    TCLAP::ValuesConstraint<std::string> compression_constraint_ =
+        TCLAP::ValuesConstraint<std::string>(supported_compr_mode_names());
+
+    TCLAP::ValueArg<std::string> compression_arg_ = TCLAP::ValueArg<std::string>(
+        "",
+        "compression",
+        std::string(
+            "Compression for the query; the sender uses the same for its response "
+            "(default is ") +
+            apsi::network::compr_mode_str(apsi::receiver::Receiver::default_compr_mode) +
+            "). A sender built with Microsoft SEAL older than 4.6, as APSI 1.x senders usually "
+            "are, cannot read bitpack; use zstd for it",
+        false,
+        apsi::network::compr_mode_str(apsi::receiver::Receiver::default_compr_mode),
+        &compression_constraint_);
+
     std::string net_addr_;
 
     int net_port_{};
@@ -161,4 +228,6 @@ private:
     std::string output_file_;
 
     std::chrono::milliseconds timeout_{};
+
+    seal::compr_mode_type compr_mode_ = apsi::receiver::Receiver::default_compr_mode;
 };

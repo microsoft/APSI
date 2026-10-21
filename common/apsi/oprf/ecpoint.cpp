@@ -16,7 +16,17 @@
 #include "apsi/fourq/FourQ.h"
 #include "apsi/fourq/FourQ_api.h"
 #include "apsi/fourq/FourQ_internal.h"
+// FourQ_params.h also defines the constants of hash_to_curve.c, as arrays that are static but
+// not const. This translation unit uses only curve_order, and GCC warns that it leaves those
+// unused.
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#endif
 #include "apsi/fourq/FourQ_params.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 // SEAL
 #include "seal/randomgen.h"

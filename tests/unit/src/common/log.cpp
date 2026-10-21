@@ -116,7 +116,9 @@ namespace APSITests {
         }
 
         // Each test takes ownership of the global logger and restores it on scope exit, so test
-        // ordering does not matter and one test cannot leak state into the next.
+        // ordering does not matter and one test cannot leak state into the next. Closing the
+        // logger calls its close handlers, so a LogCapture given to the logger must be declared
+        // before the scope, to outlive it.
         class GlobalLoggerScope {
         public:
             GlobalLoggerScope() : saved_level_(GetLogLevel())
@@ -137,8 +139,8 @@ namespace APSITests {
 
     TEST(LogTests, MacroRoutesToCustomLogger)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         SetLogger(make_capturing_logger(cap));
         SetLogLevel(LogLevel::trace);
 
@@ -163,8 +165,8 @@ namespace APSITests {
 
     TEST(LogTests, LevelFiltersBeforeDispatch)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         SetLogger(make_capturing_logger(cap));
         SetLogLevel(LogLevel::warning);
 
@@ -183,8 +185,8 @@ namespace APSITests {
 
     TEST(LogTests, LevelSuppressSuppressesEverything)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         SetLogger(make_capturing_logger(cap));
         SetLogLevel(LogLevel::suppress);
 
@@ -223,8 +225,8 @@ namespace APSITests {
 
     TEST(LogTests, FlushInvokesHandlers)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         auto logger = make_capturing_logger(cap);
         SetLogger(logger);
         SetLogLevel(LogLevel::trace);
@@ -238,8 +240,8 @@ namespace APSITests {
 
     TEST(LogTests, CloseInvokesCloseHandlerAndRendersLoggerInert)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         auto logger = make_capturing_logger(cap);
         SetLogger(logger);
         SetLogLevel(LogLevel::trace);
@@ -256,8 +258,8 @@ namespace APSITests {
 
     TEST(LogTests, CloseLoggerClearsCustomLogger)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         SetLogger(make_capturing_logger(cap));
         SetLogLevel(LogLevel::trace);
 
@@ -277,8 +279,8 @@ namespace APSITests {
 
     TEST(LogTests, SetLoggerNullClearsAndLazyRebuildsDefault)
     {
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         SetLogger(make_capturing_logger(cap));
         SetLogLevel(LogLevel::trace);
 
@@ -301,8 +303,8 @@ namespace APSITests {
     {
         // The level threshold lives in Log, not Logger. Calling Logger::log directly should always
         // dispatch (subject only to the handler being non-empty), regardless of SetLogLevel.
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         auto logger = make_capturing_logger(cap);
         SetLogger(logger);
         SetLogLevel(LogLevel::suppress);
@@ -318,8 +320,8 @@ namespace APSITests {
         // LogLevel::suppress is a threshold-only sentinel with no handler slot (its integer value
         // equals level_count). Logger::log must treat it as an out-of-range no-op rather than
         // index the handler array out of bounds or crash.
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         auto logger = make_capturing_logger(cap);
         SetLogger(logger);
 
@@ -459,8 +461,8 @@ namespace APSITests {
         constexpr int thread_count = 8;
         static constexpr int lines_per_thread = 1000;
 
-        GlobalLoggerScope scope;
         LogCapture cap;
+        GlobalLoggerScope scope;
         SetLogger(make_capturing_logger(cap));
         SetLogLevel(LogLevel::trace);
 

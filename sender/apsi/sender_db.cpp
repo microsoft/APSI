@@ -3,14 +3,20 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <functional>
 #include <iterator>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <sstream>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
 #include <unordered_set>
 
 // APSI
@@ -20,6 +26,8 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/log_noexcept.h"
+#include "apsi/util/save_size.h"
 #include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
@@ -27,6 +35,7 @@
 #include "kuku/locfunc.h"
 
 // SEAL
+#include "seal/serialization.h"
 #include "seal/util/common.h"
 #include "seal/util/streambuf.h"
 
@@ -40,7 +49,19 @@ namespace apsi {
     using namespace oprf;
 
     namespace sender {
+        using util::log_noexcept;
+
         namespace {
+            /**
+            Returns whether every byte of the OPRF key is zero, as SenderDB::strip leaves it. Under
+            a zero key every item hashes to the same value.
+            */
+            bool is_zero_key(const OPRFKey &oprf_key)
+            {
+                auto key = oprf_key.key_span();
+                return all_of(key.begin(), key.end(), [](unsigned char b) { return b == 0; });
+            }
+
             /**
             Creates and returns the vector of hash functions similarly to how Kuku 2.x sets them
             internally.
@@ -83,6 +104,27 @@ namespace apsi {
             }
 
             /**
+            Computes the number of label parts a BinBundle stores for each item. Without match
+            tags these are the parts of the encrypted label, nonce included, exactly as
+            compute_label_size gives them. With match tags they are the tag parts followed by
+            the parts of the encrypted label, if the items have labels; without labels there is
+            no nonce either.
+            */
+            size_t compute_label_part_count(
+                size_t label_byte_count, size_t nonce_byte_count, const PSIParams &params)
+            {
+                if (!params.uses_tags()) {
+                    return compute_label_size(nonce_byte_count + label_byte_count, params);
+                }
+
+                size_t payload_part_count =
+                    label_byte_count
+                        ? compute_label_size(nonce_byte_count + label_byte_count, params)
+                        : 0;
+                return params.tag_part_count() + payload_part_count;
+            }
+
+            /**
             Unpacks a cuckoo idx into its bin and bundle indices
             */
             pair<size_t, size_t> unpack_cuckoo_idx(size_t cuckoo_idx, size_t bins_per_bundle)
@@ -110,7 +152,10 @@ namespace apsi {
                 const PSIParams &params)
             {
                 STOPWATCH(sender_stopwatch, "preprocess_labeled_data");
-                APSI_LOG_DEBUG("Start preprocessing " << distance(begin, end) << " labeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Start preprocessing " << distance(begin, end) << " labeled items");
+                });
 
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
@@ -143,8 +188,10 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Finished preprocessing " << distance(begin, end) << " labeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Finished preprocessing " << distance(begin, end) << " labeled items");
+                });
 
                 return data_with_indices;
             }
@@ -159,8 +206,10 @@ namespace apsi {
                 const PSIParams &params)
             {
                 STOPWATCH(sender_stopwatch, "preprocess_unlabeled_data");
-                APSI_LOG_DEBUG(
-                    "Start preprocessing " << distance(begin, end) << " unlabeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Start preprocessing " << distance(begin, end) << " unlabeled items");
+                });
 
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
@@ -192,8 +241,10 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Finished preprocessing " << distance(begin, end) << " unlabeled items");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Finished preprocessing " << distance(begin, end) << " unlabeled items");
+                });
 
                 return data_with_indices;
             }
@@ -211,12 +262,583 @@ namespace apsi {
             }
 
             /**
+            An item with its encrypted label, empty for an unlabeled SenderDB, and its match tag.
+            */
+            using TaggedHashedItem = tuple<HashedItem, EncryptedLabel, vector<felt_t>>;
+
+            /**
+            Returns the number of field elements of an item's match tag: tag_part_count parts of
+            felts_per_item field elements each.
+            */
+            size_t tag_felt_count(const PSIParams &params)
+            {
+                return mul_safe<size_t>(
+                    params.tag_part_count(), params.item_params().felts_per_item);
+            }
+
+            /**
+            Throws std::invalid_argument unless the encrypted label takes byte_count bytes, the
+            label byte count and the nonce byte count of the SenderDB together, as
+            util::encrypt_label makes every label take. A label of another size would give the item
+            more or fewer label parts than its bin bundles hold.
+            */
+            void check_encrypted_label(const EncryptedLabel &encrypted_label, size_t byte_count)
+            {
+                if (encrypted_label.size() != byte_count) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert an encrypted label of "
+                        << encrypted_label.size()
+                        << " bytes but this SenderDB holds encrypted labels of " << byte_count
+                        << " bytes, nonce included");
+                    throw invalid_argument("failed to insert data: encrypted label has wrong size");
+                }
+            }
+
+            /**
+            Throws std::invalid_argument unless the match tag has felt_count field elements, each
+            below 2^bits_per_felt, as util::compute_match_tag gives them. A tag of another length
+            would give the item more or fewer label parts than its bin bundles hold, and a field
+            element out of range is one no receiver derives.
+            */
+            void check_match_tag(
+                const vector<felt_t> &tag, size_t felt_count, uint32_t bits_per_felt)
+            {
+                if (tag.size() != felt_count) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert a match tag of "
+                        << tag.size() << " field elements but this SenderDB holds tags of "
+                        << felt_count << " field elements");
+                    throw invalid_argument("failed to insert data: match tag has wrong size");
+                }
+                for (felt_t felt : tag) {
+                    if ((bits_per_felt < 64) && (felt >> bits_per_felt)) {
+                        APSI_LOG_ERROR(
+                            "Attempted to insert a match tag with a field element of more than "
+                            << bits_per_felt << " bits");
+                        throw invalid_argument(
+                            "failed to insert data: match tag field element is out of range");
+                    }
+                }
+            }
+
+            /**
+            Records that the item is in the batch, and throws std::invalid_argument if it was
+            already: two labels for one item cannot both be meant, so neither is chosen.
+            */
+            void check_unique_in_batch(
+                unordered_set<HashedItem> &batch_items, const HashedItem &item)
+            {
+                if (!batch_items.insert(item).second) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert the same item twice in one batch, so the intended "
+                        "label is ambiguous");
+                    throw invalid_argument("failed to insert data: duplicate item in batch");
+                }
+            }
+
+            /**
+            Throws std::logic_error unless a SenderDB that is stripped or not, labeled or not, and
+            with parameters that use match tags or not, can take items hashed already with or
+            without labels and match tags.
+            */
+            void check_hashed_insertion(
+                bool stripped, bool labeled, bool uses_tags, bool data_labeled, bool data_tagged)
+            {
+                if (stripped) {
+                    APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
+                    throw logic_error("failed to insert data");
+                }
+                if (labeled != data_labeled) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert "
+                        << (data_labeled ? "labeled" : "unlabeled") << " data but this is "
+                        << (labeled ? "a labeled" : "an unlabeled") << " SenderDB");
+                    throw logic_error("failed to insert data");
+                }
+                if (uses_tags != data_tagged) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert items " << (data_tagged ? "with" : "without")
+                                                     << " match tags but the parameters of this "
+                                                        "SenderDB "
+                                                     << (uses_tags ? "use" : "do not use")
+                                                     << " match tags");
+                    throw logic_error("failed to insert data");
+                }
+            }
+
+            /**
+            Converts each given item, with its encrypted label and its match tag, into the form a
+            SenderDB with match tags stores it in: its HashedItem, and its field elements with
+            label parts that begin with the parts of its tag. Also computes each item's cuckoo
+            indices.
+            */
+            vector<pair<TaggedAlgItemLabel, size_t>> preprocess_tagged_data(
+                const vector<TaggedHashedItem>::const_iterator begin,
+                const vector<TaggedHashedItem>::const_iterator end,
+                const PSIParams &params)
+            {
+                STOPWATCH(sender_stopwatch, "preprocess_tagged_data");
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Start preprocessing " << distance(begin, end) << " tagged items");
+                });
+
+                // Some variables we'll need
+                size_t bins_per_item = params.item_params().felts_per_item;
+                size_t item_bit_count = params.item_bit_count();
+
+                // Set up Kuku hash functions
+                auto hash_funcs = hash_functions(params);
+
+                vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices;
+                for (auto it = begin; it != end; it++) {
+                    const auto &[item, label, tag] = *it;
+
+                    TaggedAlgItemLabel tagged_item{
+                        item,
+                        algebraize_item_tag_label(
+                            item, tag, label, item_bit_count, params.seal_params().plain_modulus())
+                    };
+
+                    // Get the cuckoo table locations for this item and add to data_with_indices
+                    for (auto location : all_locations(hash_funcs, item)) {
+                        size_t bin_idx = location * bins_per_item;
+                        data_with_indices.emplace_back(tagged_item, bin_idx);
+                    }
+                }
+
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Finished preprocessing " << distance(begin, end) << " tagged items");
+                });
+
+                return data_with_indices;
+            }
+
+            /**
+            An item as a SenderDB with match tags looks for it: its field elements, and its
+            HashedItem, which is what identifies it.
+            */
+            using AlgItemWithHash = pair<AlgItem, HashedItem>;
+
+            /**
+            Converts each given item into the form a SenderDB with match tags looks it up in, and
+            computes each item's cuckoo indices.
+            */
+            vector<pair<AlgItemWithHash, size_t>> preprocess_tagged_lookup_data(
+                const vector<HashedItem>::const_iterator begin,
+                const vector<HashedItem>::const_iterator end,
+                const PSIParams &params)
+            {
+                // Some variables we'll need
+                size_t bins_per_item = params.item_params().felts_per_item;
+                size_t item_bit_count = params.item_bit_count();
+
+                // Set up Kuku hash functions
+                auto hash_funcs = hash_functions(params);
+
+                vector<pair<AlgItemWithHash, size_t>> data_with_indices;
+                for (auto it = begin; it != end; it++) {
+                    const HashedItem &item = *it;
+                    AlgItem alg_item =
+                        algebraize_item(item, item_bit_count, params.seal_params().plain_modulus());
+
+                    // Get the cuckoo table locations for this item and add to data_with_indices
+                    for (auto location : all_locations(hash_funcs, item)) {
+                        size_t bin_idx = location * bins_per_item;
+                        data_with_indices.emplace_back(make_pair(alg_item, item), bin_idx);
+                    }
+                }
+
+                return data_with_indices;
+            }
+
+            /**
+            Looks an item up in, or removes it from, a BinBundle: as an AlgItem without match tags,
+            and by its HashedItem with them.
+            */
+            bool bundle_contains(const BinBundle &bundle, const AlgItem &data, size_t bin_idx)
+            {
+                return bundle.multi_contains(data, bin_idx);
+            }
+
+            bool bundle_contains(
+                const BinBundle &bundle, const AlgItemWithHash &data, size_t bin_idx)
+            {
+                return bundle.multi_contains(data.first, data.second, bin_idx);
+            }
+
+            bool bundle_remove(BinBundle &bundle, const AlgItem &data, size_t bin_idx)
+            {
+                return bundle.try_multi_remove(data, bin_idx);
+            }
+
+            bool bundle_remove(BinBundle &bundle, const AlgItemWithHash &data, size_t bin_idx)
+            {
+                return bundle.try_multi_remove(data.first, data.second, bin_idx);
+            }
+
+            /**
+            Returns whether each of the felt_count bins of a BinBundle beginning at start_bin_idx
+            holds fewer than max_bin_size items. An item occupies one place in each of the bins
+            of its location, so with match tags those bins always hold equally many items, but
+            each is checked.
+            */
+            bool has_room(
+                const BinBundle &bundle,
+                size_t start_bin_idx,
+                size_t felt_count,
+                size_t max_bin_size)
+            {
+                const vector<vector<felt_t>> &item_bins = bundle.get_item_bins();
+                for (size_t felt_idx = 0; felt_idx < felt_count; felt_idx++) {
+                    if (item_bins[start_bin_idx + felt_idx].size() >= max_bin_size) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            /**
+            Reads the item stored at position pos of the felt_count bins of a BinBundle with match
+            tags beginning at start_bin_idx: its HashedItem, its field elements, and all its label
+            parts, tag parts included, in the form multi_insert takes. An item is stored at the
+            same position in each of the bins of its location. Returns false if the bins do not
+            hold one item there, which happens only if the BinBundle has been corrupted.
+            */
+            bool read_stored_item(
+                const BinBundle &bundle,
+                size_t start_bin_idx,
+                size_t felt_count,
+                size_t pos,
+                TaggedAlgItemLabel &stored_item)
+            {
+                const vector<vector<felt_t>> &item_bins = bundle.get_item_bins();
+                const vector<vector<HashedItem>> &hashed_item_bins = bundle.get_hashed_item_bins();
+                const vector<vector<vector<felt_t>>> &label_bins = bundle.get_label_bins();
+                size_t label_size = bundle.get_label_size();
+
+                stored_item.alg_item_label.clear();
+                stored_item.alg_item_label.reserve(felt_count);
+                for (size_t felt_idx = 0; felt_idx < felt_count; felt_idx++) {
+                    size_t curr_bin_idx = start_bin_idx + felt_idx;
+                    if ((pos >= item_bins[curr_bin_idx].size()) ||
+                        (pos >= hashed_item_bins[curr_bin_idx].size())) {
+                        return false;
+                    }
+
+                    const HashedItem &hashed_item = hashed_item_bins[curr_bin_idx][pos];
+                    if (felt_idx == 0) {
+                        stored_item.item = hashed_item;
+                    } else if (!(hashed_item == stored_item.item)) {
+                        return false;
+                    }
+
+                    vector<felt_t> label_parts(label_size);
+                    for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
+                        const vector<felt_t> &label_bin = label_bins[label_idx][curr_bin_idx];
+                        if (pos >= label_bin.size()) {
+                            return false;
+                        }
+                        label_parts[label_idx] = label_bin[pos];
+                    }
+
+                    stored_item.alg_item_label.emplace_back(
+                        item_bins[curr_bin_idx][pos], std::move(label_parts));
+                }
+
+                return true;
+            }
+
+            /**
+            What insert_by_relocation did: moved a stored item and inserted the new one in its
+            place; found no move possible, as no BinBundle is both full and free of the new item's
+            field elements, or none has room; declined a move through a BinBundle that the batch
+            had not changed; or found no move among the BinBundles it tried.
+            */
+            enum class Relocation { moved, impossible, declined, not_found };
+
+            /**
+            Inserts an item into one of the BinBundles of a SenderDB with match tags at the item's
+            bundle index, none of which accepts it, by first moving an item already stored there to
+            another of them. Unless it returns Relocation::moved, the BinBundles are left as they
+            were, and the caller puts the item in a new BinBundle.
+
+            A bin cannot hold two items with the same field element, as its label polynomials
+            interpolate through them. When the item's bins are full in some BinBundles and hold one
+            of its field elements in all the others, the item would need a new BinBundle, which
+            costs every query tag_part_count more result ciphertexts and one more per label part,
+            although there is room for it. Instead, this moves a stored item out of a source, a
+            BinBundle whose bins at the location are full and hold none of the item's field
+            elements, into a destination whose bins there have room and hold none of the moved
+            item's field elements, and puts the new item in its place. Every lookup searches all the
+            BinBundles at a bundle index, so the moved item is still found. With one field element
+            per item, such a move exists whenever the bins have room for the item and not every
+            BinBundle holds its field element: a full source holds max_bin_size distinct field
+            elements, more than a destination with room, so one of them is not in the destination.
+            With more field elements per item, a single move is merely tried.
+
+            Only BinBundles the batch has already changed, and so regenerates anyway, are used:
+            moving an item through any other would make the batch encode all its plaintexts again,
+            while the new BinBundle the move avoids costs almost nothing to generate. So a large
+            batch moves items for free, and a small one opens a new BinBundle instead. Newer
+            BinBundles are tried first, and the stored items of a source in the order they are
+            stored, so the choice is deterministic.
+
+            Nothing is changed until dry runs have shown that the moved item fits in the destination
+            and that the new item can take its place in the source. Adding the moved item to the
+            destination then either throws having changed nothing, as it reserves memory first, or
+            succeeds, and replacing it in the source neither allocates nor throws, and cannot fail,
+            as the source has not changed since its dry run. So nothing ever needs to be undone, and
+            the moved item is stored throughout, and in the end exactly once.
+            */
+            Relocation insert_by_relocation(
+                vector<BinBundle> &bundle_set,
+                const TaggedAlgItemLabel &item,
+                size_t bin_idx,
+                size_t max_bin_size)
+            {
+                size_t felt_count = item.alg_item_label.size();
+
+                // A BinBundle with room holds one of the item's field elements, or the item would
+                // have gone into it. One that is full can take the item only if it holds none of
+                // them, which its dry run shows by returning a size, one too large, rather than
+                // -1; the item fits once a stored item has made way for it.
+                vector<size_t> sources;
+                vector<size_t> destinations;
+                for (size_t set_idx = bundle_set.size(); set_idx-- > 0;) {
+                    BinBundle &bundle = bundle_set[set_idx];
+                    if (has_room(bundle, bin_idx, felt_count, max_bin_size)) {
+                        destinations.push_back(set_idx);
+                        continue;
+                    }
+
+                    int32_t new_size = bundle.multi_insert_dry_run(item, bin_idx);
+                    if ((new_size > 0) && (static_cast<size_t>(new_size) <= max_bin_size + 1)) {
+                        sources.push_back(set_idx);
+                    }
+                }
+
+                if (sources.empty() || destinations.empty()) {
+                    return Relocation::impossible;
+                }
+
+                // Each destination's field elements at the location, collected once per call
+                unordered_map<size_t, vector<unordered_set<felt_t>>> destination_felts;
+
+                // Whether a move was declined as it would change a BinBundle the batch has not
+                bool declined = false;
+
+                for (size_t source_idx : sources) {
+                    for (size_t destination_idx : destinations) {
+                        BinBundle &source = bundle_set[source_idx];
+                        BinBundle &destination = bundle_set[destination_idx];
+
+                        // A BinBundle's cache is invalid exactly when this batch has changed it,
+                        // or made it, so that the batch regenerates it anyway
+                        if (!source.cache_invalid() || !destination.cache_invalid()) {
+                            declined = true;
+                            continue;
+                        }
+
+                        // Collect the destination's field elements the first time it is tried
+                        auto [felts_it, felts_new] = destination_felts.try_emplace(destination_idx);
+                        vector<unordered_set<felt_t>> &dest_felts = felts_it->second;
+                        if (felts_new) {
+                            dest_felts.resize(felt_count);
+                            for (size_t felt_idx = 0; felt_idx < felt_count; felt_idx++) {
+                                const vector<felt_t> &bin =
+                                    destination.get_item_bins()[bin_idx + felt_idx];
+                                dest_felts[felt_idx].reserve(bin.size());
+                                dest_felts[felt_idx].insert(bin.begin(), bin.end());
+                            }
+                        }
+
+                        // Try the stored items in the order they are stored. One can move if the
+                        // destination holds none of its field elements.
+                        const vector<vector<felt_t>> &source_bins = source.get_item_bins();
+                        size_t stored_count = source_bins[bin_idx].size();
+                        for (size_t pos = 0; pos < stored_count; pos++) {
+                            bool movable = true;
+                            for (size_t felt_idx = 0; movable && (felt_idx < felt_count);
+                                 felt_idx++) {
+                                const vector<felt_t> &bin = source_bins[bin_idx + felt_idx];
+                                movable =
+                                    (pos < bin.size()) && !dest_felts[felt_idx].count(bin[pos]);
+                            }
+                            if (!movable) {
+                                continue;
+                            }
+
+                            TaggedAlgItemLabel stored_item;
+                            if (!read_stored_item(source, bin_idx, felt_count, pos, stored_item)) {
+                                log_noexcept([&] {
+                                    APSI_LOG_ERROR(
+                                        "Insert-or-Assign worker: the bins beginning at index "
+                                        << bin_idx
+                                        << " of a BinBundle do not hold one item at the same "
+                                           "position; the internal state of the BinBundle has "
+                                           "been corrupted");
+                                });
+                                return Relocation::not_found;
+                            }
+
+                            // Check the whole move before changing anything
+                            int32_t new_dest_size =
+                                destination.multi_insert_dry_run(stored_item, bin_idx);
+                            if ((new_dest_size <= 0) ||
+                                (static_cast<size_t>(new_dest_size) > max_bin_size) ||
+                                !source.try_multi_replace(
+                                    stored_item.item, pos, item, bin_idx, true)) {
+                                continue;
+                            }
+
+                            // Add the moved item to the destination before replacing it in the
+                            // source, so that nothing ever needs to be undone; see above.
+                            if (destination.multi_insert_for_real(stored_item, bin_idx) < 0) {
+                                APSI_LOG_ERROR(
+                                    "Insert-or-Assign worker: failed to move an item to another "
+                                    "BinBundle at bin index "
+                                    << bin_idx);
+                                throw logic_error("failed to move an item to another BinBundle");
+                            }
+                            if (!source.try_multi_replace(
+                                    stored_item.item, pos, item, bin_idx, false)) {
+                                APSI_LOG_ERROR(
+                                    "Insert-or-Assign worker: failed to put an item in place of "
+                                    "one moved to another BinBundle at bin index "
+                                    << bin_idx);
+                                throw logic_error(
+                                    "failed to put an item in place of one moved out of its way");
+                            }
+
+                            return Relocation::moved;
+                        }
+                    }
+                }
+
+                return declined ? Relocation::declined : Relocation::not_found;
+            }
+
+            /**
+            Places the new items at a bundle index that holds no BinBundles, for a SenderDB with
+            match tags and one field element per item, in as few BinBundles as any placement of
+            them can use. entries are the positions in data_with_indices of the items at this
+            bundle index, in the order in which they are to be stored.
+
+            A bin of n items in which no field element appears more than m times needs
+            max(ceil(n / K), m) BinBundles, for a capacity K: no BinBundle holds more than K items
+            in a bin or one field element twice. This uses B BinBundles, the largest of those
+            numbers over the bins of the bundle index, and is therefore optimal. In each bin, the
+            items are sorted by field element, so that equal ones are adjacent, and dealt to the
+            B BinBundles in turn. Equal field elements, at most B of them, go to distinct
+            BinBundles, and each BinBundle gets at most ceil(n / B) <= K items. The bins of all B
+            BinBundles are then about equally full, which also keeps the interpolation, whose
+            cost grows with the square of the number of items in a bin, cheaper than filling the
+            BinBundles one after another, and leaves room in each of them for items inserted
+            later.
+
+            Placing items one at a time, newest BinBundle first, can need more BinBundles: an
+            item whose field element is in the one BinBundle with room opens a new one, although
+            an older, full one could have taken it had a stored item been moved. Nothing is moved
+            here, and every BinBundle is new, so no cache is regenerated more than once.
+            */
+            void pack_tagged_items(
+                const vector<pair<TaggedAlgItemLabel, size_t>> &data_with_indices,
+                const vector<size_t> &entries,
+                vector<BinBundle> &bundle_set,
+                CryptoContext &crypto_context,
+                uint32_t bins_per_bundle,
+                size_t label_size,
+                size_t tag_part_count,
+                size_t max_bin_size,
+                size_t ps_low_degree,
+                bool compressed)
+            {
+                // Each item here has one field element, by which it is sorted and dealt
+                auto felt_of = [&](size_t entry) {
+                    return data_with_indices[entry].first.alg_item_label[0].first;
+                };
+
+                // Group the items by bin
+                vector<vector<size_t>> bins(bins_per_bundle);
+                for (size_t entry : entries) {
+                    size_t bin_idx = data_with_indices[entry].second % bins_per_bundle;
+                    bins[bin_idx].push_back(entry);
+                }
+
+                // Sort each bin by field element, and find how many BinBundles the fullest bin, or
+                // the most repeated field element, needs
+                size_t bundle_count = 0;
+                for (auto &bin : bins) {
+                    if (bin.empty()) {
+                        continue;
+                    }
+
+                    stable_sort(bin.begin(), bin.end(), [&](size_t a, size_t b) {
+                        return felt_of(a) < felt_of(b);
+                    });
+
+                    size_t repeat_count = 1;
+                    size_t max_repeat_count = 1;
+                    for (size_t i = 1; i < bin.size(); i++) {
+                        repeat_count =
+                            (felt_of(bin[i]) == felt_of(bin[i - 1])) ? repeat_count + 1 : 1;
+                        max_repeat_count = max(max_repeat_count, repeat_count);
+                    }
+
+                    size_t fill_count = (bin.size() + max_bin_size - 1) / max_bin_size;
+                    bundle_count = max({ bundle_count, fill_count, max_repeat_count });
+                }
+
+                // Make the BinBundles. They are added to the bundle index only once all of them
+                // hold their items.
+                vector<BinBundle> packed;
+                packed.reserve(bundle_count);
+                for (size_t i = 0; i < bundle_count; i++) {
+                    packed.emplace_back(
+                        crypto_context,
+                        label_size,
+                        max_bin_size,
+                        ps_low_degree,
+                        bins_per_bundle,
+                        compressed,
+                        false,
+                        tag_part_count);
+                }
+
+                // Deal each bin's items to the BinBundles in turn
+                for (size_t bin_idx = 0; bin_idx < bins.size(); bin_idx++) {
+                    const vector<size_t> &bin = bins[bin_idx];
+                    for (size_t i = 0; i < bin.size(); i++) {
+                        int32_t new_size = packed[i % bundle_count].multi_insert_for_real(
+                            data_with_indices[bin[i]].first, bin_idx);
+                        if ((new_size <= 0) || (static_cast<size_t>(new_size) > max_bin_size)) {
+                            APSI_LOG_ERROR(
+                                "Insert-or-Assign worker: failed to insert an item into a new "
+                                "BinBundle while packing the bin at index "
+                                << bin_idx);
+                            throw logic_error("failed to insert item into a new BinBundle");
+                        }
+                    }
+                }
+
+                bundle_set = std::move(packed);
+            }
+
+            /**
             Inserts the given items and corresponding labels into bin_bundles at their respective
-            cuckoo indices. It will only insert the data with bundle index in the half-open range
-            range indicated by work_range. If inserting into a BinBundle would make the number of
-            items in a bin larger than max_bin_size, this function will create and insert a new
-            BinBundle. If overwrite is set, this will overwrite the labels if it finds an
-            AlgItemLabel that matches the input perfectly.
+            cuckoo indices, for the items whose bundle index is bundle_index. An item goes into the
+            newest BinBundle that accepts it, or into a new BinBundle if none does. A bin holds at
+            most max_bin_size - 1 items, or max_bin_size with match tags, which a non-zero
+            tag_part_count selects. If overwrite is set, every item must already be stored in the
+            BinBundles at its bundle index; its labels are overwritten in every one of them that
+            holds it, and nothing is inserted. With match tags, new items at a bundle index without
+            BinBundles are packed into as few as possible (see pack_tagged_items), and an item that
+            no BinBundle accepts goes into a new BinBundle only if moving a stored item between
+            BinBundles this batch has already changed cannot make room for it in one of them (see
+            insert_by_relocation).
             */
             template <typename T>
             void insert_or_assign_worker(
@@ -226,16 +848,70 @@ namespace apsi {
                 uint32_t bundle_index,
                 uint32_t bins_per_bundle,
                 size_t label_size,
+                size_t tag_part_count,
                 size_t max_bin_size,
                 size_t ps_low_degree,
                 bool overwrite,
                 bool compressed)
             {
                 STOPWATCH(sender_stopwatch, "insert_or_assign_worker");
-                APSI_LOG_DEBUG(
-                    "Insert-or-Assign worker for bundle index "
-                    << bundle_index << "; mode of operation: "
-                    << (overwrite ? "overwriting existing" : "inserting new"));
+                log_noexcept([&] {
+                    APSI_LOG_DEBUG(
+                        "Insert-or-Assign worker for bundle index "
+                        << bundle_index << "; mode of operation: "
+                        << (overwrite ? "overwriting existing" : "inserting new"));
+                });
+
+                constexpr bool with_tags = is_same_v<T, TaggedAlgItemLabel>;
+
+                // With match tags and one field element per item, the new items at a bundle index
+                // that holds no BinBundles, as after set_data has cleared the SenderDB, are all
+                // known before any is placed, and are packed into as few BinBundles as possible
+                if constexpr (with_tags) {
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_index];
+                    if (!overwrite && bundle_set.empty()) {
+                        vector<size_t> entries;
+                        bool one_felt = true;
+                        for (size_t entry = 0; entry < data_with_indices.size(); entry++) {
+                            const auto &data_with_idx = data_with_indices[entry];
+                            if (unpack_cuckoo_idx(data_with_idx.second, bins_per_bundle).second ==
+                                bundle_index) {
+                                entries.push_back(entry);
+                                one_felt =
+                                    one_felt && (data_with_idx.first.alg_item_label.size() == 1);
+                            }
+                        }
+
+                        if (one_felt && !entries.empty()) {
+                            pack_tagged_items(
+                                data_with_indices,
+                                entries,
+                                bundle_set,
+                                crypto_context,
+                                bins_per_bundle,
+                                label_size,
+                                tag_part_count,
+                                max_bin_size,
+                                ps_low_degree,
+                                compressed);
+                            log_noexcept([&] {
+                                APSI_LOG_DEBUG(
+                                    "Insert-or-Assign worker: finished processing bundle index "
+                                    << bundle_index << "; packed " << entries.size()
+                                    << " items into " << bundle_set.size() << " new BinBundles");
+                            });
+                            return;
+                        }
+                    }
+                }
+
+                // With match tags, how many BinBundles were opened, how many items were inserted by
+                // moving another, how many moves were declined as they would have changed a
+                // BinBundle this batch had not, and how many searches found no move
+                size_t opened_count = 0;
+                size_t moved_count = 0;
+                size_t declined_count = 0;
+                size_t not_found_count = 0;
 
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices) {
@@ -256,29 +932,75 @@ namespace apsi {
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
-                    // Try to insert or overwrite these field elements in an existing BinBundle at
-                    // this bundle index. Keep track of whether or not we succeed.
-                    bool written = false;
-                    for (auto bundle_it = bundle_set.rbegin(); bundle_it != bundle_set.rend();
-                         bundle_it++) {
-                        // If we're supposed to overwrite, try to overwrite. One of these BinBundles
-                        // has to have the data we're trying to overwrite.
-                        if (overwrite) {
-                            // If we successfully overwrote, we're done with this bundle
-                            written = bundle_it->try_multi_overwrite(data, bin_idx);
-                            if (written) {
-                                break;
+                    // Overwrite the item in every BinBundle that holds it, all found before any is
+                    // changed, and in no other. Trying them one at a time, as APSI 1.x did, can
+                    // store a second copy with the new label and leave the old one to answer
+                    // queries, so an item can be stored more than once; every copy is overwritten,
+                    // so that whichever one a query matches gives the new label.
+                    if (overwrite) {
+                        vector<BinBundle *> holders;
+                        for (auto &bundle : bundle_set) {
+                            if (bundle.multi_contains(data, bin_idx)) {
+                                holders.push_back(&bundle);
                             }
                         }
 
+                        // The item is in the database, so this should never happen
+                        if (holders.empty()) {
+                            APSI_LOG_ERROR(
+                                "Insert-or-Assign worker: "
+                                "failed to overwrite item at bundle index "
+                                << bundle_idx << " because no BinBundle there holds it");
+                            throw logic_error("tried to overwrite non-existent item");
+                        }
+
+                        if (holders.size() > 1) {
+                            log_noexcept([&] {
+                                APSI_LOG_WARNING(
+                                    "Insert-or-Assign worker: overwriting all "
+                                    << holders.size() << " copies of an item at bundle index "
+                                    << bundle_index
+                                    << "; an older version of APSI stored the item more than "
+                                       "once when it updated its label. Removing the item and "
+                                       "inserting it again drops the extra copies.");
+                            });
+                        }
+
+                        for (BinBundle *holder : holders) {
+                            if (!holder->try_multi_overwrite(data, bin_idx)) {
+                                APSI_LOG_ERROR(
+                                    "Insert-or-Assign worker: "
+                                    "failed to overwrite item at bundle index "
+                                    << bundle_idx << " although it was found there");
+                                throw logic_error("failed to overwrite item");
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    // Try to insert these field elements in an existing BinBundle at this bundle
+                    // index. Keep track of whether or not we succeed.
+                    bool written = false;
+                    for (auto bundle_it = bundle_set.rbegin(); bundle_it != bundle_set.rend();
+                         bundle_it++) {
                         // Do a dry-run insertion and see if the new largest bin size in the range
                         // exceeds the limit
                         int32_t new_largest_bin_size =
                             bundle_it->multi_insert_dry_run(data, bin_idx);
 
-                        // Check if inserting would violate the max bin size constraint
-                        if (new_largest_bin_size > 0 &&
-                            safe_cast<size_t>(new_largest_bin_size) < max_bin_size) {
+                        // Check if inserting would violate the max bin size constraint. Without
+                        // match tags a bin holds fewer than max_bin_size items, as in APSI 1.x.
+                        // With them it may hold max_bin_size, as its label polynomials then have
+                        // degree below max_bin_size, which the query powers cover. A negative size
+                        // means the dry run failed.
+                        bool fits = false;
+                        if (new_largest_bin_size > 0) {
+                            auto new_bin_size = static_cast<size_t>(new_largest_bin_size);
+                            fits = tag_part_count ? (new_bin_size <= max_bin_size)
+                                                  : (new_bin_size < max_bin_size);
+                        }
+                        if (fits) {
                             // All good
                             bundle_it->multi_insert_for_real(data, bin_idx);
                             written = true;
@@ -286,15 +1008,25 @@ namespace apsi {
                         }
                     }
 
-                    // We tried to overwrite an item that doesn't exist. This should never happen
-                    if (overwrite && !written) {
-                        APSI_LOG_ERROR(
-                            "Insert-or-Assign worker: "
-                            "failed to overwrite item at bundle index "
-                            << bundle_idx
-                            << " "
-                               "because the item was not found");
-                        throw logic_error("tried to overwrite non-existent item");
+                    // With match tags, an item can fail to fit only because its field elements
+                    // are in the bins with room, and moving a stored item may make room for it
+                    if constexpr (with_tags) {
+                        if (!written) {
+                            switch (insert_by_relocation(bundle_set, data, bin_idx, max_bin_size)) {
+                            case Relocation::moved:
+                                written = true;
+                                moved_count++;
+                                break;
+                            case Relocation::declined:
+                                declined_count++;
+                                break;
+                            case Relocation::not_found:
+                                not_found_count++;
+                                break;
+                            case Relocation::impossible:
+                                break;
+                            }
+                        }
                     }
 
                     // If we had conflicts everywhere when trying to insert, then we need to make a
@@ -308,7 +1040,8 @@ namespace apsi {
                             ps_low_degree,
                             bins_per_bundle,
                             compressed,
-                            false);
+                            false,
+                            tag_part_count);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                         // If even that failed, I don't know what could've happened
@@ -322,11 +1055,27 @@ namespace apsi {
 
                         // Push a new BinBundle to the set of BinBundles at this bundle index
                         bundle_set.push_back(std::move(new_bin_bundle));
+                        opened_count++;
                     }
                 }
 
-                APSI_LOG_DEBUG(
-                    "Insert-or-Assign worker: finished processing bundle index " << bundle_index);
+                if constexpr (with_tags) {
+                    log_noexcept([&] {
+                        APSI_LOG_DEBUG(
+                            "Insert-or-Assign worker: finished processing bundle index "
+                            << bundle_index << "; opened " << opened_count << " BinBundles; moved "
+                            << moved_count << " items to make room; declined " << declined_count
+                            << " moves through BinBundles the batch had not changed; "
+                               "found no move for "
+                            << not_found_count << " items");
+                    });
+                } else {
+                    log_noexcept([&] {
+                        APSI_LOG_DEBUG(
+                            "Insert-or-Assign worker: finished processing bundle index "
+                            << bundle_index);
+                    });
+                }
             }
 
             /**
@@ -341,6 +1090,7 @@ namespace apsi {
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 size_t label_size,
+                size_t tag_part_count,
                 uint32_t max_bin_size,
                 uint32_t ps_low_degree,
                 bool overwrite,
@@ -373,8 +1123,10 @@ namespace apsi {
                 // Run the threads on the partitions
                 TaskGroup tasks(tpm.thread_pool());
                 tasks.reserve(bundle_indices.size());
-                APSI_LOG_INFO(
-                    "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
+                log_noexcept([&] {
+                    APSI_LOG_INFO(
+                        "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
+                });
                 for (auto &bundle_idx : bundle_indices) {
                     tasks.add([&, bundle_idx] {
                         insert_or_assign_worker(
@@ -384,6 +1136,7 @@ namespace apsi {
                             static_cast<uint32_t>(bundle_idx),
                             bins_per_bundle,
                             label_size,
+                            tag_part_count,
                             max_bin_size,
                             ps_low_degree,
                             overwrite,
@@ -394,21 +1147,70 @@ namespace apsi {
                 // Wait for the tasks to finish
                 tasks.join();
 
-                APSI_LOG_INFO("Finished insert-or-assign worker tasks");
+                log_noexcept([] { APSI_LOG_INFO("Finished insert-or-assign worker tasks"); });
+            }
+
+            /**
+            Checks, without changing anything, that each of the given items is stored at its
+            respective cuckoo index in at least one of bin_bundles. Only the data with bundle index
+            bundle_index is checked. Throws std::logic_error if an item is missing.
+            */
+            template <typename T>
+            void remove_check_worker(
+                const vector<pair<T, size_t>> &data_with_indices,
+                const vector<vector<BinBundle>> &bin_bundles,
+                uint32_t bundle_index,
+                uint32_t bins_per_bundle)
+            {
+                STOPWATCH(sender_stopwatch, "remove_check_worker");
+
+                for (const auto &data_with_idx : data_with_indices) {
+                    // Get the bundle index
+                    size_t cuckoo_idx = data_with_idx.second;
+
+                    auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    // If the bundle_idx isn't in the prescribed range, don't check this data
+                    if (bundle_idx != bundle_index) {
+                        // Dealing with this bundle index is not our job
+                        continue;
+                    }
+
+                    const vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
+                    bool found = false;
+                    for (const BinBundle &bundle : bundle_set) {
+                        if (bundle_contains(bundle, data_with_idx.first, bin_idx)) {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    // SenderDB::remove has checked that the item is in the SenderDB, so this means
+                    // the item set and the bin bundles disagree. Nothing has been removed yet.
+                    if (!found) {
+                        APSI_LOG_ERROR(
+                            "Remove worker: the item to remove at bundle index "
+                            << bundle_idx << " was not found; nothing has been removed");
+                        throw logic_error("failed to remove item");
+                    }
+                }
             }
 
             /**
             Removes the given items and corresponding labels from bin_bundles at their respective
-            cuckoo indices.
+            cuckoo indices. An item found in more than one BinBundle at its bundle index, as
+            APSI 1.x could leave one behind when it updated a label, is removed from every one of
+            them.
             */
+            template <typename T>
             void remove_worker(
-                const vector<pair<AlgItem, size_t>> &data_with_indices,
+                const vector<pair<T, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
                 uint32_t bundle_index,
                 uint32_t bins_per_bundle)
             {
                 STOPWATCH(sender_stopwatch, "remove_worker");
-                APSI_LOG_INFO("Remove worker [" << bundle_index << "]");
+                log_noexcept([&] { APSI_LOG_INFO("Remove worker [" << bundle_index << "]"); });
 
                 // Iteratively remove each item-label pair at the given cuckoo index
                 for (const auto &data_with_idx : data_with_indices) {
@@ -427,15 +1229,22 @@ namespace apsi {
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
-                    // Try to remove these field elements from an existing BinBundle at this bundle
-                    // index. Keep track of whether or not we succeed.
-                    bool removed = false;
+                    // Remove these field elements from every BinBundle at this bundle index that
+                    // holds them, and count the BinBundles that did
+                    size_t removed_count = 0;
                     for (BinBundle &bundle : bundle_set) {
-                        // If we successfully removed, we're done with this bundle
-                        removed = bundle.try_multi_remove(data_with_idx.first, bin_idx);
-                        if (removed) {
-                            break;
+                        if (bundle_remove(bundle, data_with_idx.first, bin_idx)) {
+                            removed_count++;
                         }
+                    }
+
+                    if (removed_count > 1) {
+                        log_noexcept([&] {
+                            APSI_LOG_WARNING(
+                                "Remove worker: removed an item stored in "
+                                << removed_count << " BinBundles at bundle index " << bundle_index
+                                << " instead of one");
+                        });
                     }
 
                     // We may have produced some empty BinBundles so just remove them all
@@ -444,8 +1253,9 @@ namespace apsi {
                     });
                     bundle_set.erase(rem_it, bundle_set.end());
 
-                    // We tried to remove an item that doesn't exist. This should never happen
-                    if (!removed) {
+                    // We tried to remove an item that doesn't exist. The check that runs before
+                    // any removal makes this impossible.
+                    if (!removed_count) {
                         APSI_LOG_ERROR(
                             "Remove worker: "
                             "failed to remove item at bundle index "
@@ -456,15 +1266,21 @@ namespace apsi {
                     }
                 }
 
-                APSI_LOG_INFO("Remove worker: finished processing bundle index " << bundle_index);
+                log_noexcept([&] {
+                    APSI_LOG_INFO(
+                        "Remove worker: finished processing bundle index " << bundle_index);
+                });
             }
 
             /**
-            Takes algebraized data to be removed, splits it up, and distributes it so that
-            thread_count many threads can all remove in parallel.
+            Takes algebraized data to be removed, splits it up, and distributes it so that worker
+            threads can all remove in parallel. Every item is first checked to be present, and
+            nothing is removed unless all of them are: a removal cannot be undone partway, so a
+            batch that cannot be removed in full has to be refused before it has had any effect.
             */
+            template <typename T>
             void dispatch_remove(
-                const vector<pair<AlgItem, size_t>> &data_with_indices,
+                const vector<pair<T, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
                 uint32_t bins_per_bundle)
             {
@@ -491,6 +1307,24 @@ namespace apsi {
                     bundle_indices_set.end(),
                     back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
+
+                // Check that everything to remove is present before removing anything
+                {
+                    TaskGroup check_tasks(tpm.thread_pool());
+                    check_tasks.reserve(bundle_indices.size());
+                    for (auto &bundle_idx : bundle_indices) {
+                        check_tasks.add([&, bundle_idx] {
+                            remove_check_worker(
+                                data_with_indices,
+                                bin_bundles,
+                                static_cast<uint32_t>(bundle_idx),
+                                bins_per_bundle);
+                        });
+                    }
+
+                    // Wait for the tasks to finish
+                    check_tasks.join();
+                }
 
                 // Run the threads on the partitions
                 TaskGroup tasks(tpm.thread_pool());
@@ -525,6 +1359,40 @@ namespace apsi {
                 return result;
             }
         } // namespace
+
+        namespace util {
+            SaveSizeBounds sender_db_header_save_size_bounds(
+                size_t params_byte_count,
+                size_t oprf_key_byte_count,
+                size_t hashed_item_count,
+                size_t bin_bundle_count)
+            {
+                // This mirrors SenderDB::save, and must be kept in step with it
+                FlatBufferSizeBounds sizer;
+                sizer.add_vector(
+                    params_byte_count, sizeof(uint8_t), flatbuffers::AlignOf<uint8_t>());
+                sizer.add_vector(
+                    oprf_key_byte_count, sizeof(uint8_t), flatbuffers::AlignOf<uint8_t>());
+                sizer.add_vector(
+                    hashed_item_count,
+                    sizeof(fbs::HashedItem),
+                    flatbuffers::AlignOf<fbs::HashedItem>());
+
+                // A bin bundle count of zero, its default, is not written
+                array<FlatBufferField, 5> fields{
+                    offset_field(fbs::SenderDB::VT_PARAMS),
+                    struct_field<fbs::SenderDBInfo>(fbs::SenderDB::VT_INFO),
+                    offset_field(fbs::SenderDB::VT_OPRF_KEY),
+                    offset_field(fbs::SenderDB::VT_HASHED_ITEMS),
+                    scalar_field<uint32_t>(fbs::SenderDB::VT_BIN_BUNDLE_COUNT)
+                };
+                sizer.add_table(
+                    fields.data(), bin_bundle_count ? fields.size() : fields.size() - 1);
+
+                sizer.finish_size_prefixed();
+                return sizer.bounds();
+            }
+        } // namespace util
 
         SenderDB::SenderDB(
             const PSIParams &params,
@@ -587,6 +1455,11 @@ namespace apsi {
             bool compressed)
             : SenderDB(params, label_byte_count, nonce_byte_count, compressed)
         {
+            if (is_zero_key(oprf_key)) {
+                APSI_LOG_ERROR("Cannot create a SenderDB with an OPRF key of zero");
+                throw invalid_argument("oprf_key is zero");
+            }
+
             // Initialize oprf key with the one given to this constructor
             oprf_key_ = std::move(oprf_key);
         }
@@ -745,6 +1618,13 @@ namespace apsi {
             // Lock the database for writing
             auto lock = get_writer_lock();
 
+            // A stripped SenderDB has no OPRF key: strip() zeroed it, and every item would hash to
+            // the same value under it. Clearing makes the SenderDB as a newly constructed one,
+            // with a new key of its own.
+            if (stripped_) {
+                oprf_key_ = OPRFKey();
+            }
+
             if (!hashed_items_.empty()) {
                 APSI_LOG_INFO("Removing " << hashed_items_.size() << " items pairs from SenderDB");
             }
@@ -755,15 +1635,37 @@ namespace apsi {
         void SenderDB::generate_caches()
         {
             STOPWATCH(sender_stopwatch, "SenderDB::generate_caches");
-            APSI_LOG_INFO("Start generating bin bundle caches");
+            log_noexcept([] { APSI_LOG_INFO("Start generating bin bundle caches"); });
 
+            // Only the bin bundles changed since their caches were last generated are regenerated.
+            // Each computes the polynomials of its changed bins again and makes all its plaintexts
+            // again, so the cost of an update depends mostly on how many bin bundles it changes.
+            size_t regen_count = 0;
+            size_t bundle_count = 0;
             for (auto &bundle_idx : bin_bundles_) {
                 for (auto &bb : bundle_idx) {
+                    bundle_count++;
+                    if (bb.cache_invalid()) {
+                        regen_count++;
+                    }
                     bb.regen_cache();
                 }
             }
 
-            APSI_LOG_INFO("Finished generating bin bundle caches");
+            log_noexcept([&] {
+                APSI_LOG_DEBUG(
+                    "Regenerated the caches of " << regen_count << " of " << bundle_count
+                                                 << " bin bundles");
+            });
+            log_noexcept([] { APSI_LOG_INFO("Finished generating bin bundle caches"); });
+        }
+
+        void SenderDB::generate_caches_after_failure() noexcept
+        {
+            try {
+                generate_caches();
+            } catch (...) { // NOLINT(bugprone-empty-catch): the update's exception is passed on
+            }
         }
 
         vector<reference_wrapper<const BinBundleCache>> SenderDB::get_cache_at(uint32_t bundle_idx)
@@ -775,6 +1677,12 @@ namespace apsi {
         {
             // Lock the database for writing
             auto lock = get_writer_lock();
+
+            // A stripped SenderDB holds no OPRF key, only the zeros strip() left in its place
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot strip a SenderDB that is stripped already");
+                throw logic_error("failed to strip SenderDB");
+            }
 
             stripped_ = true;
 
@@ -807,7 +1715,7 @@ namespace apsi {
             // Wait for the tasks to finish
             tasks.join();
 
-            APSI_LOG_INFO("SenderDB has been stripped");
+            log_noexcept([] { APSI_LOG_INFO("SenderDB has been stripped"); });
 
             return oprf_key_copy;
         }
@@ -832,7 +1740,21 @@ namespace apsi {
             // outside it can read a key that is being destroyed, and items hashed under a key
             // the database no longer holds would be committed under hashes no receiver can match.
             auto lock = get_writer_lock();
+            insert_or_assign_locked(data, false);
+        }
 
+        void SenderDB::set_data(const vector<pair<Item, Label>> &data)
+        {
+            // Lock the database for writing, as insert_or_assign does, and keep it locked from the
+            // checks to the end of the insertion, so that nothing is cleared for a batch that is
+            // then refused
+            auto lock = get_writer_lock();
+            insert_or_assign_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_locked(
+            const vector<pair<Item, Label>> &data, bool clear_first)
+        {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
                 throw logic_error("failed to insert data");
@@ -874,9 +1796,32 @@ namespace apsi {
                 }
             }
 
+            if (clear_first) {
+                clear_internal();
+            }
+
+            if (params_.uses_tags()) {
+                // Compute the hashes and encrypt the labels as without match tags, and derive each
+                // item's match tag from its label key as well
+                insert_tagged_labeled(
+                    OPRFSender::ComputeHashesAndMatchTags(
+                        data,
+                        oprf_key_,
+                        label_byte_count_,
+                        nonce_byte_count_,
+                        tag_felt_count(params_),
+                        params_.item_bit_count_per_felt()));
+                return;
+            }
+
             // Compute the hashes for the input data
-            auto hashed_data =
-                OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_);
+            insert_hashed_labeled(
+                OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_));
+        }
+
+        void SenderDB::insert_hashed_labeled(vector<pair<HashedItem, EncryptedLabel>> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
 
             // We need to know which items are new and which are old, since we have to tell
             // dispatch_insert_or_assign when to have an overwrite-on-collision versus
@@ -888,8 +1833,8 @@ namespace apsi {
                     return hashed_items_.find(item_label_pair.first) == hashed_items_.end();
                 });
 
-            // Dispatch the insertion, first for the new data, then for the data we're gonna
-            // overwrite
+            // Dispatch the insertion, first for the data we're gonna overwrite, then for the new
+            // data
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
             uint32_t ps_low_degree = params_.query_params().ps_low_degree;
@@ -900,59 +1845,70 @@ namespace apsi {
             auto new_item_count = distance(hashed_data.begin(), new_data_end);
             auto existing_item_count = distance(new_data_end, hashed_data.end());
 
-            if (existing_item_count) {
-                APSI_LOG_INFO(
-                    "Found " << existing_item_count << " existing items to replace in SenderDB");
+            try {
+                if (existing_item_count) {
+                    APSI_LOG_INFO(
+                        "Found " << existing_item_count
+                                 << " existing items to replace in SenderDB");
 
-                // Break the data into field element representation. Also compute the items' cuckoo
-                // indices.
-                vector<pair<AlgItemLabel, size_t>> data_with_indices =
-                    preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
+                    // Break the data into field element representation. Also compute the items'
+                    // cuckoo indices.
+                    vector<pair<AlgItemLabel, size_t>> data_with_indices =
+                        preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
 
-                dispatch_insert_or_assign(
-                    data_with_indices,
-                    bin_bundles_,
-                    crypto_context_,
-                    bins_per_bundle,
-                    label_size,
-                    max_bin_size,
-                    ps_low_degree,
-                    true, /* overwrite items */
-                    compressed_);
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        0, /* tag part count */
+                        max_bin_size,
+                        ps_low_degree,
+                        true, /* overwrite items */
+                        compressed_);
+                }
+
+                if (new_item_count) {
+                    log_noexcept([&] {
+                        APSI_LOG_INFO(
+                            "Found " << new_item_count << " new items to insert in SenderDB");
+                    });
+
+                    // Process and add the new data. Break the data into field element
+                    // representation. Also compute the items' cuckoo indices.
+                    vector<pair<AlgItemLabel, size_t>> data_with_indices =
+                        preprocess_labeled_data(hashed_data.begin(), new_data_end, params_);
+
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        0, /* tag part count */
+                        max_bin_size,
+                        ps_low_degree,
+                        false, /* don't overwrite items */
+                        compressed_);
+                }
+
+                // Both dispatches have succeeded, so the new items can be recorded. Recording them
+                // only now keeps the item set from naming an item that no bin bundle holds; a
+                // dispatch that throws partway can leave new items stored but not recorded.
+                for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                    hashed_items_.insert(it->first);
+                }
+                item_count_ += static_cast<size_t>(new_item_count);
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
-
-            if (new_item_count) {
-                APSI_LOG_INFO("Found " << new_item_count << " new items to insert in SenderDB");
-
-                // Process and add the new data. Break the data into field element representation.
-                // Also compute the items' cuckoo indices.
-                vector<pair<AlgItemLabel, size_t>> data_with_indices =
-                    preprocess_labeled_data(hashed_data.begin(), new_data_end, params_);
-
-                dispatch_insert_or_assign(
-                    data_with_indices,
-                    bin_bundles_,
-                    crypto_context_,
-                    bins_per_bundle,
-                    label_size,
-                    max_bin_size,
-                    ps_low_degree,
-                    false, /* don't overwrite items */
-                    compressed_);
-            }
-
-            // Both dispatches have succeeded, so the new items really are in bin bundles now and
-            // can be recorded. Doing this last is what keeps the item set and the bin bundles
-            // describing the same database when an insertion fails.
-            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
-                hashed_items_.insert(it->first);
-            }
-            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
         }
 
         void SenderDB::insert_or_assign(const vector<Item> &data)
@@ -960,7 +1916,18 @@ namespace apsi {
             // Lock the database for writing. See the labeled overload above for why the lock must
             // span the stripped_ check, the hashing and the insertion.
             auto lock = get_writer_lock();
+            insert_or_assign_locked(data, false);
+        }
 
+        void SenderDB::set_data(const vector<Item> &data)
+        {
+            // Lock the database for writing; see the labeled overload above
+            auto lock = get_writer_lock();
+            insert_or_assign_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_locked(const vector<Item> &data, bool clear_first)
+        {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
                 throw logic_error("failed to insert data");
@@ -973,8 +1940,29 @@ namespace apsi {
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
+            if (clear_first) {
+                clear_internal();
+            }
+
+            if (params_.uses_tags()) {
+                // Compute the hashes as without match tags, and derive each item's match tag from
+                // its label key as well
+                insert_tagged_unlabeled(
+                    OPRFSender::ComputeHashesAndMatchTags(
+                        data,
+                        oprf_key_,
+                        tag_felt_count(params_),
+                        params_.item_bit_count_per_felt()));
+                return;
+            }
+
             // Compute the hashes for the input data
-            auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
+            insert_hashed_unlabeled(OPRFSender::ComputeHashes(data, oprf_key_));
+        }
+
+        void SenderDB::insert_hashed_unlabeled(vector<HashedItem> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
 
             // We are not going to insert items that already appear in the database. Partition
             // without recording anything: an item registered in hashed_items_ before it is
@@ -1014,29 +2002,177 @@ namespace apsi {
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
             uint32_t ps_low_degree = params_.query_params().ps_low_degree;
 
-            dispatch_insert_or_assign(
-                data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                0, /* label size */
-                max_bin_size,
-                ps_low_degree,
-                false, /* don't overwrite items */
-                compressed_);
+            try {
+                dispatch_insert_or_assign(
+                    data_with_indices,
+                    bin_bundles_,
+                    crypto_context_,
+                    bins_per_bundle,
+                    0, /* label size */
+                    0, /* tag part count */
+                    max_bin_size,
+                    ps_low_degree,
+                    false, /* don't overwrite items */
+                    compressed_);
 
-            // The dispatch has succeeded, so the new items really are in bin bundles now and can
-            // be recorded. Doing this last is what keeps the item set and the bin bundles
-            // describing the same database when an insertion fails.
-            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
-                hashed_items_.insert(*it);
+                // The dispatch has succeeded, so the new items can be recorded. Recording them
+                // only now keeps the item set from naming an item that no bin bundle holds; a
+                // dispatch that throws partway can leave new items stored but not recorded.
+                for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                    hashed_items_.insert(*it);
+                }
+                item_count_ += static_cast<size_t>(new_item_count);
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
             }
-            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
+        }
+
+        void SenderDB::insert_tagged_labeled(vector<TaggedHashedItem> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
+
+            // As without match tags, partition the new items from the ones to overwrite without
+            // recording anything yet
+            auto new_data_end =
+                partition(hashed_data.begin(), hashed_data.end(), [&](const auto &tagged_item) {
+                    return hashed_items_.find(get<0>(tagged_item)) == hashed_items_.end();
+                });
+
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+            uint32_t max_bin_size = params_.table_params().max_items_per_bin;
+            uint32_t ps_low_degree = params_.query_params().ps_low_degree;
+            size_t label_size =
+                compute_label_part_count(label_byte_count_, nonce_byte_count_, params_);
+
+            auto new_item_count = distance(hashed_data.begin(), new_data_end);
+            auto existing_item_count = distance(new_data_end, hashed_data.end());
+
+            // Overwrite the existing items before inserting the new ones, as without match tags.
+            // The BinBundles the overwrites change are regenerated anyway, so placing the new items
+            // can then move stored items through them as well; see insert_by_relocation.
+            try {
+                if (existing_item_count) {
+                    APSI_LOG_INFO(
+                        "Found " << existing_item_count
+                                 << " existing items to replace in SenderDB");
+
+                    vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
+                        preprocess_tagged_data(new_data_end, hashed_data.end(), params_);
+
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        params_.tag_part_count(),
+                        max_bin_size,
+                        ps_low_degree,
+                        true, /* overwrite items */
+                        compressed_);
+                }
+
+                if (new_item_count) {
+                    log_noexcept([&] {
+                        APSI_LOG_INFO(
+                            "Found " << new_item_count << " new items to insert in SenderDB");
+                    });
+
+                    vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
+                        preprocess_tagged_data(hashed_data.begin(), new_data_end, params_);
+
+                    dispatch_insert_or_assign(
+                        data_with_indices,
+                        bin_bundles_,
+                        crypto_context_,
+                        bins_per_bundle,
+                        label_size,
+                        params_.tag_part_count(),
+                        max_bin_size,
+                        ps_low_degree,
+                        false, /* don't overwrite items */
+                        compressed_);
+                }
+
+                // Both dispatches have succeeded, so the new items can be recorded; see the
+                // overload without match tags
+                for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                    hashed_items_.insert(get<0>(*it));
+                }
+                item_count_ += static_cast<size_t>(new_item_count);
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
+            }
+
+            // Generate the BinBundle caches
+            generate_caches();
+
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
+        }
+
+        void SenderDB::insert_tagged_unlabeled(vector<pair<HashedItem, vector<felt_t>>> tagged_data)
+        {
+            size_t item_count = tagged_data.size();
+
+            // As without match tags, repeats within the batch are collapsed, and items already in
+            // the database are left as they are: there is no label to update, and the tag of an
+            // item never changes
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(tagged_data.size());
+            vector<TaggedHashedItem> hashed_data;
+            hashed_data.reserve(tagged_data.size());
+            for (auto &[item, tag] : tagged_data) {
+                if (batch_items.insert(item).second &&
+                    (hashed_items_.find(item) == hashed_items_.end())) {
+                    hashed_data.emplace_back(item, EncryptedLabel(), std::move(tag));
+                }
+            }
+
+            auto new_item_count = hashed_data.size();
+            APSI_LOG_INFO("Found " << new_item_count << " new items to insert in SenderDB");
+
+            vector<pair<TaggedAlgItemLabel, size_t>> data_with_indices =
+                preprocess_tagged_data(hashed_data.begin(), hashed_data.end(), params_);
+
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+            uint32_t max_bin_size = params_.table_params().max_items_per_bin;
+            uint32_t ps_low_degree = params_.query_params().ps_low_degree;
+
+            try {
+                dispatch_insert_or_assign(
+                    data_with_indices,
+                    bin_bundles_,
+                    crypto_context_,
+                    bins_per_bundle,
+                    compute_label_part_count(label_byte_count_, nonce_byte_count_, params_),
+                    params_.tag_part_count(),
+                    max_bin_size,
+                    ps_low_degree,
+                    false, /* don't overwrite items */
+                    compressed_);
+
+                // The dispatch has succeeded, so the new items can be recorded; see the overload
+                // without match tags
+                for (const auto &tagged_item : hashed_data) {
+                    hashed_items_.insert(get<0>(tagged_item));
+                }
+                item_count_ += new_item_count;
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
+            }
+
+            // Generate the BinBundle caches
+            generate_caches();
+
+            APSI_LOG_INFO("Finished inserting " << item_count << " items in SenderDB");
         }
 
         void SenderDB::remove(const vector<Item> &data)
@@ -1054,44 +2190,233 @@ namespace apsi {
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
             // Compute the hashes for the input data
-            auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
+            remove_hashed_items(OPRFSender::ComputeHashes(data, oprf_key_));
+        }
 
-            // Remove items that do not exist in the database.
-            auto existing_data_end =
-                remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
-                    bool found = hashed_items_.find(item) != hashed_items_.end();
-                    if (found) {
-                        // Remove from hashed_items_ already at this point!
-                        hashed_items_.erase(item);
-                        item_count_--;
-                    }
+        void SenderDB::remove_hashed_items(vector<HashedItem> hashed_data)
+        {
+            size_t item_count = hashed_data.size();
 
-                    // Remove those that were not found
-                    return !found;
+            // Removing an item twice in one batch is the same as removing it once, so repeats are
+            // collapsed. remove_if applies its predicate exactly once per element, which is what
+            // makes using it to deduplicate sound.
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(hashed_data.size());
+            hashed_data.erase(
+                remove_if(
+                    hashed_data.begin(),
+                    hashed_data.end(),
+                    [&](const auto &item) { return !batch_items.insert(item).second; }),
+                hashed_data.end());
+
+            // An item that is not in the database cannot be removed. Removal fans out across
+            // worker threads and cannot be unwound partway, so the batch is refused before it has
+            // had any effect, and the item set is changed only once the removal below has
+            // succeeded; a removal that throws partway can leave items removed from the bin
+            // bundles but still in the item set.
+            auto missing_item_count =
+                count_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
+                    return hashed_items_.find(item) == hashed_items_.end();
                 });
-
-            // This distance is always non-negative
-            size_t existing_item_count =
-                static_cast<size_t>(distance(existing_data_end, hashed_data.end()));
-            if (existing_item_count) {
-                APSI_LOG_WARNING(
-                    "Ignoring " << existing_item_count
-                                << " items that are not present in the SenderDB");
+            if (missing_item_count) {
+                APSI_LOG_ERROR(
+                    "Cannot remove " << missing_item_count
+                                     << " items that are not present in the SenderDB");
+                throw logic_error("failed to remove item");
             }
 
             // Break the data down into its field element representation. Also compute the items'
-            // cuckoo indices.
-            vector<pair<AlgItem, size_t>> data_with_indices =
-                preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
-
-            // Dispatch the removal
+            // cuckoo indices. Then dispatch the removal, which changes nothing unless every item
+            // can be removed. With match tags, an item is found by its HashedItem.
             uint32_t bins_per_bundle = params_.bins_per_bundle();
-            dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+            try {
+                if (params_.uses_tags()) {
+                    vector<pair<AlgItemWithHash, size_t>> data_with_indices =
+                        preprocess_tagged_lookup_data(
+                            hashed_data.begin(), hashed_data.end(), params_);
+                    dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+                } else {
+                    vector<pair<AlgItem, size_t>> data_with_indices =
+                        preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
+                    dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
+                }
+            } catch (...) {
+                generate_caches_after_failure();
+                throw;
+            }
+
+            // The items are gone from the bin bundles, so they can now be removed from the item
+            // set as well
+            for (const auto &item : hashed_data) {
+                hashed_items_.erase(item);
+                item_count_--;
+            }
 
             // Generate the BinBundle caches
             generate_caches();
 
-            APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
+            APSI_LOG_INFO("Finished removing " << item_count << " items from SenderDB");
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<HashedItem> &data)
+        {
+            // Lock the database for writing, as insert_or_assign does
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<HashedItem> &data)
+        {
+            // Lock the database for writing, as set_data does
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<HashedItem> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), false, false);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (unlabeled)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_hashed_unlabeled(data);
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<pair<HashedItem, EncryptedLabel>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<pair<HashedItem, EncryptedLabel>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<pair<HashedItem, EncryptedLabel>> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), true, false);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (labeled)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            // Validate the whole batch before anything is modified, as insert_or_assign does
+            size_t encrypted_label_byte_count = label_byte_count_ + nonce_byte_count_;
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(data.size());
+            for (const auto &[item, encrypted_label] : data) {
+                check_encrypted_label(encrypted_label, encrypted_label_byte_count);
+                check_unique_in_batch(batch_items, item);
+            }
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_hashed_labeled(data);
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<pair<HashedItem, vector<felt_t>>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<pair<HashedItem, vector<felt_t>>> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<pair<HashedItem, vector<felt_t>>> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), false, true);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (unlabeled, tagged)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            // Validate the whole batch before anything is modified. An item given again with the
+            // same tag is collapsed, as when the tags are derived here; with another tag, which of
+            // them was meant cannot be known.
+            size_t felt_count = tag_felt_count(params_);
+            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
+            unordered_map<HashedItem, const vector<felt_t> *> batch_tags;
+            batch_tags.reserve(data.size());
+            for (const auto &[item, tag] : data) {
+                check_match_tag(tag, felt_count, bits_per_felt);
+                auto [where, inserted] = batch_tags.emplace(item, &tag);
+                if (!inserted && (*where->second != tag)) {
+                    APSI_LOG_ERROR(
+                        "Attempted to insert the same item twice in one batch with different "
+                        "match tags, so the intended tag is ambiguous");
+                    throw invalid_argument("failed to insert data: duplicate item in batch");
+                }
+            }
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_tagged_unlabeled(data);
+        }
+
+        void SenderDB::insert_or_assign_hashed(const vector<TaggedHashedItem> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, false);
+        }
+
+        void SenderDB::set_data_hashed(const vector<TaggedHashedItem> &data)
+        {
+            auto lock = get_writer_lock();
+            insert_or_assign_hashed_locked(data, true);
+        }
+
+        void SenderDB::insert_or_assign_hashed_locked(
+            const vector<TaggedHashedItem> &data, bool clear_first)
+        {
+            check_hashed_insertion(stripped_, is_labeled(), params_.uses_tags(), true, true);
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign_hashed (labeled, tagged)");
+            APSI_LOG_INFO("Start inserting " << data.size() << " hashed items in SenderDB");
+
+            // Validate the whole batch before anything is modified, as insert_or_assign does
+            size_t encrypted_label_byte_count = label_byte_count_ + nonce_byte_count_;
+            size_t felt_count = tag_felt_count(params_);
+            uint32_t bits_per_felt = params_.item_bit_count_per_felt();
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(data.size());
+            for (const auto &[item, encrypted_label, tag] : data) {
+                check_encrypted_label(encrypted_label, encrypted_label_byte_count);
+                check_match_tag(tag, felt_count, bits_per_felt);
+                check_unique_in_batch(batch_items, item);
+            }
+
+            if (clear_first) {
+                clear_internal();
+            }
+            insert_tagged_labeled(data);
+        }
+
+        void SenderDB::remove_hashed(const vector<HashedItem> &data)
+        {
+            // Lock the database for writing, as remove does
+            auto lock = get_writer_lock();
+
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot remove data from a stripped SenderDB");
+                throw logic_error("failed to remove data");
+            }
+
+            STOPWATCH(sender_stopwatch, "SenderDB::remove_hashed");
+            APSI_LOG_INFO("Start removing " << data.size() << " hashed items from SenderDB");
+
+            remove_hashed_items(data);
         }
 
         bool SenderDB::has_item(const Item &item) const
@@ -1156,13 +2481,18 @@ namespace apsi {
 
             auto [bin_idx, bundle_idx] = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
-            // Retrieve the algebraic labels from one of the BinBundles at this index
+            // Retrieve the algebraic labels from one of the BinBundles at this index. With match
+            // tags, the item is found by its HashedItem.
             const vector<BinBundle> &bundle_set = bin_bundles_[bundle_idx];
             vector<felt_t> alg_label;
             bool got_labels = false;
             for (const BinBundle &bundle : bundle_set) {
                 // Try to retrieve the contiguous labels from this BinBundle
-                if (bundle.try_get_multi_label(alg_item, bin_idx, alg_label)) {
+                bool found =
+                    params_.uses_tags()
+                        ? bundle.try_get_multi_label(alg_item, hashed_item, bin_idx, alg_label)
+                        : bundle.try_get_multi_label(alg_item, bin_idx, alg_label);
+                if (found) {
                     got_labels = true;
                     break;
                 }
@@ -1174,6 +2504,15 @@ namespace apsi {
                 APSI_LOG_ERROR(
                     "Failed to retrieve label for an item that was supposed to be in the SenderDB");
                 throw logic_error("failed to retrieve label");
+            }
+
+            // With match tags, the label parts begin with the parts of the item's tag, which is
+            // not part of its label
+            if (params_.uses_tags()) {
+                size_t tag_felt_count = mul_safe<size_t>(
+                    params_.tag_part_count(), params_.item_params().felts_per_item);
+                alg_label.erase(
+                    alg_label.begin(), alg_label.begin() + static_cast<ptrdiff_t>(tag_felt_count));
             }
 
             // All good. Now just reconstruct the big label from its split-up parts
@@ -1201,6 +2540,58 @@ namespace apsi {
             stringstream ss;
             params_.save(ss);
             string params_str = ss.str();
+            auto oprf_key_span = oprf_key_.key_span();
+            auto bin_bundle_count = get_bin_bundle_count_unlocked();
+
+            // SenderDB::Load reads what precedes the BinBundles, and then each BinBundle, as a
+            // buffer of at most max_size bytes. A SenderDB with a buffer that might be larger is
+            // refused before anything is written, so that no file is left that cannot be loaded,
+            // not even in part. What decides is an upper bound on the size of each buffer.
+            size_t max_size = util::save_size_limit();
+            size_t hashed_item_count = get_hashed_items().size();
+            util::SaveSizeBounds header_bounds = util::sender_db_header_save_size_bounds(
+                params_str.size(), oprf_key_span.size(), hashed_item_count, bin_bundle_count);
+            if (header_bounds.upper > max_size) {
+                // The header holds the HashedItem of every item unless the SenderDB is stripped,
+                // and without them it takes a few hundred bytes
+                util::SaveSizeBounds stripped_bounds = util::sender_db_header_save_size_bounds(
+                    params_str.size(), oprf_key_span.size(), 0, bin_bundle_count);
+                stringstream msg;
+                if (hashed_item_count && (stripped_bounds.upper <= max_size)) {
+                    msg << "its " << hashed_item_count
+                        << " items are too many to save unstripped, as its header, which holds "
+                           "their HashedItems, "
+                        << util::refusal_reason(header_bounds, max_size)
+                        << "; SenderDB::strip() removes them";
+                } else {
+                    msg << "its header " << util::refusal_reason(header_bounds, max_size);
+                }
+                APSI_LOG_ERROR("Cannot save SenderDB: " << msg.str());
+                throw length_error("failed to save SenderDB: " + msg.str());
+            }
+
+            auto seal_context = crypto_context_.seal_context();
+            for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++) {
+                const auto &bundles = bin_bundles_[bundle_idx];
+                for (size_t i = 0; i < bundles.size(); i++) {
+                    util::SaveSizeBounds bounds = util::bin_bundle_save_size_bounds(
+                        bundles[i], static_cast<uint32_t>(bundle_idx), nullopt, *seal_context);
+                    if (bounds.upper <= max_size) {
+                        continue;
+                    }
+
+                    stringstream msg;
+                    if (bundles.size() > 1) {
+                        msg << "BinBundle " << i + 1 << " of " << bundles.size()
+                            << " at bundle index " << bundle_idx;
+                    } else {
+                        msg << "the BinBundle at bundle index " << bundle_idx;
+                    }
+                    msg << " " << util::refusal_reason(bounds, max_size);
+                    APSI_LOG_ERROR("Cannot save SenderDB: " << msg.str());
+                    throw length_error("failed to save SenderDB: " + msg.str());
+                }
+            }
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
@@ -1212,7 +2603,6 @@ namespace apsi {
                 safe_cast<uint32_t>(item_count_),
                 compressed_,
                 stripped_);
-            auto oprf_key_span = oprf_key_.key_span();
             auto oprf_key = fbs_builder.CreateVector(oprf_key_span.data(), oprf_key_span.size());
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&] {
                 // The HashedItems vector is populated with an immediately-invoked lambda
@@ -1230,8 +2620,6 @@ namespace apsi {
                 return ret;
             }());
 
-            auto bin_bundle_count = get_bin_bundle_count_unlocked();
-
             fbs::SenderDBBuilder sender_db_builder(fbs_builder);
             sender_db_builder.add_params(params);
             sender_db_builder.add_info(&info);
@@ -1240,6 +2628,16 @@ namespace apsi {
             sender_db_builder.add_bin_bundle_count(safe_cast<uint32_t>(bin_bundle_count));
             auto sdb = sender_db_builder.Finish();
             fbs_builder.FinishSizePrefixed(sdb);
+
+            // The bounds keep the header from being any larger, but should they ever fail to, a
+            // header that SenderDB::Load cannot read is still not written
+            if (fbs_builder.GetSize() > max_size) {
+                stringstream msg;
+                msg << "its header takes " << fbs_builder.GetSize() << " bytes, more than the "
+                    << max_size << " bytes SenderDB::Load reads";
+                APSI_LOG_ERROR("Cannot save SenderDB: " << msg.str());
+                throw length_error("failed to save SenderDB: " + msg.str());
+            }
 
             out.write(
                 reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
@@ -1250,7 +2648,7 @@ namespace apsi {
             size_t bin_bundle_data_size = 0;
             for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++) {
                 for (const auto &bb : bin_bundles_[bundle_idx]) {
-                    auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
+                    size_t size = bb.save(out, static_cast<uint32_t>(bundle_idx));
                     APSI_LOG_DEBUG(
                         "Saved BinBundle at bundle index " << bundle_idx << " (" << size
                                                            << " bytes)");
@@ -1358,6 +2756,15 @@ namespace apsi {
             sender_db->oprf_key_.load(oprf_key_span_const_type(
                 reinterpret_cast<const unsigned char *>(sdb->oprf_key()->data()), oprf_key_size));
 
+            // A SenderDB that is not stripped needs its OPRF key. APSI 1.1.0 could save one with
+            // the zeros that SenderDB::strip leaves, once a stripped SenderDB had been cleared or
+            // given new data, and under them every item hashes to the same value.
+            if (!stripped && is_zero_key(sender_db->oprf_key_)) {
+                APSI_LOG_ERROR(
+                    "The loaded SenderDB is not stripped but its OPRF key is zero; rebuild it");
+                throw runtime_error("failed to load SenderDB");
+            }
+
             // Load the hashed items if this SenderDB is not stripped
             if (!stripped) {
                 const auto &hashed_items = *sdb->hashed_items();
@@ -1378,11 +2785,9 @@ namespace apsi {
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
 
-            // Cap bin_bundle_count to a sane upper bound before reserving. Without this, a
-            // malicious DB blob could set bin_bundle_count to (close to) UINT32_MAX and force
-            // a multi-gigabyte reservation just for the outer vector. The legitimate value is
-            // at most a small multiple of bundle_idx_count; cap at 64K * bundle_idx_count
-            // which leaves enormous headroom over realistic configurations.
+            // Cap bin_bundle_count to a sane upper bound before reading any BinBundle. The
+            // legitimate value is at most a small multiple of bundle_idx_count; cap at 64K *
+            // bundle_idx_count which leaves enormous headroom over realistic configurations.
             uint64_t max_bin_bundle_count = mul_safe<uint64_t>(
                 static_cast<uint64_t>(params->bundle_idx_count()), static_cast<uint64_t>(65536));
             if (bin_bundle_count > max_bin_bundle_count) {
@@ -1397,13 +2802,25 @@ namespace apsi {
             uint32_t max_bin_size = params->table_params().max_items_per_bin;
             uint32_t ps_low_degree = params->query_params().ps_low_degree;
             uint32_t bins_per_bundle = params->bins_per_bundle();
-            size_t label_size = compute_label_size(nonce_byte_count + label_byte_count, *params);
+            size_t label_size =
+                compute_label_part_count(label_byte_count, nonce_byte_count, *params);
 
-            // Load all BinBundle data
+            // Load all BinBundle data. The count comes from the file, so nothing is reserved for
+            // it: the vector grows only as BinBundles are actually read. A file that ends early is
+            // reported at the first BinBundle missing from it.
             vector<vector<unsigned char>> bin_bundle_data;
-            bin_bundle_data.reserve(bin_bundle_count);
-            while (bin_bundle_count--) {
-                bin_bundle_data.push_back(read_from_stream(in));
+            for (uint32_t bb_idx = 0; bb_idx < bin_bundle_count; bb_idx++) {
+                try {
+                    bin_bundle_data.push_back(read_from_stream(in));
+                } catch (const runtime_error &ex) {
+                    APSI_LOG_ERROR(
+                        "Failed to read BinBundle " << bb_idx + 1 << " of the " << bin_bundle_count
+                                                    << " the SenderDB declares: " << ex.what());
+                    if (in.eof()) {
+                        throw runtime_error("failed to load SenderDB: the data is truncated");
+                    }
+                    throw runtime_error("failed to load SenderDB");
+                }
             }
 
             // Use multiple threads to recreate the BinBundles
@@ -1426,7 +2843,8 @@ namespace apsi {
                         ps_low_degree,
                         bins_per_bundle,
                         compressed,
-                        stripped);
+                        stripped,
+                        params->tag_part_count());
                     auto &raw_bb_data = bin_bundle_data[bb_data_idx];
                     auto bb_data = bb.load(raw_bb_data);
 

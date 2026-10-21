@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstddef>
 #include <future>
+#include <memory>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -38,14 +39,19 @@ namespace APSITests {
             SecondError() : runtime_error("second")
             {}
         };
+
+        // Every contract below holds with or without a parallelism limit, so each test runs
+        // without one and under limits of 1, 2 and 4.
+        class TaskGroupTests : public testing::TestWithParam<size_t> {};
     } // namespace
 
-    TEST(TaskGroupTests, JoinWaitsForEveryTaskDespiteAnEarlyThrow)
+    TEST_P(TaskGroupTests, JoinWaitsForEveryTaskDespiteAnEarlyThrow)
     {
         // The whole point of the class. A plain "for (f : futures) f.get();" rethrows on the
         // first failing task and abandons the rest, which keep running against the caller's
         // locals while the caller unwinds and destroys them.
         constexpr size_t task_count = 8;
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
         atomic<size_t> finished{ 0 };
 
@@ -66,12 +72,14 @@ namespace APSITests {
         ASSERT_EQ(task_count - 1, finished.load());
     }
 
-    TEST(TaskGroupTests, JoinRethrowsTheFirstExceptionByAddOrder)
+    TEST_P(TaskGroupTests, JoinRethrowsTheFirstExceptionByAddOrder)
     {
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
 
         // Make the LAST task fail first in time, so a "first failure wins" implementation would
-        // surface SecondError. join() must report by the order tasks were added instead.
+        // surface SecondError. join() must report by the order tasks were added instead. With a
+        // limit of one the tasks run in order, which join() must report all the same.
         promise<void> gate;
         shared_future<void> gate_future = gate.get_future().share();
 
@@ -89,11 +97,13 @@ namespace APSITests {
         ASSERT_THROW(tasks.join(), FirstError);
     }
 
-    TEST(TaskGroupTests, ForgettingJoinStillWaitsForEveryTask)
+    TEST_P(TaskGroupTests, ForgettingJoinStillWaitsForEveryTask)
     {
         // The safety property that makes this design hard to misuse: a caller who never calls
         // join() -- or who leaves the scope by an exception thrown while tasks are still being
-        // added -- loses the task exceptions but never leaks a running task.
+        // added -- loses the task exceptions but never leaks a running task. With a limit, the
+        // destructor begins while tasks are still waiting for a runner.
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
         atomic<size_t> finished{ 0 };
         constexpr size_t task_count = 4;
@@ -112,10 +122,11 @@ namespace APSITests {
         ASSERT_EQ(task_count, finished.load());
     }
 
-    TEST(TaskGroupTests, DestructorWaitsWhenTheAddLoopThrows)
+    TEST_P(TaskGroupTests, DestructorWaitsWhenTheAddLoopThrows)
     {
         // add() allocates, so it can throw partway through fanning out, before join() is ever
         // reached. The already-started tasks must not be abandoned.
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
         atomic<size_t> finished{ 0 };
         constexpr size_t added_before_failure = 4;
@@ -141,10 +152,11 @@ namespace APSITests {
         ASSERT_EQ(added_before_failure, finished.load());
     }
 
-    TEST(TaskGroupTests, DestructorSwallowsTaskExceptions)
+    TEST_P(TaskGroupTests, DestructorSwallowsTaskExceptions)
     {
         // The destructor is implicitly noexcept; letting a task exception escape it would call
         // std::terminate.
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
 
         ASSERT_NO_THROW({
@@ -154,8 +166,9 @@ namespace APSITests {
         });
     }
 
-    TEST(TaskGroupTests, JoinIsIdempotentAndLeavesTheGroupEmpty)
+    TEST_P(TaskGroupTests, JoinIsIdempotentAndLeavesTheGroupEmpty)
     {
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
         atomic<size_t> finished{ 0 };
 
@@ -173,8 +186,9 @@ namespace APSITests {
         ASSERT_EQ(static_cast<size_t>(4), finished.load());
     }
 
-    TEST(TaskGroupTests, JoinOnAnEmptyGroupIsANoOp)
+    TEST_P(TaskGroupTests, JoinOnAnEmptyGroupIsANoOp)
     {
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
 
         TaskGroup tasks(tpm.thread_pool());
@@ -182,11 +196,12 @@ namespace APSITests {
         ASSERT_NO_THROW(tasks.join());
     }
 
-    TEST(TaskGroupTests, AddKeepsEveryTaskAcrossReallocation)
+    TEST_P(TaskGroupTests, AddKeepsEveryTaskAcrossReallocation)
     {
-        // The internal container reallocates repeatedly here; no task may be lost along the way.
-        // add() stores the future before queueing the task precisely so that a reallocation
-        // failure cannot strand a running task outside the group.
+        // The internal containers grow repeatedly here; no task may be lost along the way.
+        // Without a limit, add() stores the future before queueing the task precisely so that a
+        // reallocation failure cannot strand a running task outside the group.
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
         atomic<size_t> finished{ 0 };
         constexpr size_t task_count = 64;
@@ -201,10 +216,11 @@ namespace APSITests {
         ASSERT_EQ(task_count, finished.load());
     }
 
-    TEST(TaskGroupTests, AddForwardsTrailingArguments)
+    TEST_P(TaskGroupTests, AddForwardsTrailingArguments)
     {
         // Matches ThreadPool::enqueue's (callable, args...) form, which the OPRF call sites use
-        // to hand each task its slice index.
+        // to hand each task its slice index. A move-only callable is accepted as well.
+        ScopedParallelismLimit scope(GetParam());
         ThreadPoolMgr tpm;
         atomic<size_t> total{ 0 };
 
@@ -215,43 +231,24 @@ namespace APSITests {
         for (size_t t = 0; t < 4; t++) {
             tasks.add(worker, t, static_cast<size_t>(10));
         }
+        tasks.add([p = make_unique<size_t>(100), &total] { total += *p; });
 
         ASSERT_NO_THROW(tasks.join());
-        ASSERT_EQ(static_cast<size_t>(46), total.load());
+        ASSERT_EQ(static_cast<size_t>(146), total.load());
     }
 
-    TEST(TaskGroupTests, PoolWorkersAreIdentifiedAsSuch)
-    {
-        // The nested-use guard rests on a pool being able to recognize its own workers, and on
-        // not mistaking another pool's. Waiting on a different pool from a worker is safe, so
-        // confusing the two would either miss real deadlocks or reject sound code.
-        ThreadPool pool_a(1);
-        ThreadPool pool_b(1);
-
-        ASSERT_FALSE(pool_a.is_worker_thread());
-        ASSERT_FALSE(pool_b.is_worker_thread());
-
-        auto from_a = pool_a.enqueue([&pool_a, &pool_b] {
-            return make_pair(pool_a.is_worker_thread(), pool_b.is_worker_thread());
-        });
-
-        auto seen = from_a.get();
-        ASSERT_TRUE(seen.first);   // its own pool
-        ASSERT_FALSE(seen.second); // an unrelated pool
-
-        // The marker must not outlive the worker: this thread never becomes a worker.
-        ASSERT_FALSE(pool_a.is_worker_thread());
-    }
-
-    TEST(TaskGroupTests, RejectsUseFromInsideItsOwnPool)
+    TEST_P(TaskGroupTests, RejectsUseFromInsideItsOwnPool)
     {
         // Adding to a group backed by the pool the caller is running on is the step that makes a
         // deadlock possible: join() would then block a worker on work only that pool can run.
         // It is refused outright, so the mistake surfaces as an error where it is made rather
-        // than as a hang whose cause is somewhere else entirely.
+        // than as a hang whose cause is somewhere else entirely. The refused group then has
+        // nothing to wait for as it is destroyed on the worker. The limit is created in the task,
+        // since it belongs to the thread that creates the group.
         ThreadPool pool(2);
 
-        auto fut = pool.enqueue([&pool] {
+        auto fut = pool.enqueue([&pool, limit = GetParam()] {
+            ScopedParallelismLimit scope(limit);
             TaskGroup nested(pool);
             nested.add([] {});
         });
@@ -259,14 +256,15 @@ namespace APSITests {
         ASSERT_THROW(fut.get(), logic_error);
     }
 
-    TEST(TaskGroupTests, AllowsUseFromAWorkerOfADifferentPool)
+    TEST_P(TaskGroupTests, AllowsUseFromAWorkerOfADifferentPool)
     {
         // The guard is about waiting on the pool you occupy. A worker of one pool waiting on a
         // different pool cannot starve it, and must keep working.
         ThreadPool pool_a(1);
         ThreadPool pool_b(2);
 
-        auto fut = pool_a.enqueue([&pool_b] {
+        auto fut = pool_a.enqueue([&pool_b, limit = GetParam()] {
+            ScopedParallelismLimit scope(limit);
             TaskGroup tasks(pool_b);
             atomic<int> ran{ 0 };
             tasks.add([&ran] { ran++; });
@@ -276,4 +274,7 @@ namespace APSITests {
 
         ASSERT_EQ(1, fut.get());
     }
+
+    INSTANTIATE_TEST_SUITE_P(
+        Limits, TaskGroupTests, testing::Values(size_t(0), size_t(1), size_t(2), size_t(4)));
 } // namespace APSITests

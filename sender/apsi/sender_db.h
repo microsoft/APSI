@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -36,12 +37,57 @@ namespace apsi::sender {
     number of new items into a SenderDB can take time, it is not recommended to recreate the
     SenderDB when the database changes a little bit. Instead, the class supports fast update and
     deletion operations that should be preferred: SenderDB::insert_or_assign and
-    SenderDB::remove.
+    SenderDB::remove. SenderDB::insert_or_assign inserts the items that are not yet in the database
+    and, in a labeled SenderDB, replaces the labels of the others in place, never storing an item
+    twice. SenderDB::remove removes all of a batch or nothing: if any item is not in the database,
+    it throws std::logic_error before changing anything.
 
     The SenderDB constructor allows the label byte count to be specified; unlabeled mode is
     activated by setting the label byte count to zero. It is possible to optionally specify the
     size of the nonce used in encrypting the labels, but this is best left to its default value
-    unless the user is absolutely sure of what they are doing.
+    unless the user is absolutely sure of what they are doing. An unlabeled SenderDB uses no
+    nonce, whatever nonce byte count is given.
+
+    With match tags (see PSIParams::uses_tags), a SenderDB stores the tag of every item, labeled or
+    not, as the item's first label parts. It derives the tag from the item's label key, which it
+    does not keep, so a SenderDB with match tags must be built from the original items, or from the
+    tags that oprf::OPRFSender::ComputeHashesAndMatchTags computes from them (see below). Since two
+    items can then share their field elements in a bin, it also keeps the full HashedItem of every
+    item until it is stripped.
+
+    With match tags and one field element per item, the items inserted at a bundle index that
+    has no bin bundles, as set_data inserts them, are placed all at once in as few bin bundles
+    as any placement could use: no bin bundle can hold more than max_items_per_bin items in a
+    bin or one field element twice there, and the items of each bin are spread evenly over the
+    bin bundles. Items inserted later go into the newest bin bundle that has room for them, as in
+    APSI 1.x. An item whose field element is already in every bin bundle with room at its location
+    can take the place of a stored item, which moves to a bin bundle with room, but only if the same
+    update already changes both bin bundles: otherwise the move would make the update regenerate
+    their caches as well, and the item goes into a new bin bundle instead.
+
+    A SenderDB can also be built without its OPRF key. SenderDB::insert_or_assign_hashed and
+    SenderDB::set_data_hashed take items hashed already, as oprf::OPRFSender::ComputeHashes
+    computes them, with encrypted labels in a labeled SenderDB, or, for parameters with match
+    tags, as oprf::OPRFSender::ComputeHashesAndMatchTags computes them with a tag_felt_count of
+    tag_part_count * felts_per_item and a bits_per_felt of PSIParams::item_bit_count_per_felt.
+    SenderDB::remove_hashed takes the hashed items alone. They otherwise work as
+    SenderDB::insert_or_assign, SenderDB::set_data and SenderDB::remove do. The label keys, which
+    encrypt the labels and give the tags, stay where the items are hashed, and the labels must be
+    encrypted there with the SenderDB's label byte count and nonce byte count. The two functions
+    of oprf::OPRFSender refuse a label longer than the label byte count, as
+    SenderDB::insert_or_assign does, and SenderDB::insert_or_assign_hashed and
+    SenderDB::set_data_hashed refuse with std::invalid_argument an encrypted label that does not
+    take exactly the two byte counts together. But APSI cannot tell how an encrypted label of the
+    right size divides into nonce and label, and one encrypted with another nonce byte count
+    decrypts wrongly. Nor can it tell which key the items were hashed with: items hashed with any
+    key other than the one the sender answers OPRF requests with match nothing.
+
+    Such a SenderDB holds an OPRF key of its own, which SenderDB::get_oprf_key and SenderDB::strip
+    return, and with which the functions that take an Item, such as SenderDB::has_item and
+    SenderDB::get_label, hash it, so they answer correctly only if that is the key the items were
+    hashed with. Unless it is, strip the SenderDB before serving it with the key the items were
+    hashed with: ZMQSenderDispatcher refuses a key other than the one a SenderDB that is not
+    stripped holds, and answers with that one if given none.
 
     The SenderDB requires substantially more memory than the raw data would. Part of that memory
     can automatically be compressed when it is not in use; this feature is enabled by default,
@@ -53,8 +99,33 @@ namespace apsi::sender {
     writer lock for the whole of their work, including the OPRF hashing they begin with, while
     answering a query holds a reader lock for as long as the answer takes. An embedder that
     updates a SenderDB while it serves queries therefore stalls every query for the duration of
-    the update, which for a large batch is not brief. Where that matters, build the new state
-    separately and direct later queries at it, or update while the sender is not serving.
+    the update, which for a large batch is not brief. An update regenerates the cache of every
+    bin bundle it changes: it computes the polynomials of the bins it changed again, and makes
+    every plaintext of the bin bundle again, as each holds coefficients of all its bins. Where
+    that matters, build the new state separately and direct later queries at it, or update while
+    the sender is not serving.
+
+    In many cases the SenderDB does not need to be modified after having been constructed, or
+    loaded from disk. The function SenderDB::strip can be called to remove all data that is not
+    strictly needed to serve query requests. A SenderDB that has been stripped cannot be modified,
+    cannot be checked for the presence of specific items, and labels cannot be retrieved from it:
+    every function that would do so throws std::logic_error, apart from SenderDB::clear, which
+    makes it as a newly constructed SenderDB, with a new OPRF key. A stripped SenderDB can be
+    serialized and deserialized.
+
+    SenderDB::Load reads the header and each bin bundle as one buffer of at most about 2 GiB, and
+    the header of a SenderDB that is not stripped holds a 16-byte HashedItem for each item, which
+    limits it to about 134 million items. SenderDB::save refuses, with std::length_error and before
+    it writes anything, a SenderDB that SenderDB::Load might not read, so a SenderDB of more items,
+    such as 256 million, can be saved only once SenderDB::strip has removed its HashedItems. The
+    check is conservative, so it may also refuse a bin bundle somewhat below the limit: by a
+    fraction of a percent of it with large bins, and by up to about a tenth with very small bins and
+    long labels. How large a full bin bundle is depends on the parameters, through the number of
+    bins, max_items_per_bin and the coefficient modulus, and on the label size, but not on how many
+    items are inserted, which only add bin bundles.
+
+    A saved SenderDB is trusted input. SenderDB::Load checks its structure, but a crafted file can
+    still make queries fail or answer wrongly, so load only a SenderDB you saved yourself.
     */
     class SenderDB {
     public:
@@ -68,7 +139,8 @@ namespace apsi::sender {
             bool compressed = true);
 
         /**
-        Creates a new SenderDB.
+        Creates a new SenderDB with the given OPRF key. Throws std::invalid_argument if the key is
+        zero, as SenderDB::strip leaves it, since every item would hash to the same value under it.
         */
         SenderDB(
             const PSIParams &params,
@@ -97,7 +169,9 @@ namespace apsi::sender {
         SenderDB(const SenderDB &copy) = delete;
 
         /**
-        Clears the database. Every item and label will be removed. The OPRF key is unchanged.
+        Clears the database. Every item and label will be removed. The OPRF key is unchanged,
+        except in a stripped SenderDB, whose key SenderDB::strip has removed: such a SenderDB gets
+        a new OPRF key, as a newly constructed SenderDB does, and is no longer stripped.
         */
         void clear();
 
@@ -144,7 +218,8 @@ namespace apsi::sender {
 
         /**
         Strips the SenderDB of all information not needed for serving a query. Returns a copy of
-        the OPRF key and clears it from the SenderDB.
+        the OPRF key and clears it from the SenderDB, leaving zeros in its place. Throws
+        std::logic_error if the SenderDB is stripped already, as it then has no key to return.
         */
         oprf::OPRFKey strip();
 
@@ -156,14 +231,17 @@ namespace apsi::sender {
         /**
         Inserts the given data into the database. This function can be used only on a labeled
         SenderDB instance. If an item already exists in the database, its label is overwritten
-        with the new label.
+        with the new label in every bin bundle that holds it. APSI 1.x could store an item more
+        than once when it updated the item's label; every copy is then overwritten, and a warning
+        is logged. Removing such an item and inserting it again drops the extra copies.
         */
         void insert_or_assign(const std::vector<std::pair<Item, Label>> &data);
 
         /**
-        Inserts the given (hashed) item-label pair into the database. This function can be used
-        only on a labeled SenderDB instance. If the item already exists in the database, its
-        label is overwritten with the new label.
+        Inserts the given item-label pair into the database. The item is hashed with the OPRF key
+        of this SenderDB, as by every function that takes an Item, so a HashedItem passed here is
+        hashed again. This function can be used only on a labeled SenderDB instance. If the item
+        already exists in the database, its label is overwritten with the new label.
         */
         void insert_or_assign(const std::pair<Item, Label> &data)
         {
@@ -178,8 +256,9 @@ namespace apsi::sender {
         void insert_or_assign(const std::vector<Item> &data);
 
         /**
-        Inserts the given (hashed) item into the database. This function can be used only on an
-        unlabeled SenderDB instance.
+        Inserts the given item into the database. The item is hashed with the OPRF key of this
+        SenderDB, as by every function that takes an Item, so a HashedItem passed here is hashed
+        again. This function can be used only on an unlabeled SenderDB instance.
         */
         void insert_or_assign(const Item &data)
         {
@@ -189,37 +268,133 @@ namespace apsi::sender {
 
         /**
         Clears the database and inserts the given data. This function can be used only on a
-        labeled SenderDB instance.
+        labeled SenderDB instance. It checks the SenderDB and the data as insert_or_assign does
+        before clearing anything, so if it refuses them, with std::logic_error for a stripped
+        SenderDB or unlabeled data or with std::invalid_argument for a batch that does not fit, the
+        database is left as it was.
         */
-        void set_data(const std::vector<std::pair<Item, Label>> &data)
-        {
-            clear();
-            insert_or_assign(data);
-        }
+        void set_data(const std::vector<std::pair<Item, Label>> &data);
 
         /**
         Clears the database and inserts the given data. This function can be used only on an
-        unlabeled SenderDB instance.
+        unlabeled SenderDB instance. It checks the SenderDB as insert_or_assign does before
+        clearing anything, so if it refuses it, with std::logic_error for a stripped or labeled
+        SenderDB, the database is left as it was.
         */
-        void set_data(const std::vector<Item> &data)
-        {
-            clear();
-            insert_or_assign(data);
-        }
+        void set_data(const std::vector<Item> &data);
 
         /**
-        Removes the given data from the database, using at most thread_count threads.
+        Removes the given data from the database. An item given more than once is removed once.
+        Throws std::logic_error if an item is not in the database, in which case nothing is removed.
         */
         void remove(const std::vector<Item> &data);
 
         /**
-        Removes the given (hashed) item from the database.
+        Removes the given item from the database. The item is hashed with the OPRF key of this
+        SenderDB, as by every function that takes an Item, so a HashedItem passed here is hashed
+        again. Throws std::logic_error if the item is not in the database.
         */
         void remove(const Item &data)
         {
             std::vector<Item> data_singleton{ data };
             remove(data_singleton);
         }
+
+        /**
+        Inserts items hashed already, as oprf::OPRFSender::ComputeHashes computes them for items,
+        into an unlabeled SenderDB whose parameters do not use match tags; see the class
+        description. As with insert_or_assign, an item already in the database, or given more than
+        once, is inserted once.
+
+        Throws std::logic_error, and inserts nothing, if the SenderDB is stripped or labeled, or if
+        its parameters use match tags.
+        */
+        void insert_or_assign_hashed(const std::vector<HashedItem> &data);
+
+        /**
+        Inserts items hashed already, with their encrypted labels, as
+        oprf::OPRFSender::ComputeHashes computes them for item-label pairs with this SenderDB's
+        label byte count and nonce byte count, into a labeled SenderDB whose parameters do not use
+        match tags; see the class description. As with insert_or_assign, the label of an item
+        already in the database is replaced.
+
+        Throws std::logic_error if the SenderDB is stripped or unlabeled, or if its parameters use
+        match tags, and std::invalid_argument if an item is given more than once, or if an
+        encrypted label does not take exactly get_label_byte_count() + get_nonce_byte_count()
+        bytes. Nothing is inserted then.
+        */
+        void insert_or_assign_hashed(
+            const std::vector<std::pair<HashedItem, EncryptedLabel>> &data);
+
+        /**
+        Inserts items hashed already, with their match tags, as
+        oprf::OPRFSender::ComputeHashesAndMatchTags computes them for items, into an unlabeled
+        SenderDB whose parameters use match tags; see the class description. A tag has
+        PSIParams::tag_part_count() * felts_per_item field elements, each below
+        2^PSIParams::item_bit_count_per_felt(). As with insert_or_assign, an item already in the
+        database is left as it is, and an item given more than once with the same tag is inserted
+        once.
+
+        Throws std::logic_error if the SenderDB is stripped or labeled, or if its parameters do not
+        use match tags, and std::invalid_argument if a tag is not as described, or if an item is
+        given more than once with different tags. Nothing is inserted then.
+        */
+        void insert_or_assign_hashed(
+            const std::vector<std::pair<HashedItem, std::vector<apsi::util::felt_t>>> &data);
+
+        /**
+        Inserts items hashed already, with their encrypted labels and match tags, as
+        oprf::OPRFSender::ComputeHashesAndMatchTags computes them for item-label pairs with this
+        SenderDB's label byte count and nonce byte count, into a labeled SenderDB whose parameters
+        use match tags; see the class description, and the overloads above for the encrypted
+        labels and the tags. As with insert_or_assign, the label of an item already in the
+        database is replaced, and so is its tag.
+
+        Throws std::logic_error if the SenderDB is stripped or unlabeled, or if its parameters do
+        not use match tags, and std::invalid_argument if an item is given more than once, or if an
+        encrypted label or a tag is not as the overloads above describe. Nothing is inserted then.
+        */
+        void insert_or_assign_hashed(
+            const std::vector<
+                std::tuple<HashedItem, EncryptedLabel, std::vector<apsi::util::felt_t>>> &data);
+
+        /**
+        Clears the database and inserts the given items hashed already. This function can be used
+        only as the overload of insert_or_assign_hashed taking the same data can. It checks the
+        SenderDB and the data as that overload does before clearing anything, so if it refuses
+        them, with std::logic_error for a stripped SenderDB or data of the wrong kind or with
+        std::invalid_argument for a batch that does not fit, the database is left as it was.
+        */
+        void set_data_hashed(const std::vector<HashedItem> &data);
+
+        /**
+        Clears the database and inserts the given items hashed already, with their encrypted
+        labels, as the overload of set_data_hashed above does.
+        */
+        void set_data_hashed(const std::vector<std::pair<HashedItem, EncryptedLabel>> &data);
+
+        /**
+        Clears the database and inserts the given items hashed already, with their match tags, as
+        the overloads of set_data_hashed above do.
+        */
+        void set_data_hashed(
+            const std::vector<std::pair<HashedItem, std::vector<apsi::util::felt_t>>> &data);
+
+        /**
+        Clears the database and inserts the given items hashed already, with their encrypted
+        labels and match tags, as the overloads of set_data_hashed above do.
+        */
+        void set_data_hashed(
+            const std::vector<
+                std::tuple<HashedItem, EncryptedLabel, std::vector<apsi::util::felt_t>>> &data);
+
+        /**
+        Removes items hashed already, as oprf::OPRFSender::ComputeHashes computes them for items,
+        from the database; see the class description. As with remove, an item given more than
+        once is removed once, and if an item is not in the database, std::logic_error is thrown and
+        nothing is removed. Also throws std::logic_error if the SenderDB is stripped.
+        */
+        void remove_hashed(const std::vector<HashedItem> &data);
 
         /**
         Returns whether the given item has been inserted in the SenderDB.
@@ -309,6 +484,10 @@ namespace apsi::sender {
         upper bound rather than an exact figure -- both terms it adds are union bounds -- and it
         assumes the OPRF leaves items pseudorandom.
 
+        With match tags, a bin bundle gives an item a false positive only by giving it its tag,
+        so the term for one bin bundle is -min(tag_bit_count, 128), as
+        PSIParams::log2_fpp_per_bin_bundle gives it, however many items the bins hold.
+
         Throws std::invalid_argument if query_item_count is zero.
         */
         [[nodiscard]] double log2_fpp(std::size_t query_item_count) const;
@@ -337,12 +516,23 @@ namespace apsi::sender {
         }
 
         /**
-        Writes the SenderDB to a stream.
+        Writes the SenderDB to a stream, with its plaintexts as it holds them: a compressed
+        SenderDB holds bit-packed plaintexts, which Microsoft SEAL older than 4.6 cannot load.
+
+        SenderDB::Load reads the header, and then each bin bundle, as one buffer of at most
+        apsi::util::max_buffer_size bytes, just under 2 GiB. Throws std::length_error, giving the
+        size, and writes nothing, if either might take more: a bin bundle, named by its bundle
+        index, or the header, which holds the 16-byte HashedItem of every item until SenderDB::strip
+        removes them, and so is too large for more than about 134 million items. The check is
+        conservative (see BinBundle::save).
         */
         std::size_t save(std::ostream &out) const;
 
         /**
-        Reads the SenderDB from a stream.
+        Reads the SenderDB from a stream. Throws std::runtime_error for a SenderDB that is not
+        stripped but holds an OPRF key of zero, which APSI 1.1.0 could save after clearing a
+        stripped SenderDB or setting its data: every item it holds hashed to the same value, so it
+        must be rebuilt.
         */
         static std::pair<SenderDB, std::size_t> Load(std::istream &in);
 
@@ -367,6 +557,84 @@ namespace apsi::sender {
         void clear_internal();
 
         void generate_caches();
+
+        /**
+        Calls generate_caches after an update has failed partway, so that the sender answers
+        queries from what the bin bundles hold rather than refusing them for a stale cache. An
+        exception from generate_caches is dropped, as the caller passes on the update's own.
+        */
+        void generate_caches_after_failure() noexcept;
+
+        /**
+        Does the work of insert_or_assign and set_data for a labeled SenderDB: checks the SenderDB
+        and the batch, clears the database if clear_first is true, and inserts the data. The caller
+        holds the writer lock.
+        */
+        void insert_or_assign_locked(
+            const std::vector<std::pair<Item, Label>> &data, bool clear_first);
+
+        /**
+        Does the work of insert_or_assign and set_data for an unlabeled SenderDB: checks the
+        SenderDB, clears the database if clear_first is true, and inserts the data. The caller
+        holds the writer lock.
+        */
+        void insert_or_assign_locked(const std::vector<Item> &data, bool clear_first);
+
+        /**
+        Do the work of insert_or_assign_hashed and set_data_hashed: check the SenderDB and the
+        batch, clear the database if clear_first is true, and insert the data. The caller holds the
+        writer lock.
+        */
+        void insert_or_assign_hashed_locked(const std::vector<HashedItem> &data, bool clear_first);
+
+        void insert_or_assign_hashed_locked(
+            const std::vector<std::pair<HashedItem, EncryptedLabel>> &data, bool clear_first);
+
+        void insert_or_assign_hashed_locked(
+            const std::vector<std::pair<HashedItem, std::vector<apsi::util::felt_t>>> &data,
+            bool clear_first);
+
+        void insert_or_assign_hashed_locked(
+            const std::vector<
+                std::tuple<HashedItem, EncryptedLabel, std::vector<apsi::util::felt_t>>> &data,
+            bool clear_first);
+
+        /**
+        Does the work of insert_or_assign and insert_or_assign_hashed for a labeled SenderDB whose
+        parameters do not use match tags, given the hashed items with their encrypted labels. The
+        caller holds the writer lock and has checked the batch.
+        */
+        void insert_hashed_labeled(std::vector<std::pair<HashedItem, EncryptedLabel>> hashed_data);
+
+        /**
+        Does the work of insert_or_assign and insert_or_assign_hashed for an unlabeled SenderDB
+        whose parameters do not use match tags, given the hashed items. The caller holds the writer
+        lock.
+        */
+        void insert_hashed_unlabeled(std::vector<HashedItem> hashed_data);
+
+        /**
+        Does the work of insert_or_assign and insert_or_assign_hashed for a labeled SenderDB whose
+        parameters use match tags, given the hashed items with their encrypted labels and tags. The
+        caller holds the writer lock and has checked the batch.
+        */
+        void insert_tagged_labeled(
+            std::vector<std::tuple<HashedItem, EncryptedLabel, std::vector<apsi::util::felt_t>>>
+                hashed_data);
+
+        /**
+        Does the work of insert_or_assign and insert_or_assign_hashed for an unlabeled SenderDB
+        whose parameters use match tags, given the hashed items with their tags. The caller holds
+        the writer lock and has checked the batch.
+        */
+        void insert_tagged_unlabeled(
+            std::vector<std::pair<HashedItem, std::vector<apsi::util::felt_t>>> tagged_data);
+
+        /**
+        Does the work of remove and remove_hashed, given the hashed items. The caller holds the
+        writer lock and has checked that the SenderDB is not stripped.
+        */
+        void remove_hashed_items(std::vector<HashedItem> hashed_data);
 
         /**
         The set of all items that have been inserted into the database

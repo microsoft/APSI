@@ -29,19 +29,3 @@ directories hold arch-specific field arithmetic and are selected at configure
 time. `CMakeLists.txt` copies the headers to
 `${CMAKE_BINARY_DIR}/common/apsi/fourq/` at configure time, which is how the
 `apsi/fourq/` include prefix resolves.
-
-## Two diagnostics that are not defects
-
-GCC reports `'fp2neg1271' accessing 32 bytes in a region of size 16` in `decode`
-(`crypto_util.c`). It is a false positive: passing `P->x[0]`, one 16-byte `felm_t`,
-to `mod1271` narrows what GCC believes is reachable through `P->x`, so the 32-byte
-`f2elm_t` access that follows looks like an overrun. `P->x` is a whole `f2elm_t` in
-every caller, so those 32 bytes are there.
-
-Microsoft SEAL declares `uint128_t` as `unsigned __int128` wherever it has
-`__int128`, and the generic implementation here declares that name as `uint64_t[2]`,
-so a translation unit including both will not compile where both apply -- and
-`common/apsi/oprf/ecpoint.cpp` includes both. The configurations APSI builds keep
-them apart: the generic implementation is selected for ARM64 Windows, which builds
-with MSVC, where SEAL declares no `uint128_t`, and for 32-bit x86, which has no
-`__int128`. Only a generic build by GCC or Clang for a 64-bit target would collide.

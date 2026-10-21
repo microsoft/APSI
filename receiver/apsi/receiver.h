@@ -31,6 +31,9 @@
 #include "apsi/responses.h"
 #include "apsi/seal_object.h"
 
+// SEAL
+#include "seal/serialization.h"
+
 namespace apsi::receiver {
     /**
     The Receiver class implements all necessary functions to create and send parameter, OPRF,
@@ -82,14 +85,26 @@ namespace apsi::receiver {
     important piece of data: the number of ResultPart objects the receiver should expect to
     receive from the sender in the next step.
 
-    (4) network::Channel::receive_result must be called repeatedly to receive all ResultParts.
-    For each received ResultPart Receiver::process_result_part must be called to find a
-    std::vector<MatchRecord> representing the match data associated to that ResultPart.
-    Alternatively, one can first retrieve all ResultParts, collect them into a
-    std::vector<ResultPart>, and use Receiver::process_result to find the complete result --
-    just like what the simple API returns. Both Receiver::process_result_part and
-    Receiver::process_result require the IndexTranslationTable and the LabelKeyVector
-    objects created in the previous steps.
+    (4) network::Channel::receive_result_for must be called repeatedly, with the Receiver's
+    seal::SEALContext, from Receiver::get_seal_context, and the PSIParams the Receiver was created
+    from, to receive all ResultParts. It rejects, as a failed receive, a package that cannot be a
+    result for these parameters. For each received ResultPart Receiver::process_result_part must be
+    called to find a std::vector<MatchRecord> representing the match data associated to that
+    ResultPart. Alternatively, one can first retrieve all ResultParts, collect them into a
+    std::vector<ResultPart>, and use Receiver::process_result to find the complete result -- just
+    like what the simple API returns. Both Receiver::process_result_part and
+    Receiver::process_result require the IndexTranslationTable and the LabelKeyVector objects
+    created in the previous steps.
+
+    With match tags (see PSIParams::uses_tags), the receiver derives the tags of its items from
+    their label keys, so it needs the LabelKeyVector even when the sender's items have no labels.
+    Receiver::request_query, Receiver::process_result_part, and Receiver::process_result then throw
+    std::invalid_argument unless there is a label key for every item. The same functions also throw
+    std::runtime_error on a result package that is null or cannot be a result for these parameters.
+    With matching polynomials, Receiver::process_result_part and Receiver::process_result throw
+    std::runtime_error on a result package that is null or has no psi_result. A lost package could
+    hide a match, so a caller collecting packages itself should treat a failed receive as a failed
+    query, as the simple API does.
     */
     class Receiver {
     public:
@@ -138,6 +153,23 @@ namespace apsi::receiver {
             std::chrono::minutes(30);
 
         /**
+        The compression mode a Receiver uses for its queries unless Receiver::set_compr_mode is
+        called.
+
+        Bit-packing stores each block of coefficients of the relinearization keys and ciphertexts
+        without the high-order and low-order bits that are zero in all of them, such as the
+        low-order bits a sender clears in its results. It saves several times faster than Zstandard,
+        loads about as fast or faster, and makes both queries and result packages smaller. The
+        sender saves its result packages in the mode the query was sent in, so the choice applies to
+        both directions.
+
+        Only Microsoft SEAL 4.6 and later can load bit-packed data, so a receiver querying a
+        sender built with an earlier version, as APSI 1.x senders usually are, must choose another
+        mode, normally seal::compr_mode_type::zstd.
+        */
+        static constexpr seal::compr_mode_type default_compr_mode = seal::compr_mode_type::bitpack;
+
+        /**
         Creates a new receiver with parameters specified. In this case the receiver has
         specified the parameters and expects the sender to use the same set.
         */
@@ -178,6 +210,25 @@ namespace apsi::receiver {
         }
 
         /**
+        Returns the compression mode for the relinearization keys and ciphertexts in the queries
+        this Receiver creates.
+        */
+        [[nodiscard]] seal::compr_mode_type get_compr_mode() const noexcept
+        {
+            return compr_mode_;
+        }
+
+        /**
+        Sets the compression mode for the relinearization keys and ciphertexts in the queries this
+        Receiver creates from now on. Any mode this build of Microsoft SEAL supports can be used;
+        see Receiver::default_compr_mode for the default and for when to choose another. The sender
+        answers each query in the mode it was sent in.
+
+        Throws std::invalid_argument if this build of Microsoft SEAL does not support compr_mode.
+        */
+        void set_compr_mode(seal::compr_mode_type compr_mode);
+
+        /**
         Performs a parameter request and returns the received PSIParams object.
 
         Throws std::runtime_error if the sender sends nothing for timeout; see
@@ -203,11 +254,16 @@ namespace apsi::receiver {
         Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of
         items, and the result is a same-size vector of MatchRecord objects. If an item is in the
         intersection, the corresponding MatchRecord indicates it in the `found` field, and the
-        `label` field may contain the corresponding label if a sender's data included it.
+        `label` field may contain the corresponding label if a sender's data included it. An item
+        that appears more than once in the vector gets the same MatchRecord at each of its indices.
 
         Throws std::runtime_error if the sender sends nothing for timeout, whether that happens
         before the query response or partway through the result packages; see
         Receiver::default_receive_timeout for what that bound means and how to lift it.
+
+        With parameters that use match tags, label_keys must hold the label key of every item, or
+        this throws std::invalid_argument before anything is sent, and a result package that
+        cannot be a result for these parameters makes this throw std::runtime_error.
         */
         std::vector<MatchRecord> request_query(
             const std::vector<HashedItem> &items,
@@ -251,16 +307,37 @@ namespace apsi::receiver {
         more than one query is responsible for calling Receiver::reset_keys between them, at a
         point where no query is in flight; otherwise every query it sends carries the same
         relinearization keys, and a sender can recognize them as coming from one receiver.
+
+        With parameters that use match tags, an empty entry of the cuckoo table is encoded as the
+        value 2^item_bit_count_per_felt in each of its slots, which no field element of a
+        sender's item can take, so that an empty entry never selects a value the sender stores.
+        Without match tags it is the all-zero item, as in APSI 1.x.
+
+        The query is saved in the compression mode Receiver::get_compr_mode returns, and carries
+        the fingerprint of the Receiver's PSIParams (see PSIParams::fingerprint), which the sender
+        checks against its own parameters.
         */
         std::pair<Request, IndexTranslationTable> create_query(
             const std::vector<HashedItem> &items);
 
         /**
         Processes a ResultPart object and returns a vector of MatchRecords in the same order as
-        the original vector of OPRF hashed items used to create the query. The return value
-        includes matches only for those items whose results happened to be in this particular
-        result part. Thus, to determine whether there was a match with the sender's data, the
-        results for each received ResultPart must be checked.
+        the original vector of OPRF hashed items used to create the query. An item that appears
+        more than once in that vector gets the same MatchRecord at each of its indices. The return
+        value includes matches only for those items whose results happened to be in this
+        particular result part. Thus, to determine whether there was a match with the sender's
+        data, the results for each received ResultPart must be checked. Processing decrypts the
+        ciphertexts in result_part, which cannot be processed again.
+
+        Without match tags, this throws std::runtime_error if result_part is null or has no PSI
+        result. With parameters that use match tags, an
+        item matches when the result holds its match tag in the item's slots. Every ciphertext in
+        result_part is decrypted either way, and with match tags and labels, the label of every
+        queried item at the package's bundle index is decoded and decrypted as well, whether or not
+        any item matches, so that the time taken does not tell the sender which of the receiver's
+        items it holds. With match tags, this throws std::invalid_argument unless label_keys holds
+        a label key for every item of the query, and std::runtime_error if result_part is null or
+        does not have the structure network::ResultPackage::check_tag_structure describes.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result_part(
             const LabelKeyVector &label_keys,
@@ -270,7 +347,12 @@ namespace apsi::receiver {
         /**
         This function does multiple calls to Receiver::process_result_part, once for each
         ResultPart in the given vector. The results are collected together so that the returned
-        vector of MatchRecords reflects the logical OR of the results from each ResultPart.
+        vector of MatchRecords reflects the logical OR of the results from each ResultPart. When
+        two ResultParts both match an item, the first match is kept and an error is logged.
+
+        This throws as Receiver::process_result_part does, for any one of the ResultParts, so that
+        a package that cannot be a result aborts the whole query: a null one, and with match tags
+        a malformed one, or without them one without a PSI result.
         */
         [[nodiscard]] std::vector<MatchRecord> process_result(
             const LabelKeyVector &label_keys,
@@ -345,12 +427,63 @@ namespace apsi::receiver {
             std::vector<MatchRecord> mrs;
         };
 
+        /**
+        With match tags, throws std::invalid_argument unless there is a label key for each of the
+        item_count items of the query, as the tags cannot be checked without them. Does nothing
+        without match tags.
+        */
+        void check_label_keys(const LabelKeyVector &label_keys, std::size_t item_count) const;
+
+        /**
+        With match tags, returns the match tag of each of the item_count items of the query,
+        derived from its label key, so that a query derives each tag once rather than for every
+        result package. Returns an empty vector without match tags. The caller has checked the
+        label keys with check_label_keys.
+        */
+        [[nodiscard]] std::vector<std::vector<std::uint64_t>> compute_match_tags(
+            const LabelKeyVector &label_keys, std::size_t item_count) const;
+
+        /**
+        Copies the MatchRecord of each item that appears more than once among the items of the
+        query from its first index to its other indices, if it reports a match.
+        */
+        static void copy_to_repeated_items(
+            const IndexTranslationTable &itt, std::vector<MatchRecord> &mrs);
+
+        /**
+        With match tags, throws std::runtime_error, aborting the query, if result_part is null or
+        does not have the structure network::ResultPackage::check_tag_structure describes. Does
+        nothing without match tags.
+        */
+        void check_tagged_result_part(const ResultPart &result_part) const;
+
+        /**
+        The work of process_result_part. With match tags, match_tags holds the match tag of every
+        item of the query, as compute_match_tags gives them, or is null, and then the tags of the
+        items at the package's bundle index are derived from their label keys.
+        */
+        [[nodiscard]] std::vector<MatchRecord> process_result_part(
+            const LabelKeyVector &label_keys,
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part,
+            const std::vector<std::vector<std::uint64_t>> *match_tags) const;
+
+        /**
+        The work of process_result_part for parameters with match tags.
+        */
+        [[nodiscard]] std::vector<MatchRecord> process_tagged_result_part(
+            const LabelKeyVector &label_keys,
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part,
+            const std::vector<std::vector<std::uint64_t>> *match_tags) const;
+
         void process_result_worker(
             std::atomic<std::uint32_t> &package_count,
             ResultMergeState &merge_state,
             ReceiveDeadline &deadline,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
+            const std::vector<std::vector<std::uint64_t>> &match_tags,
             network::Channel &chl) const;
 
         void initialize();
@@ -362,5 +495,7 @@ namespace apsi::receiver {
         PowersDag pd_;
 
         SEALObject<seal::RelinKeys> relin_keys_;
+
+        seal::compr_mode_type compr_mode_ = default_compr_mode;
     }; // class Receiver
 } // namespace apsi::receiver

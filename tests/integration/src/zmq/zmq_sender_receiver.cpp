@@ -119,7 +119,9 @@ namespace APSITests {
             const vector<Item> &int_items,
             const vector<pair<Item, Label>> &all_item_labels)
         {
-            verify_unlabeled_results(query_result, query_vec, int_items);
+            if (!verify_unlabeled_results(query_result, query_vec, int_items)) {
+                return false;
+            }
 
             // Verify that all labels were received for items that were found
             for (const auto &result : query_result) {
@@ -195,6 +197,7 @@ namespace APSITests {
             atomic<bool> stop_sender{ false };
 
             RunningDispatcher sender = start_dispatcher(loaded_sender_db, stop_sender);
+            DispatcherStopper stopper(stop_sender, sender.done);
             const string &conn_addr = sender.conn_addr;
 
             for (auto client_total_and_int_size : client_total_and_int_sizes) {
@@ -238,6 +241,7 @@ namespace APSITests {
                 }
             }
 
+            // Stopped here as well, so that an exception from the dispatcher surfaces
             stop_sender = true;
             sender.done.get();
         }
@@ -276,6 +280,7 @@ namespace APSITests {
             atomic<bool> stop_sender{ false };
 
             RunningDispatcher sender = start_dispatcher(loaded_sender_db, stop_sender);
+            DispatcherStopper stopper(stop_sender, sender.done);
             const string &conn_addr = sender.conn_addr;
 
             for (auto client_total_and_int_size : client_total_and_int_sizes) {
@@ -319,6 +324,7 @@ namespace APSITests {
                 }
             }
 
+            // Stopped here as well, so that an exception from the dispatcher surfaces
             stop_sender = true;
             sender.done.get();
         }
@@ -1162,5 +1168,93 @@ namespace APSITests {
             create_huge_params2(),
             1,
             thread::hardware_concurrency());
+    }
+
+    // With match tags, through the same exchange: Receiver::RequestOPRF, which gives the label
+    // keys the tags are derived from, and Receiver::request_query, against a SenderDB saved and
+    // loaded, as a deployment serves one
+
+    TEST(ZMQSenderReceiverTests, TagUnlabeledSmall1)
+    {
+        size_t sender_size = 10;
+        RunUnlabeledTest(
+            sender_size,
+            {
+                { 0, 0 },
+                { 1, 0 },
+                { 1, 1 },
+                { 5, 0 },
+                { 5, 2 },
+                { 5, 5 },
+                { 10, 0 },
+                { 10, 5 },
+                { 10, 10 },
+            },
+            create_tag_params1(),
+            1,
+            1);
+    }
+
+    TEST(ZMQSenderReceiverTests, TagUnlabeledSmall2)
+    {
+        size_t sender_size = 10;
+        RunUnlabeledTest(
+            sender_size,
+            {
+                { 0, 0 },
+                { 1, 0 },
+                { 1, 1 },
+                { 5, 0 },
+                { 5, 2 },
+                { 5, 5 },
+                { 10, 0 },
+                { 10, 5 },
+                { 10, 10 },
+            },
+            create_tag_params2(),
+            1,
+            1);
+    }
+
+    TEST(ZMQSenderReceiverTests, TagLabeledSmall1)
+    {
+        size_t sender_size = 10;
+        RunLabeledTest(
+            sender_size,
+            {
+                { 0, 0 },
+                { 1, 0 },
+                { 1, 1 },
+                { 5, 0 },
+                { 5, 2 },
+                { 5, 5 },
+                { 10, 0 },
+                { 10, 5 },
+                { 10, 10 },
+            },
+            create_tag_params1(),
+            1,
+            1);
+    }
+
+    TEST(ZMQSenderReceiverTests, TagLabeledSmall2)
+    {
+        size_t sender_size = 10;
+        RunLabeledTest(
+            sender_size,
+            {
+                { 0, 0 },
+                { 1, 0 },
+                { 1, 1 },
+                { 5, 0 },
+                { 5, 2 },
+                { 5, 5 },
+                { 10, 0 },
+                { 10, 5 },
+                { 10, 10 },
+            },
+            create_tag_params2(),
+            1,
+            1);
     }
 } // namespace APSITests

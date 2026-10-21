@@ -1,5 +1,52 @@
 # List of Changes
 
+## Version 2.0.0
+
+### Breaking changes
+
+- Required Microsoft SEAL 4.7 or a newer 4.x release; see [Microsoft SEAL](README.md#microsoft-seal).
+- Re-tuned every parameter set in `parameters/` under its old name, so a deployment that loads a shipped file by name gets new parameters. To keep its parameters, it must keep the file from APSI 1.1.0; to move to the new set, it must rebuild its `SenderDB` from the original items. 32 of the 36 sets use match tags, which APSI 1.x cannot use. See [Upgrading from APSI 1.x](README.md#upgrading-from-apsi-1x).
+- The receiver bit-packs its queries by default. A sender built with Microsoft SEAL older than 4.6, as APSI 1.x senders usually are, cannot load such a query and drops it, so the receiver waits out its timeout. To query such a sender, call `Receiver::set_compr_mode(seal::compr_mode_type::zstd)`, or pass `--compression zstd` to `receiver_cli`.
+- A query carries a fingerprint of the parameters it was created for, and a sender refuses a query created for other parameters. A query without a fingerprint, as receivers of APSI 1.x send, is still answered for parameters without match tags.
+- A compressed `SenderDB`, the default, bit-packs its plaintexts or keeps them uncompressed, where it used Zstandard. APSI 1.x usually cannot serve a compressed `SenderDB` that APSI 2.0 saves: it loads it and then fails every query, or may crash. APSI 2.0 loads the `SenderDB`s APSI 1.x saves, except as the next entry describes.
+- `SenderDB::set_data` throws `std::logic_error` for a stripped `SenderDB`, and so does `SenderDB::strip` for one that is stripped already. The `SenderDB` constructor that takes an OPRF key throws `std::invalid_argument` for a key of zero, and `SenderDB::Load` refuses a `SenderDB` that is not stripped but holds a key of zero, which APSI 1.1.0 could save after `SenderDB::clear` or `SenderDB::set_data` on a stripped `SenderDB`; such a `SenderDB` must be rebuilt.
+- `network::Channel` has a new virtual member function, `receive_result_for`, so code built against the headers of APSI 1.x must be recompiled.
+- `network::ResultPackage::psi_result` is optional, since results with match tags have none. Code that loads result packages itself should use `network::Channel::receive_result_for`, or the overload of `network::ResultPackage::load` that takes the `PSIParams`.
+- `Receiver::process_result` and `Receiver::process_result_part` throw `std::runtime_error` for a null result package, which they used to skip, as a lost package could hide a match.
+- `network::SenderOperationQuery::load` keeps the ciphertexts of a query serialized, for `sender::Query` to load and check, so code that reads them itself must load them with `SEALObject::extract` and a `seal::SEALContext`. It refuses relinearization keys other than the single key set that `seal::KeyGenerator::create_relin_keys` makes, which is what every APSI receiver sends.
+
+### Added
+
+- Added match tags, an optional way of deciding matches, selected by a non-zero `tag_part_count` in `PSIParams::ItemParams` (`item_params.tag_part_count` in JSON, together with `"version": 2` at the top level). The sender stores a pseudorandom tag, derived from the item's label key, with every item, and the receiver accepts an item only when the sender returns exactly its tag. The false-positive probability then does not depend on `max_items_per_bin`, an item can be a single field element, and queries and responses are smaller with most parameter sets. With match tags, the receiver needs the label keys of its items even without labels. APSI 1.x refuses parameters with match tags. See [Match Tags](README.md#match-tags).
+- Added `PSIParams::fingerprint`, which every query carries, and `network::SenderOperationQuery::ExtractParamsFingerprint`, which reads it from a serialized query, for an application that serves `SenderDB`s with different parameters.
+- Added `SenderDB::insert_or_assign_hashed`, `SenderDB::set_data_hashed` and `SenderDB::remove_hashed`, which take items hashed already with `oprf::OPRFSender::ComputeHashes`, or with the new `oprf::OPRFSender::ComputeHashesAndMatchTags` for parameters with match tags, so that a `SenderDB` can be built where the OPRF key is not kept. Unless such a `SenderDB` holds the key the items were hashed with, it must be stripped before it is served with that key. See [SenderDB](README.md#senderdb).
+- Added `apsi::ScopedParallelismLimit`, which, while it exists, limits how many tasks of the shared thread pool the APSI operations begun on the calling thread use at once. See [Per-Operation Limits](README.md#per-operation-limits).
+
+### Hardened
+
+- A sender checks how many ciphertexts and relinearization keys a query holds before loading them, and refuses ciphertexts that share bytes or would decompress to far more than their size, so that a small crafted query can no longer make it allocate gigabytes of memory.
+- A receiver refuses result packages that a sender cannot have produced, such as ones whose ciphertexts are of the wrong size or level, share bytes, or would decompress to far more than their size, so that a malicious sender can no longer make it allocate far more memory than any result takes.
+- `SenderDB::Load` no longer reserves memory for as many bin bundles as a file declares. It refuses a truncated file, and a bin bundle holding a polynomial without coefficients, which crashed a sender answering a query.
+
+### Changed and fixed
+
+- Compared with the APSI 1.x set of the same name, on the same build of APSI 2.0, no set in `parameters/` takes more bytes for a query and its results, or has a higher false-positive probability at the sizes its name gives, and none takes more of the sender's CPU time per query beyond measurement noise; many take much less. The false-positive probability is below 2^-40 for every set. Setting up a `SenderDB` takes longer with some of the largest sets.
+- A sender answers queries much faster. Bit-packed and uncompressed plaintexts load much faster than ones compressed with Zstandard, uncompressed plaintexts are read in place, polynomials are evaluated with fewer operations, and the ciphertexts of a query are loaded in parallel.
+- Setting up a labeled `SenderDB` is much faster, and so are small updates of a `SenderDB`, which used to compute the polynomials of every bin of the bin bundles they changed, and could hold off queries for seconds.
+- Fixed `SenderDB::insert_or_assign` storing a second copy of an item when it replaced the item's label: queries could then return the old label, and `SenderDB::remove` left a copy behind. A `SenderDB` in which APSI 1.x replaced labels may hold such copies. Replacing the label again with APSI 2.0 gives every copy the new label, and removing the item and inserting it again, or rebuilding the `SenderDB`, removes the copies.
+- Fixed `SenderDB::clear` and `SenderDB::set_data` making a stripped `SenderDB` usable again under its zeroed OPRF key, with which every item would have matched. `SenderDB::clear` now gives a stripped `SenderDB` a new key.
+- `SenderDB::set_data` and `SenderDB::remove` change nothing when they refuse a batch, where `SenderDB::set_data` left the database empty and `SenderDB::remove` could apply part of the batch. An update that fails partway, as for lack of memory or because the log handler throws, no longer leaves the `SenderDB` refusing every later query.
+- `oprf::OPRFSender::ComputeHashes` throws `std::invalid_argument` for a label longer than `label_byte_count`, which it used to truncate.
+- Fixed `SenderDB::save` writing files that `SenderDB::Load` cannot read. It refuses, with `std::length_error` and before writing anything, a `SenderDB` that `SenderDB::Load` might not read: one with a bin bundle of more than about 2 GiB, which large parameters can produce, or one that is not stripped and holds more than about 134 million items.
+- Fixed `SenderDB::Load` refusing a `SenderDB` with long labels and many bins, which could be saved but not loaded.
+- Fixed the receiver reporting an item given more than once in a query only at its last index.
+- Fixed undefined behavior in `util::field_elts_to_bits`, with which the receiver decodes labels.
+- Fixed `sender::Query::deep_copy`, which made an invalid copy of a valid query.
+
+### Build
+
+- Fixed the build for targets for which FourQ has no optimized implementation, such as 64-bit RISC-V and 32-bit x86 Linux, which stopped with "Unsupported ARCHITECTURE".
+
 ## Version 1.1.0
 
 - The installed paths no longer carry the version: headers go to `include/apsi`, the CMake package to `lib/cmake/APSI`, and the library is named `apsi`. Code can include `apsi/...` from the standard include directory alone. Consumers using `find_package(APSI)` and `APSI::apsi` need no change. Installing over APSI 1.0 leaves its versioned files in place; remove them first.
@@ -67,7 +114,7 @@
 
 ### Build
 
-- `APSI_SECURE_COMPILE_OPTIONS` now hardens the build rather than doing nothing, and defaults to ON. GCC and Clang get stack protection, position-independent code and bounds-checked standard library containers, together with fortified libc calls and stack-clash protection away from Apple platforms and full RELRO with a non-executable stack on ELF targets; MSVC gets Control Flow Guard, the Spectre variant 1 mitigation, EH continuation metadata on a 64-bit target, and shadow-stack marking on x64. See [Build Hardening](README.md#build-hardening) for what each toolchain receives. The options are not exported, so a consumer chooses its own.
+- `APSI_SECURE_COMPILE_OPTIONS` now hardens the build rather than doing nothing, and defaults to ON. GCC and Clang get stack protection, position-independent code and bounds-checked standard library containers, together with fortified libc calls and stack-clash protection away from Apple platforms and full RELRO with a non-executable stack on ELF targets; MSVC gets Control Flow Guard, the Spectre variant 1 mitigation, and shadow-stack marking on x64. See [Build Hardening](README.md#build-hardening) for what each toolchain receives. The options are not exported, so a consumer chooses its own.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time, as is a platform for which no FourQ target can be selected.
 - Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.

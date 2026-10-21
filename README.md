@@ -3,11 +3,14 @@
 - [Introduction](#introduction)
   - [(Unlabeled) PSI and Labeled PSI](#unlabeled-psi-and-labeled-psi)
   - [Sender and Receiver](#sender-and-receiver)
+  - [Matching Polynomials and Match Tags](#matching-polynomials-and-match-tags)
 - [How APSI Works](#how-apsi-works)
   - [Homomorphic Encryption](#homomorphic-encryption)
   - [Theory](#theory)
   - [Practice](#practice)
   - [Labeled Mode](#labeled-mode)
+  - [Match Tags](#match-tags)
+    - [Choosing a Method](#choosing-a-method)
   - [Trust Model](#trust-model)
     - [What a Peer Can Learn](#what-a-peer-can-learn)
 - [Using APSI](#using-apsi)
@@ -15,11 +18,21 @@
   - [Request, Response, and ResultPart](#request-response-and-resultpart)
   - [Sender](#sender)
   - [SenderDB](#senderdb)
+  - [Compression](#compression)
+  - [Parameter Fingerprints](#parameter-fingerprints)
   - [PSIParams](#psiparams)
   - [Query Powers](#query-powers)
   - [Thread Control](#thread-control)
   - [Logging](#logging)
+- [Upgrading from APSI 1.x](#upgrading-from-apsi-1x)
+  - [Parameter Sets](#parameter-sets)
+  - [With Matching Polynomials](#with-matching-polynomials)
+  - [With Match Tags](#with-match-tags)
+  - [Building and Interfaces](#building-and-interfaces)
 - [Building APSI](#building-apsi)
+  - [Requirements](#requirements)
+  - [Installing APSI with vcpkg](#installing-apsi-with-vcpkg)
+  - [Building APSI from Source](#building-apsi-from-source)
 - [Command-Line Interface (CLI)](#command-line-interface-cli)
   - [Common Arguments](#common-arguments)
   - [Receiver](#receiver-1)
@@ -52,7 +65,22 @@ We use the terminology *sender* and *receiver* to denote the two parties in the 
 For example, in a common use case where a server hosts a look-up table that multiple clients can query with encrypted records.
 In this case the server acts as the sender, and the clients act as (independent) receivers.
 
+### Matching Polynomials and Match Tags
+
+APSI 2.x can decide whether an item is in the intersection in two ways, and the parameters choose which.
+The first uses *matching polynomials*, which evaluate to zero at the sender's items.
+It is the only method in APSI 1.x and older, and works the same way in APSI 2.x.
+The second uses *match tags*, pseudorandom values that the receiver computes for its own items and looks for in the sender's response.
+Match tags, introduced in APSI 2.0, can make queries and responses smaller, but they are an alternative, not a replacement.
+[Choosing a Method](#choosing-a-method) explains how to choose between them.
+
+APSI 2.0 also bit-packs queries by default, sends a fingerprint of the parameters with every query, and requires Microsoft SEAL 4.7 or a later 4.x release.
+[Upgrading from APSI 1.x](#upgrading-from-apsi-1x) explains what this means for an existing deployment.
+
 ## How APSI Works
+
+In [Theory](#theory), [Practice](#practice), and [Labeled Mode](#labeled-mode) we explain how APSI decides a match with matching polynomials, and in [Match Tags](#match-tags) we describe the other method.
+[Trust Model](#trust-model) covers both.
 
 ### Homomorphic Encryption
 
@@ -92,7 +120,8 @@ It is now easy for the reader to appreciate the value of batching: computation o
 
 `coeff_modulus` is a set of prime numbers that determine the noise budget of a freshly encrypted ciphertext.
 In Microsoft SEAL the `coeff_modulus` primes are rarely given explicitly by values but instead by bit counts &ndash; the library can create them.
-In APSI it is beneficial to have as few primes in `coeff_modulus` as possible; using 2 &ndash; 8 primes is probably reasonable. A single prime is enough only when the receiver sends every power the sender needs, so that the sender never relinearizes; the smallest parameter sets in [parameters/](parameters/) do exactly that.
+In APSI it is beneficial to have as few primes in `coeff_modulus` as possible; using 2 &ndash; 8 primes is probably reasonable.
+A single prime is enough only when the receiver sends every power the sender needs, so that the sender never relinearizes; the sets in [parameters/](parameters/) with a `poly_modulus_degree` of 2048 do exactly that, and so do the `-cmp` sets, which spend communication to save the sender's computation.
 The individual primes can be up to 60 bits.
 The noise budget depends linearly on the total bit count of the primes.
 `coeff_modulus` also affects the security level of the encryption scheme: if other parameters remain the same, a bigger total bit count is less secure.
@@ -184,7 +213,7 @@ Two tricks make this possible.
 
 The first trick is to apply a hash function to all items on both the sender's and receiver's side, so that they have a capped standard length.
 We hash to 128 bits and truncate the hash to a shorter length (large enough to be collision-resistant) as necessary.
-The shortest item length we support (after truncation) is 80 bits, which is still far above the practical sizes of `plain_modulus`.
+With matching polynomials, the shortest item length we support (after truncation) is 80 bits, which is still far above the practical sizes of `plain_modulus`.
 
 The second trick is to break up each item into multiple parts and encode them separately into consecutive batching slots.
 Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B - 1` bits of an item into a batching slot and the next `B - 1` bits into the next slot.
@@ -281,7 +310,7 @@ Suppose the receiver wants to perform a query for a vector of items as follows.
 Receiver's query vector
 
 [ item92  ]
-[ item14  |
+[ item14  ]
 [ item79  ]
 [ item3   ]
 [ item401 ]
@@ -329,7 +358,7 @@ Sender's big hash table
 [ item216-part1 | empty         ][ empty         | empty         ]
 [ item216-part2 | empty         ][ empty         | empty         ]
 [ item315-part1 | item491-part1 ][ item262-part1 | empty         ]
-[ item315-part2 | item491-part2 ][ item262-part1 | empty         ]
+[ item315-part2 | item491-part2 ][ item262-part2 | empty         ]
 [ item100-part1 | item37-part1  ][ item90-part1  | item3-part1   ]
 [ item100-part2 | item37-part2  ][ item90-part2  | item3-part2   ]
 
@@ -417,6 +446,8 @@ Receiver's cuckoo hash table
 A similar breakdown takes place on the sender's side, creating a jagged array of bin bundles.
 Here is an example of what the sender's view could be.
 ```
+Sender's bin bundles
+
                 +------------++------------++------------+
                 |            ||            ||            |
 Bundle index 0  | Bin bundle || Bin bundle || Bin bundle |
@@ -450,7 +481,7 @@ The labeled mode is not too different but requires some extra explanation.
 The receiver, in addition to learning whether its query items are in the sender's set, will learn data the sender has associated to these items.
 One can think of this as a key-value store with privacy-preserving querying.
 
-To understand how the labeled mode works, recall from [Basic Idea](#basic-idea) how the matching polynomial `M(x)` outputs either an encryption of zero or an encryption of a non-zero value when being evaluated at the receiver's encrypted item `Q`.
+To understand how the labeled mode works, recall from [Naive Idea](#naive-idea) how the matching polynomial `M(x)` outputs either an encryption of zero or an encryption of a non-zero value when being evaluated at the receiver's encrypted item `Q`.
 In the labeled mode, the sender creates another polynomial `L(x)`, the *label interpolation polynomial*, that has the following property: if `{(Y_i, V_i)}` denotes the sender's set of item-label pairs, then `L(Y_i) = V_i`.
 Upon receiving `Q`, the sender computes the ciphertext pair `(M(Q), L(Q))` and returns them to the receiver.
 The receiver decrypts the pair and checks whether the first value decrypts to zero.
@@ -501,14 +532,154 @@ The `SenderDB` constructor warns whenever the nonce is shorter than the default,
 There is one last subtle issue that must be addressed.
 Recall from [Practice](#practice) how the sender constructs a large hash table and breaks it into a jagged array of bin bundles.
 In the labeled mode each bin bundle holds not only the item parts in it, but also the corresponding label parts, and the label interpolation polynomials, as described above.
-The interpolation polynomials are not created for the entire label at a time, but for each part separately, although the encryption is applied to the full item before decomposing it into parts.
+The interpolation polynomials are not created for the entire label at a time, but for each part separately, although the encryption is applied to the full label before decomposing it into parts.
 
 Now consider what happens when &ndash; by chance &ndash; `item416-part1` and `item12-part1` (as in [Practice](#practice)) are the same.
 If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`, as it cannot output both `label416-part1` and `label12-part1` on the corresponding item part.
 
-This issue is resolved by checking that label parts do not already appear in the same locations before inserting an item into a bin bundle.
+This issue is resolved by checking that item parts do not already appear in the same locations before inserting an item into a bin bundle.
 If any of them does, the item simply cannot be inserted into that bin bundle, and a new bin bundle for the same bundle index must be created.
-Note that the problem exists only in the labeled mode and can lead to worse *packing rate* (`items_inserted / theoretical_max`) than in unlabeled mode, where no such limitation exists.
+Note that with matching polynomials the problem exists only in the labeled mode and can lead to worse *packing rate* (`items_inserted / theoretical_max`) than in unlabeled mode, where no such limitation exists.
+
+### Match Tags
+
+APSI 2.x can also decide a match with match tags instead of matching polynomials, when the parameters have a positive `tag_part_count`, written `T` below (see [ItemParams](#itemparams)).
+The OPRF, cuckoo hashing, bin bundles, and label encryption work as described above, apart from two details we describe at the end of [Tags in Practice](#tags-in-practice).
+
+#### Why Items Need Many Bits
+
+Recall from [False Positives](#false-positives) that each of the `P` parts of an item the sender does not hold can match by chance, and that the parts need not even match the same item.
+A larger `plain_modulus` costs noise budget, and a smaller `K` costs bin bundles, so in practice the defense is to use many parts per item.
+This is why an item must have at least 80 bits, and why the parameter sets of APSI 1.x use 4 &ndash; 7 batching slots per item.
+We refer to each part, an integer modulo `plain_modulus` in one batching slot, as a *field element*, and to `P` as `felts_per_item`.
+
+These parts are expensive.
+A query ciphertext holds only `poly_modulus_degree / P` items, so a query needs up to `P` times as many ciphertexts as with one slot per item.
+A bin bundle likewise holds only `poly_modulus_degree / P` locations, so the sender needs up to `P` times as many bin bundles, each adding a result to the response.
+
+#### Basic Idea
+
+Match tags make most of these parts unnecessary, by deciding a match with a separate value instead of the parts themselves.
+The sender stores with each item `Y` a *match tag*, a pseudorandom value derived from the label key `LabelKey(s, Y)` of [Label Encryption](#label-encryption).
+The tag has `T` parts, each as long as the item, which the sender stores and interpolates like label parts, ahead of the parts of the encrypted label if there is one.
+There is no matching polynomial.
+
+The receiver obtains `LabelKey(s, X)` from the OPRF, so it can compute the tag of each of its items `X` itself.
+It reports a match for `X` only if the results for all `T` tag parts hold exactly the tag of `X` in the slots of `X`.
+If the sender holds `X`, the polynomials return exactly that, because `X` is one of their interpolation points.
+If not, they return zero if the bin is empty, the tag of another item if that item is alone in the bin or shares its field element with `X`, and otherwise a pseudorandom combination of the tags in the bin.
+None of these equals the tag of `X` except by chance.
+The receiver decrypts every result, compares every field element of each tag, and in labeled mode decodes the label of each of its items, whether or not anything matches, so that, apart from recording the matches, its work does not depend on what matched.
+
+The parts of an item now only select it within its bin, so an item can be a single field element, far shorter than 80 bits.
+The length of the tag sets the false-positive probability instead (see [False Positives with Tags](#false-positives-with-tags)).
+
+#### Tags in Practice
+
+We now repeat the example of [Practice](#practice) with match tags.
+Each item now uses a single batching slot, so the same cuckoo hash table takes 8 slots instead of 16.
+With `poly_modulus_degree` 16, one ciphertext would now hold a table twice as large.
+To keep the example the same, suppose `poly_modulus_degree` is 8, so that the table is again a single Microsoft SEAL ciphertext.
+```
+Receiver's cuckoo hash table
+
+[ item79  ]
+[ empty   ]
+[ item14  ]
+[ item92  ]  ==>  query-ctxt
+[ item401 ]
+[ empty   ]
+[ empty   ]
+[ item3   ]
+```
+The sender's big hash table shrinks in the same way, to one row per location, and holds the same items in the same two bin bundles.
+Suppose `T` is 2.
+Next to its items, *Bin bundle 1* then holds two parts of each item's tag.
+```
+Sender's bin bundle 1
+
+[ item416 | item12  ][ tag416-part1 | tag12-part1  ][ tag416-part2 | tag12-part2  ]
+[ item125 | item9   ][ tag125-part1 | tag9-part1   ][ tag125-part2 | tag9-part2   ]
+[ item500 | item277 ][ tag500-part1 | tag277-part1 ][ tag500-part2 | tag277-part2 ]
+[ item92  | empty   ][ tag92-part1  | empty        ][ tag92-part2  | empty        ]
+[ item498 | item403 ][ tag498-part1 | tag403-part1 ][ tag498-part2 | tag403-part2 ]
+[ item216 | empty   ][ tag216-part1 | empty        ][ tag216-part2 | empty        ]
+[ item315 | item491 ][ tag315-part1 | tag491-part1 ][ tag315-part2 | tag491-part2 ]
+[ item100 | item37  ][ tag100-part1 | tag37-part1  ][ tag100-part2 | tag37-part2  ]
+
+\-------------------/\-----------------------------/\-----------------------------/
+        Items                   Tag part 1                     Tag part 2
+```
+In the first bin, for example, the polynomial for tag part 1 outputs `tag416-part1` at `item416` and `tag12-part1` at `item12`.
+Evaluating the polynomials of each tag part at `query-ctxt` produces `result-ctxt-1-part1` through `result-ctxt-2-part2`, which the receiver decrypts as follows.
+```
+Receiver decrypting the result
+
+                          [ random      ]                                  [ random      ]
+                          [ empty       ]                                  [ empty       ]
+                          [ random      ]                                  [ random      ]
+result-ctxt-1-part1  ==>  [ tag92-part1 ]        result-ctxt-1-part2  ==>  [ tag92-part2 ]
+                          [ random      ]                                  [ random      ]
+                          [ empty       ]                                  [ empty       ]
+                          [ empty       ]                                  [ empty       ]
+                          [ random      ]                                  [ random      ]
+
+                          [ random      ]                                  [ random      ]
+                          [ empty       ]                                  [ empty       ]
+                          [ tag14-part1 ]                                  [ tag14-part2 ]
+result-ctxt-2-part1  ==>  [ zero        ]        result-ctxt-2-part2  ==>  [ zero        ]
+                          [ random      ]                                  [ random      ]
+                          [ empty       ]                                  [ empty       ]
+                          [ empty       ]                                  [ empty       ]
+                          [ tag3-part1  ]                                  [ tag3-part2  ]
+```
+Comparing these with the tags of its own items, and skipping the slots marked `empty`, the receiver finds matches for `item92` in *Bin bundle 1*, and for `item14` and `item3` in *Bin bundle 2*, and combines and orders them as in [Practice](#practice).
+The slots marked `random` hold pseudorandom combinations of the tags in their bins, and the slot of `item92` in *Bin bundle 2* holds zero, since its bin there is empty.
+
+Two details were left out above.
+First, an empty location of the receiver's cuckoo hash table holds `2^(B - 1)` in each slot rather than zero.
+No `B - 1`-bit part of a sender's item can equal it, so an empty location never evaluates the polynomials at one of the sender's items.
+Such a location still gets values, though: in *Bin bundle 1*, `item216` is alone in its bin, so the empty location there gets exactly the parts of its tag (see [What a Peer Can Learn](#what-a-peer-can-learn)).
+
+Second, since tag parts are label parts, [Partial Item Collisions](#partial-item-collisions) now applies to every item: two items with the same field element in a bin must go to different bin bundles.
+With short items this is common, and can add a bin bundle or two at each bundle index.
+
+#### Deriving a Tag
+
+A tag consists of `T * P` field elements of `B - 1` bits each, read least significant bit first from Blake2xb output of exactly `ceil(T * P * (B - 1) / 8)` bytes.
+We key Blake2xb with `LabelKey(s, Y)` and compute it on a fixed string longer than any label nonce, so a tag is never computed on the input of a label keystream.
+Any other implementation of APSI must derive tags bit for bit as [match_tag.h](common/apsi/util/match_tag.h) specifies.
+
+#### False Positives with Tags
+
+With match tags, an item the sender does not hold passes against a bin bundle only if the sender happens to return exactly its tag, however many items the bins hold.
+The negative logarithm of the false-positive probability for a single receiver's item, against a single bin bundle, is therefore the length of the tag, `T * P * (B - 1)`.
+A tag is derived from a 128-bit key, though, so APSI never counts more than 128 bits.
+
+[False Positives](#false-positives-1) under [PSIParams](#psiparams) adds the factors that apply to both methods.
+`K` matters with match tags only through the number of bin bundles: a smaller `K` means more of them, and so a higher probability per query.
+
+#### Choosing a Method
+
+Which of the two methods is better depends on the parameter set.
+
+Match tags save field elements, and with them query ciphertexts and bin bundles, as [Why Items Need Many Bits](#why-items-need-many-bits) explains.
+A query that fits in a single ciphertext has no ciphertexts to save, though.
+In exchange, each bin bundle returns `T` tag results instead of one matching result.
+Match tags therefore save the most when items would need many field elements, and when there are several bin bundles at each bundle index.
+
+Labels cost about the same either way.
+A label part holds as many bits as an item, so with one field element per item instead of `P`, a label takes `P` times as many parts, but over about `P` times fewer bin bundles.
+
+Matching polynomials tend to be the better choice in two cases.
+Where long labels dominate the cost, match tags have little to save.
+With only a few bin bundles at each bundle index, the extra bin bundle or two that short items can add weighs more.
+Matching polynomials are also the only choice for receivers of APSI 1.x and older.
+Finally, since a sender answers a query in parallel over its bin bundles, a query against the fewer bin bundles of match tags can take longer on many threads, although it may cost less computation in total.
+The two methods also differ in what a forged response or a curious peer can achieve, as [Trust Model](#trust-model) describes.
+
+Of the sets in [parameters/](parameters/), four labeled ones use matching polynomials: `100K-1-16`, `1M-1-32` and `16M-1-32`, which query a single item, and `1M-256-288`, whose labels are long.
+All the others use match tags.
 
 ### Trust Model
 
@@ -517,15 +688,21 @@ What the protocol protects is described in [OPRF](#oprf) and [Label Encryption](
 What it does not provide is any assurance about *where a response came from*.
 Nothing in a response binds it to the sender &ndash; there is no MAC, no signature, and no shared secret between the two parties beyond the OPRF itself.
 
-The practical consequence is that **any party able to write to the receiver's connection can make it report an arbitrary set of matches**, using nothing but the publicly known `PSIParams`.
+The practical consequence with matching polynomials is that **any party able to write to the receiver's connection can make it report an arbitrary set of matches**, using nothing but the publicly known `PSIParams`.
 A BFV ciphertext whose own coefficients are small decrypts to zero under every key, and a zero result is what APSI reads as a match, so such a forgery needs no key material, no observed traffic, and no involvement from the real sender.
 The receiver cannot detect it by inspection either: a forged response can match a genuine one on every property the receiver is able to measure.
+
+With match tags, a zero result matches nothing, because a forged result must hold the item's tag, which takes the item's OPRF value to compute.
+This holds only for a receiver that chose parameters with match tags itself.
+A receiver that obtains its parameters with `Receiver::RequestParams`, as the CLI receiver does, gets them over the same connection, so a party able to write to it can send parameters without match tags and then forge matches as above.
+A receiver relying on match tags must therefore fix its parameters itself, or at least refuse parameters for which `PSIParams::uses_tags` returns `false`.
+Anyone who knows an item and can obtain its OPRF value from the sender can still forge a match for it.
 
 Deployments must therefore run APSI over a channel that authenticates the sender.
 The `network::ZMQChannel` implementations used by the example applications provide no authentication and no encryption; embedders needing either should supply their own transport through `network::StreamChannel`, which is transport-agnostic by design.
 
 Two further limitations follow from the same root.
-Labels carry no integrity protection: the label ciphertext is a keystream XOR with no authentication tag, so a party on the connection can apply a chosen difference to a delivered label without detection.
+Labels carry no integrity protection: the label ciphertext is a keystream XOR with no message authentication code, so a party on the connection can apply a chosen difference to a delivered label without detection.
 And an authenticated channel makes the sender *identified*, not *honest*: a sender remains authoritative for its own data and can always answer as though its database contained any item it likes.
 
 One case makes transport *encryption* matter as much as authentication, and is the reason APSI builds Microsoft SEAL with its `no-throw-tran` feature rather than letting SEAL reject the ciphertext outright.
@@ -535,17 +712,25 @@ Such a ciphertext is *transparent*: its plaintext can be read off the wire witho
 What that exposes is the `EncryptedLabel` described in [Label Encryption](#label-encryption) rather than the label itself, so an eavesdropper who does not already know the item still cannot recover the label, and the matching result is unaffected because its leading coefficient is monic and so never degenerates.
 A deployment serving labels should nonetheless choose a transport that encrypts as well as authenticates.
 
+With match tags, the tag results of such a bin bundle are transparent too, even without labels.
+They expose the tags of its items (see [What a Peer Can Learn](#what-a-peer-can-learn)), so a deployment using match tags should encrypt its transport as well.
+
 #### What a Peer Can Learn
 
-These two exposures are properties of the protocol rather than of the transport, so an authenticated channel bounds them only by bounding *who* may query.
+These exposures are properties of the protocol rather than of the transport, so an authenticated channel bounds them only by bounding *who* may query.
 
 An OPRF request is exactly `oprf_query_size` bytes per item, so its length reveals the receiver's exact item count.
 Padding a query set up to a fixed bucket size hides this; APSI does not do so automatically.
 
 A peer allowed to query repeatedly can extract the sender's data.
-The sender holds no key with which to check that the encrypted query powers it receives are consistent, and must evaluate whatever it is given, so a peer supplying chosen values obtains an evaluation oracle for the matching and label polynomials; enough queries recover their coefficients.
+The sender holds no key with which to check that the encrypted query powers it receives are consistent, and must evaluate whatever it is given, so a peer supplying chosen values obtains an evaluation oracle for the sender's polynomials; enough queries recover their coefficients.
 The sender's item set is non-secret, but in the labeled mode the labels are not, so a deployment serving labels must treat the right to query as a privilege and limit its volume per peer.
 APSI enforces no such limit itself: it has no notion of a peer identity to attribute queries to, and the routing identifier on a ZeroMQ connection is chosen by the peer and is not authenticated.
+
+With match tags, a peer learns some of the sender's tags even when it follows the protocol.
+The slot of its item holds another item's tag when the two share a field element in a bin, and any bin holding a single item returns that item's tag, even at an empty location.
+Like a hashed item (see [OPRF](#oprf)), a tag reveals nothing by itself.
+But a peer can find out whose tag it is by obtaining the OPRF values of candidate items, so a deployment using match tags must limit OPRF requests per peer as well.
 
 ## Using APSI
 
@@ -562,10 +747,12 @@ This same text appears in the [receiver.h](receiver/apsi/receiver.h) header file
 This is needed when the receiver does not know what parameters it is supposed to use with a specific sender.
 In other cases the receiver would know the parameters ahead of time, and can skip this step.
 In any case, once the receiver has an appropriate `PSIParams` object, an `Receiver` can be instantiated.
-The `Receiver` constructor automatically creates Microsoft SEAL public and private keys.
-The public keys are sent to the sender along with every query request, and the private keys are held internally by the Receiver object for decrypting query responses.
-`Receiver::request_query` draws a new key pair for each query it sends, so two queries made through it never carry the same public keys and a sender cannot recognize them as coming from one receiver.
+The `Receiver` constructor automatically creates a Microsoft SEAL secret key, which the `Receiver` keeps to encrypt queries and decrypt their results, and, where the parameters use key switching, relinearization keys, which are sent to the sender with every query.
+With a single `coeff_modulus` prime, a query carries no keys.
+`Receiver::request_query` draws new keys for each query it sends, so two queries made through it never carry the same relinearization keys and a sender cannot recognize them as coming from one receiver.
 A caller using the advanced API instead is responsible for calling `Receiver::reset_keys` between queries, at a point where no query is still in flight: the result of a query in flight is encrypted under the key that rotating would discard.
+
+Queries are saved in the compression mode set with `Receiver::set_compr_mode` (see [Compression](#compression)).
 
 The class includes two versions of an API to perform the necessary operations.
 The "simple" API consists of three functions: `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`.
@@ -606,13 +793,20 @@ The received `Response` object must be converted to the right type (`QueryRespon
 This function will return `nullptr` if the received response was not of the right type.
 The `QueryResponse` contains only one important piece of data: the number of `ResultPart` objects the receiver should expect to receive from the sender in the next step.
 
-1. `network::Channel::receive_result` must be called repeatedly to receive all `ResultParts`.
+1. `network::Channel::receive_result_for` must be called repeatedly, with the `Receiver`'s `seal::SEALContext`, from `Receiver::get_seal_context`, and the `PSIParams` the `Receiver` was created from, to receive all `ResultParts`.
+It rejects, as a failed receive, a package that cannot be a result for these parameters.
 For each received `ResultPart`, `Receiver::process_result_part` must be called to find a `std::vector<MatchRecord>` representing the match data associated to that `ResultPart`.
 Alternatively, one can first retrieve all `ResultParts`, collect them into a `std::vector<ResultPart>`, and use `Receiver::process_result` to find the complete result &ndash; just like what the simple API returns.
 Both `Receiver::process_result_part` and `Receiver::process_result` require the `IndexTranslationTable` and the `LabelKeyVector` objects created in the previous steps.
 
+With [match tags](#match-tags), the receiver derives the tags of its items from their label keys, so it needs the `LabelKeyVector` even when the sender's items have no labels.
+`Receiver::request_query`, `Receiver::process_result_part`, and `Receiver::process_result` then throw `std::invalid_argument` unless there is a label key for every item.
+The same functions also throw `std::runtime_error` on a result package that is null or cannot be a result for these parameters.
+With matching polynomials, `Receiver::process_result_part` and `Receiver::process_result` throw `std::runtime_error` on a result package that is null or has no `psi_result`.
+A lost package could hide a match, so a caller collecting packages itself should treat a failed receive as a failed query, as the simple API does.
+
 Note that the advanced API gives you the receive loop, and with it the responsibility the simple API handles on your behalf.
-`network::Channel::receive_response` and `network::Channel::receive_result` return `nullptr` for two different reasons: nothing has arrived yet, or a message arrived and was rejected.
+`network::Channel::receive_response`, `network::Channel::receive_result`, and `network::Channel::receive_result_for` return `nullptr` for two different reasons: nothing has arrived yet, or a message arrived and was rejected.
 Only the second records a failure, so `network::Channel::receive_failed` is what tells them apart.
 A loop that simply retries on `nullptr` will wait forever once a malformed message has been consumed, because the data it is waiting for no longer exists.
 For the same reason such a loop needs a deadline of its own: a sender that accepts a request and then falls silent will otherwise hold the calling thread indefinitely.
@@ -633,11 +827,15 @@ Conversely, the `to_request` function converts a `ParamsRequest`, `OPRFRequest`,
 Similarly, the `Response` type is defined in [responses.h](common/apsi/responses.h) as an alias for `std::unique_ptr<network::SenderOperationResponse>`, along with related type aliases `ParamsResponse`, `OPRFResponse`, and `QueryResponse`, and corresponding conversion functions `to_params_response`, `to_oprf_response`, `to_query_response`, and `to_response`.
 
 Finally, the `ResultPart` type is defined in [responses.h](common/apsi/responses.h) as an alias for `std::unique_ptr<network::ResultPackage>`, where `network::ResultPackage` contains an encrypted result to a query request.
+With matching polynomials, it holds the result of a bin bundle's matching polynomial in `psi_result`, and in labeled mode the results of its label polynomials in `label_result`.
+With [match tags](#match-tags), it has no `psi_result`, and `label_result` holds the results of the tag parts followed by those of the label parts.
 Since the query is evaluated independently per each bin bundle (recall [Practice](#practice)), the results for each bin bundle are sent back to the receiver as separate `ResultPart` objects.
 The receiver must collect all these together to find the final result, as was described above in [Receiver](#receiver).
 
-The important thing about `Request`, `Response`, and `ResultPart` is that these are the object handled by the `network::Channel` class member functions `send`, `receive_operation`, `receive_response`, and `receive_result` (see [channel.h](common/apsi/network/channel.h)).
+The important thing about `Request`, `Response`, and `ResultPart` is that these are the object handled by the `network::Channel` class member functions `send`, `receive_operation`, `receive_response`, `receive_result`, and `receive_result_for` (see [channel.h](common/apsi/network/channel.h)).
 A custom `network::Channel` must tolerate concurrent calls, because a sender sends result packages from several tasks at once and a receiver receives them on several threads at once; the channels shipped with APSI serialize their sends and receives internally, and a replacement for the sender's result-package send callback must do the same.
+A custom `network::Channel` inherits a `receive_result_for` that checks a package after loading it.
+The channels shipped with APSI check it before loading any ciphertext, with the overload of `network::ResultPackage::load` that takes the `PSIParams`.
 
 ### Sender
 
@@ -665,6 +863,7 @@ It is recommended to construct the `SenderDB` directly into a `std::shared_ptr`,
 
 1. The sender's data must be loaded into the `SenderDB` with `SenderDB::set_data`.
 More data can always be added later with `SenderDB::insert_or_assign`, or removed with `SenderDB::remove`, as long as the `SenderDB` has not been stripped (see `SenderDB::strip`).
+Items hashed already with the OPRF key, wherever the key is kept, can be loaded, added and removed with `SenderDB::set_data_hashed`, `SenderDB::insert_or_assign_hashed` and `SenderDB::remove_hashed` instead (see [SenderDB](#senderdb)).
 
 1. (optional) Receive a parameter request with `network::Channel::receive_operation`.
 The received `Request` object must be converted to the right type (`ParamsRequest`) with the `to_params_request` function.
@@ -680,6 +879,7 @@ Once the request has been obtained, the `RunOPRF` function can be called with th
 This function will return `nullptr` if the received request was not of the right type.
 Once the request has been obtained, a `Query` object must be created from it.
 The constructor of the `Query` class verifies that the `QueryRequest` is valid for the given `SenderDB`, and if it is not the constructor still returns successfully but the `Query` is marked as invalid (`Query::is_valid()` returns `false`) and cannot be used in the next step.
+Among other things, the constructor checks the query's [parameter fingerprint](#parameter-fingerprints), and loads and checks its ciphertexts, which `network::SenderOperationQuery::load` leaves in serialized form, with up to as many tasks on the thread pool as `ThreadPoolMgr::GetThreadCount` gives.
 Once a valid `Query` object is created, the `RunQuery` function can be used to perform the query and respond on the given channel.
 Optionally, two lambda functions can be given to `RunQuery` to provide custom logic for sending the `QueryResponse` and the `ResultPart` objects on the channel.
 
@@ -693,9 +893,32 @@ A `SenderDB` maintains an in-memory representation of the sender's set of items 
 These items are not simply copied into the `SenderDB` data structures, but also preprocessed heavily to allow for faster online computation time.
 Since inserting a large number of new items into a `SenderDB` can take time, it is not recommended to recreate the `SenderDB` when the database changes a little bit.
 Instead, the class supports fast update and deletion operations that should be preferred: `SenderDB::insert_or_assign` and `SenderDB::remove`.
+`SenderDB::insert_or_assign` inserts the items that are not yet in the database and, in a labeled `SenderDB`, replaces the labels of the others in place, never storing an item twice.
+`SenderDB::remove` removes all of a batch or nothing: if any item is not in the database, it throws `std::logic_error` before changing anything.
 
 The `SenderDB` constructor allows the label byte count to be specified; unlabeled mode is activated by setting the label byte count to zero.
 It is possible to optionally specify the size of the nonce used in encrypting the labels, but this is best left to its default value unless the user is absolutely sure of what they are doing.
+An unlabeled `SenderDB` uses no nonce, whatever nonce byte count is given.
+
+With [match tags](#match-tags), a `SenderDB` stores the tag of every item, labeled or not, as the item's first label parts.
+It derives the tag from the item's label key, which it does not keep, so a `SenderDB` with match tags must be built from the original items, or from the tags that `oprf::OPRFSender::ComputeHashesAndMatchTags` computes from them (see below).
+Since two items can then share their field elements in a bin, it also keeps the full `HashedItem` of every item until it is stripped.
+
+With match tags and one field element per item, the items inserted at a bundle index that has no bin bundles, as `SenderDB::set_data` inserts them, are placed all at once in as few bin bundles as any placement could use: no bin bundle can hold more than `max_items_per_bin` items in a bin or one field element twice there, and the items of each bin are spread evenly over the bin bundles.
+Items inserted later go into the newest bin bundle that has room for them, as in APSI 1.x.
+An item whose field element is already in every bin bundle with room at its location can take the place of a stored item, which moves to a bin bundle with room, but only if the same update already changes both bin bundles: otherwise the move would make the update regenerate their caches as well, and the item goes into a new bin bundle instead.
+
+A `SenderDB` can also be built without its OPRF key.
+`SenderDB::insert_or_assign_hashed` and `SenderDB::set_data_hashed` take items hashed already, as `oprf::OPRFSender::ComputeHashes` computes them, with encrypted labels in a labeled `SenderDB`, or, for parameters with match tags, as `oprf::OPRFSender::ComputeHashesAndMatchTags` computes them with a `tag_felt_count` of `tag_part_count * felts_per_item` and a `bits_per_felt` of `PSIParams::item_bit_count_per_felt`.
+`SenderDB::remove_hashed` takes the hashed items alone.
+They otherwise work as `SenderDB::insert_or_assign`, `SenderDB::set_data` and `SenderDB::remove` do.
+The label keys, which encrypt the labels and give the tags, stay where the items are hashed, and the labels must be encrypted there with the `SenderDB`'s label byte count and nonce byte count.
+The two functions of `oprf::OPRFSender` refuse a label longer than the label byte count, as `SenderDB::insert_or_assign` does, and `SenderDB::insert_or_assign_hashed` and `SenderDB::set_data_hashed` refuse with `std::invalid_argument` an encrypted label that does not take exactly the two byte counts together.
+But APSI cannot tell how an encrypted label of the right size divides into nonce and label, and one encrypted with another nonce byte count decrypts wrongly.
+Nor can it tell which key the items were hashed with: items hashed with any key other than the one the sender answers OPRF requests with match nothing.
+
+Such a `SenderDB` holds an OPRF key of its own, which `SenderDB::get_oprf_key` and `SenderDB::strip` return, and with which the functions that take an `Item`, such as `SenderDB::has_item` and `SenderDB::get_label`, hash it, so they answer correctly only if that is the key the items were hashed with.
+Unless it is, strip the `SenderDB` before serving it with the key the items were hashed with: `ZMQSenderDispatcher` refuses a key other than the one a `SenderDB` that is not stripped holds, and answers with that one if given none.
 
 The `SenderDB` requires substantially more memory than the raw data would.
 Part of that memory can automatically be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing the `SenderDB`.
@@ -704,12 +927,54 @@ The downside of in-memory compression is a performance reduction from decompress
 An update and a query cannot overlap.
 `SenderDB::insert_or_assign` and `SenderDB::remove` hold a writer lock for the whole of their work, including the OPRF hashing they begin with, while answering a query holds a reader lock for as long as the answer takes.
 An embedder that updates a `SenderDB` while it serves queries therefore stalls every query for the duration of the update, which for a large batch is not brief.
+An update regenerates the cache of every bin bundle it changes: it computes the polynomials of the bins it changed again, and makes every plaintext of the bin bundle again, as each holds coefficients of all its bins.
 Where that matters, build the new state separately and direct later queries at it, or update while the sender is not serving.
 
 In many cases the `SenderDB` does not need to be modified after having been constructed, or loaded from disk.
 The function `SenderDB::strip` can be called to remove all data that is not strictly needed to serve query requests.
-A `SenderDB` that has been stripped cannot be modified, cannot be checked for the presence of specific items, and labels cannot be retrieved from it.
+A `SenderDB` that has been stripped cannot be modified, cannot be checked for the presence of specific items, and labels cannot be retrieved from it: every function that would do so throws `std::logic_error`, apart from `SenderDB::clear`, which makes it as a newly constructed `SenderDB`, with a new OPRF key.
 A stripped `SenderDB` can be serialized and deserialized.
+
+`SenderDB::Load` reads the header and each bin bundle as one buffer of at most about 2 GiB, and the header of a `SenderDB` that is not stripped holds a 16-byte `HashedItem` for each item, which limits it to about 134 million items.
+`SenderDB::save` refuses, with `std::length_error` and before it writes anything, a `SenderDB` that `SenderDB::Load` might not read, so a `SenderDB` of more items, such as 256 million, can be saved only once `SenderDB::strip` has removed its `HashedItem`s.
+The check is conservative, so it may also refuse a bin bundle somewhat below the limit: by a fraction of a percent of it with large bins, and by up to about a tenth with very small bins and long labels.
+How large a full bin bundle is depends on the parameters, through the number of bins, `max_items_per_bin` and the coefficient modulus, and on the label size, but not on how many items are inserted, which only add bin bundles; with large parameters it can take more than 2 GiB, such as 2.5 GiB uncompressed with the `256M-1` parameter set of APSI 1.x.
+
+A saved `SenderDB` is trusted input.
+`SenderDB::Load` checks its structure, but a crafted file can still make queries fail or answer wrongly, so load only a `SenderDB` you saved yourself.
+
+### Compression
+
+The receiver sets the compression mode of the Microsoft SEAL objects in its queries with `Receiver::set_compr_mode`, and the sender answers in the same mode.
+The default, `Receiver::default_compr_mode`, is bit-packing (`seal::compr_mode_type::bitpack`).
+The other modes are `none`, and `zlib` and `zstd` if Microsoft SEAL was built with them.
+
+Bit-packing, new in Microsoft SEAL 4.6, stores each block of coefficients without the high-order and low-order bits that are zero in all of them, such as the low-order bits the sender clears in its results.
+Saving with bit-packing is several times faster than with Zstandard, and makes both queries and results smaller.
+
+A sender built with Microsoft SEAL older than 4.6, as senders of APSI 1.x and older usually are, cannot load bit-packed data.
+It drops such a query without answering, and the receiver waits out its timeout.
+To query such a sender, use `seal::compr_mode_type::zstd`.
+
+The in-memory compression of a `SenderDB` is a separate feature.
+It bit-packs each plaintext the sender computes with when that saves at least an eighth of its size, and otherwise, as with primes of 56 bits or more, keeps it uncompressed.
+The sender reads the coefficients of an uncompressed plaintext in place rather than loading it, in a compressed `SenderDB` as in an uncompressed one.
+APSI 1.x used Zstandard, which takes several times longer to load, so a query against a compressed `SenderDB` takes less of the sender's CPU time than it did, and with some parameter sets much less, for about the same memory.
+A `SenderDB` loads plaintexts in any mode, but software built with Microsoft SEAL 4.0, 4.4 or 4.5, as APSI 1.x usually is, cannot use a compressed `SenderDB` that APSI 2.0 saves.
+It reads the plaintexts only to answer a query, so it loads such a `SenderDB` without complaint and then fails every query against it, or may even crash.
+
+### Parameter Fingerprints
+
+A query created for parameters other than the sender's, but of the same shape, would still be answered, with results that the receiver would read as no match.
+To prevent this, a receiver sends a *fingerprint* of its `PSIParams` with every query, and a sender refuses a query whose fingerprint differs from that of its `SenderDB`'s parameters.
+`PSIParams::fingerprint` returns the fingerprint, a hash of the parameter values that [psi_params.h](common/apsi/psi_params.h) specifies.
+
+The sender logs why it refused a query, but APSI has no error response, so to the receiver a refused query looks like a sender that does not answer.
+Receivers of APSI 1.x and older send no fingerprint, which a `SenderDB` with matching polynomials accepts and one with match tags refuses.
+Senders of APSI 1.x and older ignore the fingerprint.
+
+An application serving several `SenderDB`s can route each query by its fingerprint, which `network::SenderOperationQuery::ExtractParamsFingerprint` reads without loading any ciphertext.
+The fingerprint identifies parameters, not a `SenderDB`, so a receiver's OPRF request must still be answered with the OPRF key of the `SenderDB` its query reaches.
 
 ### PSIParams
 
@@ -734,13 +999,19 @@ Choose one whose first two numbers are at least your sender's set size and your 
 An optional third number is the label byte count, and a trailing `-com` or `-cmp` says whether the set is tuned to spend less on communication or on computation.
 Then build your `SenderDB` and read `sender::SenderDB::log2_fpp(query_item_count)` for the query size you actually expect, because the false-positive bound a file meets is tied to the sizes its name gives and a larger sender's set weakens it.
 
+Each set uses matching polynomials or match tags, whichever is better for its case ([Choosing a Method](#choosing-a-method) explains when each wins).
+A set with match tags has a `tag_part_count` and sets `version` to 2, as [Loading from JSON](#loading-from-json) shows.
+Receivers of APSI 1.x and older cannot use it (see [Upgrading from APSI 1.x](#upgrading-from-apsi-1x)).
+
 Tune only if no shipped set fits.
 The parameters are not independent, so the order matters &ndash; each step below is constrained by the ones above it, and choosing in a different order means discovering the constraints through exceptions:
 
 1. `poly_modulus_degree`, `felts_per_item` and `plain_modulus` together.
 They fix the item length, which must land in [80, 128] bits, and they are what the false-positive probability is made of.
+With match tags, `tag_part_count` joins them, the item length need only land in [8, 128] bits, and the false-positive probability is made of the tag, which is `tag_part_count` times as long as an item.
 2. `table_size` and `max_items_per_bin`.
 `table_size` must be a multiple of `floor(poly_modulus_degree / felts_per_item)`, and `max_items_per_bin` decides both how much of the false-positive budget each bin bundle spends and how many bin bundles a full location needs.
+With match tags, it decides only the second.
 3. `ps_low_degree` and `query_powers`, as [Query Powers](#query-powers) describes.
 These fix the multiplicative depth of the sender's computation.
 4. `coeff_modulus_bits` last, because the depth chosen in step 3 is what it has to support.
@@ -757,10 +1028,20 @@ The couplings worth keeping in front of you:
 | each `coeff_modulus` prime | at most 60 bits |
 | number of `coeff_modulus` primes | at most `PSIParams::coeff_modulus_size_max`, which is 12 |
 
+With match tags, the first row changes and three more apply:
+
+| Quantity | Constraint |
+|----------|------------|
+| `felts_per_item * floor(log2(plain_modulus))` | must be between 8 and 128 |
+| `tag_part_count` | at most `PSIParams::ItemParams::tag_part_count_max`, which is 64 |
+| `tag_part_count * felts_per_item * floor(log2(plain_modulus))` | at least `PSIParams::tag_bit_count_min`, which is 40 |
+| `max_items_per_bin` | at most `2^floor(log2(plain_modulus))` |
+
 A parameter set that passes the constructor can still be wrong in three ways that only show up when you run it.
 
 It can return false positives more often than you expect, which `sender::SenderDB::log2_fpp` tells you in advance; and it can run out of noise budget, which shows up as wrong results rather than as an error.
 Build a `SenderDB` whose bins are full &ndash; roughly `table_size * max_items_per_bin / hash_func_count` items, since the sender places each item once per hash function &ndash; run a query, and read the "Matching result noise budget" and "Label result noise budget" lines that APSI logs at debug level.
+With match tags, read "Tag result noise budget" in place of the first.
 Measuring with fewer items than that reports a budget that is too high, because a bin bundle that is not full evaluates a lower-degree polynomial and keeps more of it.
 A few bits left is what the shipped sets aim for; zero means the parameters are already producing wrong answers, and one or two means a different sender's set may.
 
@@ -769,7 +1050,7 @@ The receiver places its items in a cuckoo hash table of that size, and `Receiver
 
 Whether a given set fits is a property of the items themselves, so a failure carries information about the receiver's set, and the receiver cannot help acting on it: it either abandons the query or retries and sends one later than it otherwise would.
 The margin is therefore a privacy parameter and not a performance one, and the shipped sets are sized for it: `table_size` is at least 1.6 times the receiver's item count, about 62% occupancy, at which the probability of a failure is around 2^-40.
-The granularity of the first constraint above is why several sets sit well above that ratio rather than at it.
+The granularity of `table_size`, a multiple of `floor(poly_modulus_degree / felts_per_item)`, puts every set at about twice the receiver's item count or more.
 
 The failure probability is governed by occupancy rather than by the absolute size, and climbs steeply with it: by 90% it is close to even odds.
 A parameter set of your own should be sized against the largest query it will ever carry rather than a typical one, since the occupancy that decides the matter is the worst case rather than the average.
@@ -781,7 +1062,7 @@ The hash functions are seeded identically on every call, so an item's candidate 
 
 `PSIParams::SEALParams` wraps a Microsoft SEAL `seal::EncryptionParameters` object, with the scheme always set to `seal::scheme_type::bfv`.
 [Encryption Parameters](#encryption-parameters) covers what these mean; the Microsoft SEAL [examples](https://github.com/microsoft/SEAL/tree/main/native/examples) cover them in depth.
-`plain_modulus` also drives the false-positive probability, as [False Positives](#false-positives) describes.
+`plain_modulus` also drives the false-positive probability, as [False Positives](#false-positives-1) describes.
 
 Two things about `coeff_modulus` are specific to how APSI uses Microsoft SEAL, and neither is visible from the SEAL examples alone.
 
@@ -791,8 +1072,9 @@ The noise key switching adds grows with the ratio of the largest ordinary prime 
 How far is too far depends on how many times the sender relinearizes, which is decided by `query_powers` and `ps_low_degree`, so there is no single safe ratio &ndash; a gap that a shallow set tolerates can exhaust a deep one.
 
 The **first** prime is the one the response is left in.
-`BinBundle::eval` switches the result down the modulus chain to that prime and then clears the low-order bits that carry no information, so the sender-to-receiver communication is governed by the width of the first prime and by how many of its bits are cleared, and not by the rest of the chain.
-The two pull against each other &ndash; a wider first prime leaves more to clear &ndash; and what survives compression depends on where the remainder falls relative to a byte boundary, so the response size is not monotone in the width and is worth measuring rather than predicting.
+`BatchedPlaintextPolyn::eval` switches the result down the modulus chain to that prime and then clears the low-order bits that carry no information, keeping as many bits of each coefficient as the plain modulus has plus log2 of `poly_modulus_degree`, or all of them if the prime is no wider than that.
+Bit-packing, the default, stores only the kept bits, so with it the sender-to-receiver communication does not depend on the rest of the chain, and grows with the width of the first prime only up to that many bits.
+Zstandard and zlib remove the cleared bits only partly, and what survives depends on where the remainder falls relative to a byte boundary, so with them the response size is not monotone in the width of the first prime and is worth measuring rather than predicting.
 The receiver-to-sender communication, by contrast, grows with the total across the whole chain.
 
 The number of primes, rather than their sizes, is what the sender's computation scales with: each is a separate residue that every multiplication and transform has to touch.
@@ -800,15 +1082,22 @@ Use as few as the depth from step 3 above allows.
 
 #### ItemParams
 
-The `PSIParams::ItemParams` struct contains only one member variable: a 32-bit integer `felts_per_item`.
-This number was described in [Large Items](#large-items); it specifies how many Microsoft SEAL [batching slots](#encryption-parameters) should represent each item, and hence influences the item length.
-It has a significant impact on the false-positive probability, as described in [False-Positives](#false-positives).
+The `PSIParams::ItemParams` struct contains two member variables, both 32-bit integers: `felts_per_item` and `tag_part_count`.
 
+`felts_per_item` was described in [Large Items](#large-items); it specifies how many Microsoft SEAL [batching slots](#encryption-parameters) should represent each item, and hence influences the item length.
 The item length (in bits) is a product of `felts_per_item` and `floor(log_2(plain_modulus))`.
-The `PSIParams` constructor will verify that the item length is bounded between 80 and 128 bits, and will throw an exception otherwise.
 
+`tag_part_count` selects how APSI decides a match.
+If it is zero, the default, APSI uses matching polynomials as APSI 1.x does.
+`felts_per_item` then has a significant impact on the false-positive probability, as described in [False Positives](#false-positives-1).
+The `PSIParams` constructor will verify that the item length is bounded between 80 and 128 bits, and will throw an exception otherwise.
 `felts_per_item` must be at least 2 and can be at most 32.
 Most realistic parameterizations use some number between 4 and 8.
+
+If `tag_part_count` is positive, APSI uses [match tags](#match-tags) with that many tag parts, and `PSIParams::uses_tags` returns `true`.
+`felts_per_item` can then be as small as 1, and the item length need only be between 8 and 128 bits.
+The tag has `tag_part_count` times as many bits as an item, which `PSIParams::tag_bit_count` returns, and must have at least 40.
+`tag_part_count` can be at most 64.
 
 #### TableParams
 
@@ -817,8 +1106,10 @@ It holds three member variables:
 - `table_size` denotes the size of the receiver's cuckoo hash table.
 The hash table size must be a positive multiple of the number of items that can fit into a Microsoft SEAL plaintext.
 The total number of item parts that fit in a plaintext is given by the [poly_modulus_degree](#encryption-parameters) parameter, so the total number of (complete) items is `floor(poly_modulus_degree / felts_per_item)`.
-- `max_items_per_bin` denotes how many items fit into each row of the sender's bin bundles.
-It cannot be zero.
+- `max_items_per_bin` bounds how many items fit into each row of the sender's bin bundles.
+It cannot be zero, and can be at most `PSIParams::TableParams::max_items_per_bin_max`, which is 2^15.
+A bin holds up to `max_items_per_bin - 1` items with matching polynomials and up to `max_items_per_bin` with match tags, so either way its polynomials have degree at most `max_items_per_bin - 1`, and the same query powers serve both.
+With match tags, the items in a bin need distinct field elements, so `max_items_per_bin` can be at most `2^floor(log_2(plain_modulus))`.
 - `hash_func_count` denotes the number of hash functions used for cuckoo hashing.
 It must be at least 1 and at most 8.
 While setting `hash_func_count` to 1 means essentially disabling cuckoo hashing, it can improve performance in cases where the receiver is known to have only a single item (set membership).
@@ -839,20 +1130,26 @@ Any value in `query_powers` larger than `ps_low_degree` must be a multiple of `p
 
 To construct a `PSIParams` object, one needs to provide the constructor with a valid `PSIParams::SEALParams`, `PSIParams::ItemParams`, `PSIParams::TableParams`, and `PSIParams::QueryParams`. The constructor will perform the following validations on the parameters, in order, and will throw an exception (with a descriptive message) if any of them fails:
 
-1. `PSIParams::TableParams::table_size` is verified to be non-zero.
-1. `PSIParams::TableParams::max_items_per_bin` is verified to be non-zero.
+1. `PSIParams::TableParams::table_size` is verified to be non-zero and at most `PSIParams::TableParams::table_size_max`, which is 2^20.
+1. `PSIParams::TableParams::max_items_per_bin` is verified to be non-zero and at most `PSIParams::TableParams::max_items_per_bin_max`, which is 2^15.
 1. `PSIParams::TableParams::hash_func_count` is verified to be at least 1 and at most 8.
+1. `PSIParams::ItemParams::tag_part_count` is verified to be at most 64.
 1. `PSIParams::ItemParams::felts_per_item` is verified to be at least 2 and at most 32.
+With match tags, it may also be 1.
 1. `PSIParams::QueryParams::ps_low_degree` is verified to not exceed `max_items_per_bin`.
 1. `PSIParams::QueryParams::query_powers` is verified to not contain 0, to contain 1, and to not contain values larger than `max_items_per_bin`.
 Any value larger than `ps_low_degree` is verified to be divisible by `ps_low_degree + 1`.
+1. The number of `coeff_modulus` primes is verified to be at most `PSIParams::coeff_modulus_size_max`, which is 12.
 1. `PSIParams::SEALParams` are verified to be valid and to support Microsoft SEAL batching.
 Specifically, the parameters must have a `plain_modulus` that is prime and congruent to 1 modulo `2 * poly_modulus_degree`.
 Microsoft SEAL contains functions in `seal::CoeffModulus` and `seal::PlainModulus` classes (see [modulus.h](https://github.com/microsoft/SEAL/blob/main/native/src/seal/modulus.h)) to choose appropriate `coeff_modulus` and `plain_modulus` primes.
 1. The item bit count is computed as the product of `felts_per_item` and `floor(log_2(plain_modulus))`, and is verified to be at least 80 and at most 128.
+With match tags, it need only be at least 8.
+With match tags, the tag bit count, the product of `tag_part_count` and the item bit count, is then verified to be at least 40, and `max_items_per_bin` to be at most `2^floor(log_2(plain_modulus))`.
 1. The number of items fitting vertically in a bin bundle is computed as `floor(poly_modulus_degree / felts_per_item)`.
 This number is verified to be non-zero.
 1. `table_size` is verified to be a multiple of `floor(poly_modulus_degree / felts_per_item)`.
+1. The encrypted query is verified to take at most `PSIParams::query_byte_count_max`, which is 512 MiB, counting `table_size / floor(poly_modulus_degree / felts_per_item)` ciphertexts for each value in `query_powers`, each as `2 * poly_modulus_degree` 64-bit words per `coeff_modulus` prime.
 
 If all of these checks pass, the `PSIParams` object is successfully created and is valid for use in APSI.
 
@@ -881,7 +1178,7 @@ The format of the JSON string is as in the following example:
     }
 }
 ```
-This is [parameters/256K-4096-cmp.json](parameters/256K-4096-cmp.json) verbatim.
+This is the set APSI 1.x shipped as `256K-4096-cmp.json`, which uses matching polynomials.
 `PSIParams::Load` adds the power 1 to `query_powers` if the file leaves it out, which the `PSIParams` constructor does not do &ndash; it rejects a `query_powers` without it.
 Write it out, as every file in [parameters/](parameters/) does, and the file means the same thing through either route.
 The Microsoft SEAL `plain_modulus` parameter can be set to a specific prime, like in the example above in the `seal_params` section, or can be expressed as a desired number of bits for the prime, in which case the library will sample a prime of appropriate form. In such a case, the `seal_params` section would appear as follows:
@@ -900,22 +1197,55 @@ APSI uses only the width of this prime, so every prime of a given width describe
 The noise budget does depend on the value: the smaller the prime, the more budget is left, and `plain_modulus_bits` asks Microsoft SEAL for the largest prime of the width.
 An explicit prime therefore fixes both, and fixes them identically for anything else that reads the file, which is what the sets in [parameters/](parameters/) do.
 
+A set with [match tags](#match-tags) gives `tag_part_count` in `item_params`, and must also set a top-level `version` key to 2.
+For example, the following uses match tags with the same `query_params`, `seal_params`, and bin size as the set above:
+```
+{
+    "version": 2,
+    "table_params": {
+        "hash_func_count": 3,
+        "table_size": 8192,
+        "max_items_per_bin": 20
+    },
+    "item_params": {
+        "felts_per_item": 1,
+        "tag_part_count": 4
+    },
+    ...
+}
+```
+An item is now a single 17-bit field element, and the tag has 4 parts, 68 bits in all.
+`table_size` has grown from 6552 to 8192, since it must now be a multiple of `poly_modulus_degree`.
+
+The `version` key is there because APSI 1.x and older ignore `tag_part_count`, like any key they do not know, and would otherwise read a file with match tags as parameters without them.
+APSI 1.x refuses version 2 instead, but APSI before 1.0.0 ignores the version too, and may misread such a file.
+A file without match tags may set `version` to 1 or leave the key out, and `PSIParams::Load` refuses any other version.
+
 The [parameters/](parameters/) subdirectory holds ready-made sets; [Choosing a Parameter Set](#choosing-a-parameter-set) explains how their names read and how to pick one.
+
+#### Serialization
+
+`PSIParams::save` writes parameters with matching polynomials in the format APSI 1.x uses, with version 1.
+It writes parameters with match tags with version 2 (`PSIParams::tag_serialization_version`), together with their tag part count.
+APSI 1.x and older refuse version 2, and with it any parameter response or `SenderDB` holding such parameters, rather than misreading them.
+Every other message APSI sends keeps version 1.
 
 #### False Positives
 
 Poorly chosen parameters can have a significant false-positive probability: even if the receiver queries an item that is not in the sender's set, the protocol may return a false positive response.
 Depending on the scenario, this may or may not be a problem.
 
-A false positive does not require a whole item to collide.
+With matching polynomials, a false positive does not require a whole item to collide.
 Recall from [Practice](#practice) that an item is split into `felts_per_item` field elements, each held in its own bin with its own matching polynomial, and that the receiver reports a match only when all of them evaluate to zero.
 Those zeros need not come from the same stored item: the first field element may collide with one item, the second with another, and so on.
 That is what makes the probability per item roughly `(max_items_per_bin / 2^item_bit_count_per_felt)` raised to the power `felts_per_item`, which is what `PSIParams::log2_fpp_per_bin_bundle` returns the base-2 logarithm of.
 
-Two further factors apply, and both make the true probability larger.
+With [match tags](#match-tags), `PSIParams::log2_fpp_per_bin_bundle` returns `-min(tag_bit_count, 128)` instead, as [False Positives with Tags](#false-positives-with-tags) explains, and `tag_part_count` is the parameter to raise if that is too high.
 
-First, a sender location holding more items than `max_items_per_bin` spills into additional bin bundles at the same bundle index.
-Each has its own matching polynomial, and the receiver reports a match from any of them, so the probability is multiplied by the number of bin bundles at the busiest index.
+Two further factors apply to both methods, and both make the true probability larger.
+
+First, a sender location holding more items than a bin can take, `max_items_per_bin - 1` with matching polynomials and `max_items_per_bin` with match tags, spills into additional bin bundles at the same bundle index, and with labels or match tags, so does an item whose field element is already in its bin (see [Partial Item Collisions](#partial-item-collisions)).
+Each is evaluated separately, and the receiver reports a match from any of them, so the probability is multiplied by the number of bin bundles at the busiest index.
 `PSIParams::log2_fpp_per_bin_bundle` cannot know this, since `PSIParams` does not know how large the sender's set is; `sender::SenderDB::log2_fpp` does.
 Prefer it wherever a `SenderDB` exists.
 
@@ -925,12 +1255,12 @@ Second, the probability is per item queried, so a query of many items is likelie
 Pass 1 for the probability per item.
 Both factors are union bounds, so the result is an upper estimate rather than an exact figure.
 A deployment expecting queries of 1024 items should check `sender_db.log2_fpp(1024)` directly rather than adding 10 to anything by hand.
-The parameter sets in [parameters/](parameters/) are chosen so that this total stays below -40 at the sender and receiver set sizes their file names indicate, assuming the OPRF spreads items evenly enough for the load estimate behind the bin bundle count to hold.
+The parameter sets in [parameters/](parameters/) are chosen so that this total stays below -40 at the sender and receiver set sizes their file names indicate, assuming the OPRF spreads items and their field elements evenly enough for the estimate of the bin bundle count to hold.
 
 ### Query Powers
 
 `query_powers` is the set of powers of the query that the receiver encrypts and sends.
-The sender needs every power up to `max_items_per_bin` to evaluate its matching polynomials, and derives the ones it was not sent by multiplying ciphertexts together.
+The sender needs every power up to `max_items_per_bin` to evaluate its polynomials, and derives the ones it was not sent by multiplying ciphertexts together.
 Each power sent costs communication; each power derived costs multiplicative depth, and depth is what forces larger encryption parameters.
 [pd_tool](#pd_tool) reports the depth a candidate set produces, so alternatives can be compared without running a query.
 
@@ -986,7 +1316,7 @@ Now, recall from [Practice](#practice) how bin bundle rows can hold only a prede
 For this example, suppose that number was 15.
 Then, once the sender receives a query ciphertext from the receiver, it must compute &ndash; in encrypted form &ndash; all powers of the query up to 15.
 Computing these powers will require a circuit of multiplicative depth 4.
-Evaluating the matching polynomials will further require an additional multiplication (by the coefficients), so in the end the encrypted computation will have multiplicative depth 5: this requires large encryption parameters.
+Evaluating the polynomials will further require an additional multiplication (by the coefficients), so in the end the encrypted computation will have multiplicative depth 5: this requires large encryption parameters.
 Instead, the receiver can precompute the 4th and the 5th powers of the query, encrypt them, and send them to the sender in addition to the query itself (1st power).
 Now the sender can use the graph to compute all powers of the query in an efficient manner with only a depth 2 circuit.
 The coefficient multiplications will increase the depth of the full computation to 3, but this is considerably better than 5, and will allow for much smaller encryption parameters to be used.
@@ -1036,6 +1366,25 @@ Raising the worker count above the fan-out width with `SetPoolWorkerCount` there
 The pool exists only while at least one `ThreadPoolMgr` instance does; it is created with the first and destroyed with the last, so an idle process holds no worker threads.
 Instances are cheap and scope-bound, and cannot be copied or moved.
 
+#### Per-Operation Limits
+
+An `apsi::ScopedParallelismLimit` limits the parallelism of the APSI operations that the thread creating it begins while it exists.
+Each fan-out of such an operation runs at most the given number of tasks at once on the shared pool, and `ThreadPoolMgr::GetThreadCount` reports at most that number on the thread.
+The fan-outs that split their work by `ThreadPoolMgr::GetThreadCount`, the OPRF computations, `PowersDag::parallel_apply` and the loading of a query's ciphertexts in the `sender::Query` constructor, therefore have at most that many tasks; with a limit of one, a `sender::Query` loads the ciphertexts on the thread that creates it.
+Operations take turns on the workers between tasks, never within one: a task that has started runs to completion.
+The pool is neither resized nor reserved, and operations begun on other threads are unaffected, so concurrent operations with different limits share the pool without coordinating or serializing.
+For example, a server that answers each query on a thread of its own can keep every query to two tasks at a time:
+```
+apsi::ScopedParallelismLimit limit(2);
+apsi::sender::Query query(std::move(query_request), sender_db);
+apsi::sender::Sender::RunQuery(query, chl);
+```
+The limit applies per operation, not per `SenderDB`: two operations on one `SenderDB`, begun on two threads, each run under the limit of their own thread, so a server that wants a single budget for a `SenderDB` runs its operations one at a time.
+A limit does not follow work handed to other threads, so create it on the thread that runs the operation; with `ZMQSenderDispatcher`, that is the thread that calls `run`.
+On a receiver, it also caps the number of result threads `Receiver::request_query` starts.
+Limits nest, the smallest being in effect, and a limit of zero adds none.
+A limit must be destroyed on the thread that created it, in the reverse order of creation, as a local variable is.
+
 ### Logging
 
 APSI ships a simple built-in logger.
@@ -1067,6 +1416,60 @@ The tradeoff is that the global logger's destructor never runs at exit, so its `
 The built-in loggers account for this by flushing on every write: both `apsi::NewDefaultLogger()` and `apsi::NewFileLogger()` flush the console and (when present) the file after each line, so they lose no output and need no explicit teardown.
 If you install a **custom** logger that buffers output or holds a resource such as a file handle, call `apsi::CloseLogger()` during your controlled shutdown to guarantee a final flush and close; installing a replacement with `apsi::SetLogger` also flushes and closes the previous logger first.
 For the same reason, avoid APSI-dependent logging in your own static or global destructors, where ordering relative to the C++ runtime's stream flushing is undefined.
+
+## Upgrading from APSI 1.x
+
+For parameters without match tags, APSI 2.0 adds only optional fields to the formats of APSI 1.x and older, and the OPRF is unchanged for both methods.
+[CHANGES.md](CHANGES.md) lists the changes.
+The following table shows which receivers and senders work together.
+
+| Receiver | Sender | Result |
+|----------|--------|--------|
+| 2.0 | 2.0 | Works with either method, in any compression mode both builds support |
+| 2.0, bit-packing (the default) | 1.x, on Microsoft SEAL before 4.6 | The sender cannot load the query, and the receiver waits out its timeout; see [Compression](#compression) |
+| 2.0, Zstandard or no compression | 1.x | Works with matching polynomials; the sender ignores the fingerprint |
+| 1.x and older | 2.0, matching polynomials | Works if the receiver's Microsoft SEAL is 4.0, or 4.4 or later |
+| 1.x and older | 2.0, match tags | Fails: the sender refuses its queries, which carry no fingerprint; the receiver also refuses the parameters, though one older than APSI 1.0.0 may misread a JSON file whose items have 80 bits or more |
+
+### Parameter Sets
+
+The sets in [parameters/](parameters/) were re-tuned for APSI 2.0, so every file now gives different parameters than it did with APSI 1.x.
+A sender and its receivers must use the same parameters, so a deployment that wants to keep its parameters must keep a copy of the APSI 1.x file it uses, from the 1.1.0 release.
+Moving to new parameters means rebuilding the `SenderDB` from the original items and labels, and giving every receiver the new parameters.
+
+### With Matching Polynomials
+
+APSI 2.0 writes `PSIParams`, `SenderDB`s, and responses in the format APSI 1.1.0 does, apart from the Microsoft SEAL version recorded in them and the plaintexts of a compressed `SenderDB`, which it bit-packs or keeps uncompressed rather than compressing them with Zstandard (see [Compression](#compression)).
+It loads the `SenderDB`s APSI 1.1.0 saves, except one that is not stripped but holds an OPRF key of zero, which APSI 1.1.0 saves after `SenderDB::clear` or `SenderDB::set_data` on a stripped `SenderDB`, and which must be rebuilt.
+A compressed `SenderDB` loaded from a file of APSI 1.x keeps its plaintexts compressed with Zstandard, which take several times longer to load for every query than bit-packed ones, until an update makes the plaintexts of a bin bundle again or the `SenderDB` is rebuilt.
+APSI 1.1.0 built with Microsoft SEAL older than 4.6, as it usually is, can serve an uncompressed `SenderDB` that APSI 2.0 saves, but not a compressed one, which it loads and then fails every query against.
+Microsoft SEAL 4.1 to 4.3 load only objects that record their own version, so software built with them cannot load any `SenderDB` that APSI 2.0 saves.
+
+Serving from APSI 1.x also gives up hardening that APSI 2.0 adds: a sender of APSI 1.x ignores the [fingerprint](#parameter-fingerprints) of a query, so it answers queries created for other parameters of the same shape, and it loads the ciphertexts and relinearization keys of a query before checking them against the parameters.
+A `SenderDB` in which APSI 1.x updated labels may hold stale copies of items, with their old labels, which a query can still match.
+Updating such an item with APSI 2.0 updates every copy, and removing it and inserting it again, or rebuilding the `SenderDB`, removes the extra copies.
+
+### With Match Tags
+
+APSI 1.x and older cannot use match tags; [Serialization](#serialization) and [Loading from JSON](#loading-from-json) describe what they do with such parameters.
+
+A sender can serve both methods side by side, with a `SenderDB` for each, at separate endpoints or at a shared one.
+At a shared endpoint, the two need the same `oprf::OPRFKey`, which `SenderDB::get_oprf_key` or `SenderDB::strip` returns, since an OPRF request does not say which `SenderDB` it is for.
+Route each query by its fingerprint, sending a query without one to the `SenderDB` with matching polynomials.
+A parameter request carries nothing to route by, so receivers of a shared endpoint need their parameters some other way.
+`ZMQSenderDispatcher` serves a single `SenderDB`.
+
+### Building and Interfaces
+
+- APSI 2.0 requires Microsoft SEAL 4.7 or a later 4.x release; see [Microsoft SEAL](#microsoft-seal).
+- `network::Channel` has a new virtual function, `receive_result_for`, with a default implementation, but code built against the headers of APSI 1.x must be recompiled.
+- Code that loads result packages itself should use `network::Channel::receive_result_for`, or the overload of `network::ResultPackage::load` that takes the `PSIParams`.
+The overload without the `PSIParams` no longer refuses a package without a `psi_result`, since a result with match tags has none.
+- `network::SenderOperationQuery::load` holds the ciphertexts of a query in serialized form, so code that reads them itself must load them with `SEALObject::extract` and a `seal::SEALContext`.
+It also refuses relinearization keys other than the single key set `seal::KeyGenerator::create_relin_keys` makes, which is what every APSI receiver sends.
+- `SenderDB::insert_or_assign` no longer stores an item a second time when it replaces its label, and `SenderDB::remove` removes all of a batch or nothing (see [SenderDB](#senderdb)).
+- `SenderDB::set_data` throws `std::logic_error` for a stripped `SenderDB`, and so does `SenderDB::strip` for one that is stripped already.
+The constructor that takes an OPRF key throws `std::invalid_argument` for a key of zero.
 
 ## Building APSI
 
@@ -1110,7 +1513,13 @@ There is no separate "install dependencies" step.
 
 - A C++17 toolchain (see [Requirements](#requirements) above).
 - CMake ≥ 3.25.
-- A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path.
+- A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path. It has to contain the vcpkg commit that `vcpkg.json` names as its `builtin-baseline`, so `git pull` an older clone.
+
+#### Microsoft SEAL
+
+`CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.7 or a later 4.x release.
+`vcpkg.json` asks for it with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query uses.
+Its `builtin-baseline` is a vcpkg commit with Microsoft SEAL 4.7.1, so the configure step reports `Microsoft SEAL: found (4.7.1; zlib: ON, Zstandard: ON)`.
 
 #### Configuring and building with CMake presets
 
@@ -1124,7 +1533,7 @@ cmake --build --preset linux-debug
 The same pattern works for `macos-arm64-debug`, `macos-arm64-release`, `macos-x64-debug`, and `macos-x64-release`.
 The Windows presets separate the two steps: configure with `win-vs2022-x64`, `win-vs2022-arm64`, `win-vs2026-x64`, or `win-vs2026-arm64`, then build with the matching `-debug` or `-release` build preset, for example `win-vs2022-x64-release`.
 The `win-vs2026-*` presets require CMake ≥ 4.2 (see the [Requirements](#requirements) note); all others work with CMake ≥ 3.25.
-The base preset enables both tests and CLI; binaries land under `out/build/<preset>/bin/`.
+The base preset enables both tests and CLI; binaries land under `out/build/<preset>/bin/`, and with the Windows presets in its `Debug` or `Release` subdirectory.
 
 To run the tests:
 ```sh
@@ -1170,9 +1579,10 @@ The remaining flags are selected by platform and target rather than probed.
 | GCC, Clang | Stack protection; position-independent code; bounds-checked standard library containers outside `Debug` (`_GLIBCXX_ASSERTIONS`, `_LIBCPP_HARDENING_MODE`) |
 | GCC, Clang, except Apple | Stack-clash protection; fortified libc calls outside `Debug` (`_FORTIFY_SOURCE=2`) |
 | GCC, Clang on Linux and Android | Full RELRO, immediate binding, and a non-executable stack |
-| MSVC | Control Flow Guard; the Spectre variant 1 mitigation; EH continuation metadata on a 64-bit target; shadow-stack marking (`/CETCOMPAT`) on x64 |
+| MSVC | Control Flow Guard; the Spectre variant 1 mitigation; shadow-stack marking (`/CETCOMPAT`) on x64 |
 
 Apple platforms are excluded from two of these deliberately: Clang there accepts `-fstack-clash-protection` and ignores it, and Apple's libc does not implement the fortified entry points.
+MSVC does not get EH continuation metadata (`/guard:ehcont`): the linker then rejects every module built without it, and the dependencies vcpkg builds lack it.
 The standard library hardening is applied to APSI's own translation units, not to a consumer's, so a consumer that wants it enables it for its own build.
 
 These options apply to the code built in this tree and are not part of the installed target's interface, so a consumer chooses its own.
@@ -1199,8 +1609,9 @@ Older SEAL releases carry known vulnerabilities, including in the deserializatio
 
 #### Note on Microsoft SEAL and Intel HEXL
 
-[Intel HEXL](https://GitHub.com/IntelLabs/hexl) is an optional dependency of Microsoft SEAL that accelerates low-level arithmetic with advanced vector extensions.
-Its impact depends on the processor, but it can substantially reduce APSI sender online computation time.
+[Intel HEXL](https://GitHub.com/IntelLabs/hexl) is an optional dependency of Microsoft SEAL that accelerates low-level arithmetic with AVX-512, and we recommend it for a sender on an x86-64 processor that has AVX-512.
+With it, a sender answering on one thread spends noticeably less CPU time per query with the parameter sets that compute powers or use Paterson-Stockmeyer, such as `1M-256` and `1M-11041`, and a little less with sets such as `1M-1`, `1M-512-cmp` and `1M-4096-cmp`, whose queries go mostly to the sums of products that APSI computes itself, without Intel HEXL.
+A receiver spends less CPU time processing a result.
 To enable, configure with `-DVCPKG_MANIFEST_FEATURES=hexl` (in addition to any other features), which adds `seal[hexl]` to the manifest-mode resolution.
 
 ## Command-Line Interface (CLI)
@@ -1230,10 +1641,13 @@ The following arguments specify the receiver's behavior.
 | `-a` \| `--ipAddr` | IP address for a sender endpoint |
 | `--port` | TCP port to connect to (default is 1212) |
 | `--timeout` | Seconds of sender silence to tolerate before giving up (default is 1800; 0 waits forever) |
+| `--compression` | Compression mode of the query and of the sender's response: `none`, `zlib`, `zstd`, or `bitpack` (default), as far as Microsoft SEAL supports them |
 
 Every message received restarts the `--timeout` clock, so it bounds how long the sender may stay silent, not how long the query may take.
 A sender that is slow but responsive is never cut off, however large its database.
 Passing `0` disables the deadline, which is appropriate only against a sender you trust: a hostile or broken one can then hold the receiver indefinitely.
+
+A sender built with Microsoft SEAL older than 4.6 cannot load a bit-packed query, so use `--compression zstd` with it (see [Compression](#compression)).
 
 ### Sender
 
@@ -1243,12 +1657,12 @@ Note that in other applications the receiver may already know the parameters, an
 
 | <div style="width:190px">Parameter</div> | Explanation |
 |-----------|-------------|
-| `-d` \| `--dbFile` | Path to a CSV file describing the sender's dataset (an item-label pair on each row) or a file containing a serialized `SenderDB`; the CLI will first attempt to load the data as a serialized `SenderDB`, and &ndash; upon failure &ndash; will proceed to attempt to read it as a CSV file |
+| `-d` \| `--dbFile` | Path to a CSV file describing the sender's dataset (an item-label pair on each row) or a file that `--sdbOutFile` wrote, which must be trusted (see [SenderDB](#senderdb)); the CLI will first attempt to load the data as such a file, and &ndash; upon failure &ndash; will proceed to attempt to read it as a CSV file |
 | `-p` \| `--paramsFile` | Path to a JSON file [describing the parameters](#loading-from-json) to be used by the sender
 | `--port` | TCP port to bind to (default is 1212) |
 | `-n` \| `--nonceByteCount` | Number of bytes used for the nonce in labeled mode (default is 16) |
 | `-c` \| `--compress` | Whether to compress the SenderDB in memory; this will make the memory footprint smaller at the cost of increased computation |
-| `-o` \| `--sdbOutFile` | Save the `SenderDB` in the given file |
+| `-o` \| `--sdbOutFile` | Save the `SenderDB` in the given file, as `SenderDB::save` writes it by default, followed by its OPRF key |
 
 **Note:** The first row of the CSV file provided to `--dbFile` determines whether APSI will be used in unlabeled or labeled mode.
 If the first row contains two values, the first will be interpreted as the item and the rest will be interpreted as the label data.

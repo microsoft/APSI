@@ -194,6 +194,14 @@ namespace apsi::network {
             std::shared_ptr<seal::SEALContext> context) override;
 
         /**
+        Receive a ResultPackage from a sender as a result of a query made with the given parameters;
+        see Channel::receive_result_for. A package that cannot be a result for these parameters is
+        rejected before any ciphertext in it is loaded.
+        */
+        std::unique_ptr<ResultPackage> receive_result_for(
+            std::shared_ptr<seal::SEALContext> context, const PSIParams &params) override;
+
+        /**
         Do not use this function. Use ZMQChannel::receive_network_operation instead.
         */
         std::unique_ptr<SenderOperation> receive_operation(
@@ -249,6 +257,9 @@ namespace apsi::network {
         bool receive_message(zmq::multipart_t &msg, bool wait_for_message = true);
 
         void send_message(zmq::multipart_t &msg);
+
+        std::unique_ptr<ResultPackage> receive_result_package(
+            std::shared_ptr<seal::SEALContext> context, const PSIParams *params);
     }; // class ZMQChannel
 
     /**

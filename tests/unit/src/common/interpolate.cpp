@@ -2,14 +2,24 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <numeric>
 #include <random>
+#include <set>
+#include <sstream>
+#include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 // APSI
 #include "apsi/config.h"
+#include "apsi/psi_params.h"
 #include "apsi/util/interpolate.h"
 
 // SEAL
@@ -181,5 +191,275 @@ namespace APSITests {
         random_interp(13);
         random_interp(23);
         random_interp(101);
+    }
+
+    namespace {
+        /**
+        Newton interpolation with a table of divided differences, as APSI 1.x implements
+        newton_interpolate_polyn: slow, but simple enough to be the reference for
+        newton_interpolate_polyn and newton_interpolate_polyns, whose results must not change. The
+        points must be distinct.
+        */
+        vector<uint64_t> divided_differences_interpolate(
+            const vector<uint64_t> &points, const vector<uint64_t> &values, const Modulus &mod)
+        {
+            size_t size = points.size();
+            if (all_of(values.cbegin(), values.cend(), [](auto a) { return a == 0; })) {
+                return vector<uint64_t>(max<size_t>(size, 1));
+            }
+
+            vector<vector<uint64_t>> divided_differences(size);
+            for (size_t i = 0; i < size; i++) {
+                divided_differences[i].push_back(values[i]);
+            }
+            for (size_t j = 1; j < size; j++) {
+                for (size_t i = 0; i < size - j; i++) {
+                    uint64_t numerator = sub_uint_mod(
+                        divided_differences[i + 1][j - 1], divided_differences[i][j - 1], mod);
+                    uint64_t denominator = sub_uint_mod(points[i + j], points[i], mod);
+                    uint64_t inv_denominator =
+                        exponentiate_uint_mod(denominator, mod.value() - 2, mod);
+                    divided_differences[i].push_back(
+                        multiply_uint_mod(numerator, inv_denominator, mod));
+                }
+            }
+
+            vector<uint64_t> result{ 0 };
+            for (size_t i = size - 1; i > 0; i--) {
+                result[0] = add_uint_mod(result[0], divided_differences[0][i], mod);
+                polyn_mul_monic_monomial_inplace(result, points[i - 1], mod);
+            }
+            result[0] = add_uint_mod(result[0], divided_differences[0][0], mod);
+
+            return result;
+        }
+
+        /**
+        Distinct points sampled uniformly from [0, mod)
+        */
+        vector<uint64_t> random_points(size_t size, const Modulus &mod, mt19937_64 &rng)
+        {
+            uniform_int_distribution<uint64_t> u(0, mod.value() - 1);
+            unordered_set<uint64_t> seen;
+            vector<uint64_t> points;
+            while (points.size() < size) {
+                uint64_t point = u(rng);
+                if (seen.insert(point).second) {
+                    points.push_back(point);
+                }
+            }
+            return points;
+        }
+
+        /**
+        Values sampled uniformly from [0, mod), with about a quarter of them set to zero
+        */
+        vector<uint64_t> random_values(size_t size, const Modulus &mod, mt19937_64 &rng)
+        {
+            uniform_int_distribution<uint64_t> u(0, mod.value() - 1);
+            vector<uint64_t> values(size);
+            for (auto &value : values) {
+                value = (rng() % 4) ? u(rng) : 0;
+            }
+            return values;
+        }
+
+        /**
+        What the parameter sets in the parameters directory ask of interpolation: their plain
+        moduli, and for the sets without match tags and those with them, in that order, the most
+        items a bin holds and the largest plain modulus among the sets whose bins hold that many. A
+        bin holds max_items_per_bin items with match tags and one fewer without them.
+        */
+        struct ShippedBins {
+            size_t set_count = 0;
+
+            set<uint64_t> moduli;
+
+            array<pair<size_t, uint64_t>, 2> largest{};
+        };
+
+        ShippedBins read_shipped_bins()
+        {
+            namespace fs = std::filesystem;
+
+            ShippedBins shipped;
+            for (const auto &entry : fs::directory_iterator(fs::path(APSI_PARAMETERS_DIR))) {
+                if (entry.path().extension() != ".json") {
+                    continue;
+                }
+                ifstream file(entry.path());
+                stringstream json;
+                json << file.rdbuf();
+                apsi::PSIParams params = apsi::PSIParams::Load(json.str());
+
+                uint64_t modulus = params.seal_params().plain_modulus().value();
+                size_t bin_size = params.table_params().max_items_per_bin;
+                if (!params.uses_tags()) {
+                    bin_size--;
+                }
+
+                shipped.set_count++;
+                shipped.moduli.insert(modulus);
+                auto &largest = shipped.largest[params.uses_tags() ? 1 : 0];
+                if (bin_size > largest.first ||
+                    (bin_size == largest.first && modulus > largest.second)) {
+                    largest = { bin_size, modulus };
+                }
+            }
+
+            return shipped;
+        }
+    } // namespace
+
+    TEST(InterpolateTests, NewtonInterpolatePolynMatchesDividedDifferences)
+    {
+        ShippedBins shipped = read_shipped_bins();
+        ASSERT_LE(size_t(36), shipped.set_count) << "expected to find the shipped parameter sets";
+
+        // The plain moduli of the parameter sets in the parameters directory, and small ones. The
+        // reference takes a modular inversion for every divided difference, so it is compared
+        // with at small sizes only; larger ones are checked below.
+        set<uint64_t> moduli = shipped.moduli;
+        moduli.insert({ 7, 101 });
+        mt19937_64 rng(1);
+        for (uint64_t p : moduli) {
+            Modulus mod(p);
+            for (size_t size : { 1U, 2U, 3U, 5U, 42U, 228U }) {
+                if (size > p) {
+                    continue;
+                }
+                auto points = random_points(size, mod, rng);
+                auto values = random_values(size, mod, rng);
+                ASSERT_EQ(
+                    divided_differences_interpolate(points, values, mod),
+                    newton_interpolate_polyn(points, values, mod))
+                    << "modulus " << p << ", " << size << " points";
+            }
+        }
+
+        // BinBundle interpolates every bin with newton_interpolate_polyns: the tag and label parts,
+        // and without match tags the matching polynomial as well, whose roots are the points. The
+        // largest bins of the parameter sets hold over a thousand items, and nearly 3000 with
+        // match tags, but nothing in the interpolation depends on how many there are, so 2048 of
+        // them, or as many as the bins hold if that is fewer, cover it. They are interpolated with
+        // the plain modulus of the set with the largest bins, without match tags and with them.
+        //
+        // The result is checked at every point instead of against the reference: a polynomial of
+        // degree below the number of distinct points that takes the given values at all of them is
+        // the interpolating one, so with as many coefficients as there are points it is what the
+        // reference gives, and a monic polynomial whose degree is the number of points and that
+        // vanishes at all of them is the one with those roots.
+        for (bool tags : { false, true }) {
+            auto [bin_size, p] = shipped.largest[tags ? 1 : 0];
+            ASSERT_LT(size_t(0), bin_size);
+            SCOPED_TRACE(string(tags ? "with" : "without") + " match tags");
+
+            Modulus mod(p);
+            auto points = random_points(min<size_t>(bin_size, 2048), mod, rng);
+            vector<vector<uint64_t>> values{ random_values(points.size(), mod, rng),
+                                             random_values(points.size(), mod, rng) };
+            vector<uint64_t> roots;
+            auto polyns = newton_interpolate_polyns(
+                points, { values[0], values[1] }, mod, tags ? nullptr : &roots);
+
+            ASSERT_EQ(values.size(), polyns.size());
+            for (size_t j = 0; j < values.size(); j++) {
+                ASSERT_EQ(points.size(), polyns[j].size());
+                for (size_t i = 0; i < points.size(); i++) {
+                    ASSERT_EQ(values[j][i], uint64_t_poly_eval(polyns[j], points[i], mod));
+                }
+            }
+
+            if (!tags) {
+                ASSERT_EQ(points.size() + 1, roots.size());
+                ASSERT_EQ(1, roots.back());
+                for (uint64_t point : points) {
+                    ASSERT_EQ(0, uint64_t_poly_eval(roots, point, mod));
+                }
+            }
+        }
+    }
+
+    TEST(InterpolateTests, NewtonInterpolatePolyns)
+    {
+        Modulus mod(65537);
+        vector<uint64_t> roots;
+
+        // No values: only the polynomial with the given roots, which may repeat
+        ASSERT_TRUE(newton_interpolate_polyns({ 1, 2, 2 }, {}, mod, &roots).empty());
+        ASSERT_EQ(polyn_with_roots({ 1, 2, 2 }, mod), roots);
+
+        // No points
+        vector<uint64_t> no_values;
+        auto polyns = newton_interpolate_polyns({}, { no_values, no_values }, mod, &roots);
+        ASSERT_EQ(2, polyns.size());
+        for (const auto &polyn : polyns) {
+            ASSERT_EQ(vector<uint64_t>{ 0 }, polyn);
+        }
+        ASSERT_EQ(vector<uint64_t>{ 1 }, roots);
+
+        // Invalid number of values
+        vector<uint64_t> two_values{ 1, 2 };
+        vector<uint64_t> one_value{ 1 };
+        ASSERT_THROW(
+            auto result = newton_interpolate_polyns({ 0, 1 }, { two_values, one_value }, mod),
+            invalid_argument);
+
+        // Invalid modulus (not a prime)
+        ASSERT_THROW(
+            auto result = newton_interpolate_polyns({ 0 }, { one_value }, Modulus(4)),
+            invalid_argument);
+
+        // Repeated points are an error unless all values are zero, as in newton_interpolate_polyn
+        vector<uint64_t> zeros(3, 0);
+        vector<uint64_t> nonzeros{ 1, 0, 1 };
+        ASSERT_THROW(
+            auto result = newton_interpolate_polyns({ 1, 2, 1 }, { zeros, nonzeros }, mod),
+            logic_error);
+        polyns = newton_interpolate_polyns({ 1, 2, 1 }, { zeros, zeros }, mod, &roots);
+        ASSERT_EQ(2, polyns.size());
+        for (const auto &polyn : polyns) {
+            ASSERT_EQ(zeros, polyn);
+        }
+        ASSERT_EQ(polyn_with_roots({ 1, 2, 1 }, mod), roots);
+
+        // The results are identical to separate calls, including all-zero values
+        mt19937_64 rng(2);
+        for (uint64_t p : { 65537U, 270337U, 4423681U }) {
+            mod = p;
+            for (size_t size : { 1U, 7U, 228U }) {
+                for (size_t count : { 1U, 3U, 23U }) {
+                    auto points = random_points(size, mod, rng);
+                    vector<vector<uint64_t>> values;
+                    vector<gsl::span<const uint64_t>> value_spans;
+                    for (size_t j = 0; j < count; j++) {
+                        values.push_back(
+                            (j % 3 == 1) ? vector<uint64_t>(size, 0)
+                                         : random_values(size, mod, rng));
+                    }
+                    for (const auto &curr_values : values) {
+                        value_spans.emplace_back(curr_values);
+                    }
+
+                    polyns = newton_interpolate_polyns(points, value_spans, mod, &roots);
+                    ASSERT_EQ(polyn_with_roots(points, mod), roots);
+                    ASSERT_EQ(count, polyns.size());
+                    for (size_t j = 0; j < count; j++) {
+                        ASSERT_EQ(newton_interpolate_polyn(points, values[j], mod), polyns[j]);
+                    }
+
+                    // newton_interpolate_polyn is compared with the reference in
+                    // NewtonInterpolatePolynMatchesDividedDifferences, so one random and one
+                    // all-zero value vector suffice here
+                    for (size_t j = 0; j < min<size_t>(count, 2); j++) {
+                        ASSERT_EQ(
+                            divided_differences_interpolate(points, values[j], mod), polyns[j]);
+                    }
+
+                    // Without the polynomial with the given roots
+                    ASSERT_EQ(polyns, newton_interpolate_polyns(points, value_spans, mod));
+                }
+            }
+        }
     }
 } // namespace APSITests

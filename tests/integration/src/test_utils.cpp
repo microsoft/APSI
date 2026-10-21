@@ -6,6 +6,7 @@
 
 // STD
 #include <algorithm>
+#include <array>
 #include <numeric>
 #include <random>
 #include <stdexcept>
@@ -171,6 +172,19 @@ namespace APSITests {
         }
     }
 
+    oprf::OPRFKey fixed_oprf_key()
+    {
+        constexpr size_t set_byte_count = oprf::oprf_key_size - 8;
+
+        oprf::OPRFKey key;
+        array<unsigned char, oprf::oprf_key_size> bytes{};
+        for (size_t i = 0; i < set_byte_count; i++) {
+            bytes[i] = static_cast<unsigned char>(i + 1);
+        }
+        key.load(oprf::oprf_key_span_const_type(bytes));
+        return key;
+    }
+
     PSIParams create_params1()
     {
         PSIParams::ItemParams item_params;
@@ -251,6 +265,75 @@ namespace APSITests {
         seal_params.set_poly_modulus_degree(16384);
         seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(16384));
         seal_params.set_plain_modulus(65537);
+
+        return { item_params, table_params, query_params, seal_params };
+    }
+
+    PSIParams create_tag_params1()
+    {
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 1;
+        item_params.tag_part_count = 3;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 16;
+        table_params.table_size = 8192;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers = { 1, 3, 5 };
+
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(8192);
+        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
+        seal_params.set_plain_modulus(65537);
+
+        return { item_params, table_params, query_params, seal_params };
+    }
+
+    PSIParams create_tag_params2()
+    {
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 2;
+        item_params.tag_part_count = 2;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 16;
+        table_params.table_size = 4096;
+
+        PSIParams::QueryParams query_params;
+        query_params.ps_low_degree = 4;
+        query_params.query_powers = { 1, 3, 5 };
+
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(8192);
+        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
+        seal_params.set_plain_modulus(65537);
+
+        return { item_params, table_params, query_params, seal_params };
+    }
+
+    PSIParams create_tag_collision_params()
+    {
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 1;
+        item_params.tag_part_count = 4;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 1;
+        table_params.max_items_per_bin = 35;
+        table_params.table_size = 2048;
+
+        PSIParams::QueryParams query_params;
+        for (uint32_t power = 1; power <= table_params.max_items_per_bin; power++) {
+            query_params.query_powers.insert(power);
+        }
+
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(2048);
+        seal_params.set_coeff_modulus(CoeffModulus::Create(2048, { 54 }));
+        seal_params.set_plain_modulus(12289);
 
         return { item_params, table_params, query_params, seal_params };
     }
