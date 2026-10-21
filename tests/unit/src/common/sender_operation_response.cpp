@@ -112,8 +112,8 @@ namespace APSITests {
         // read them. The expected bytes are what a StreamChannel of APSI 1.1.0 writes for a
         // SenderOperationResponseParms holding each parameter set below: a SenderOperationHeader,
         // and then the response. They were recorded with APSI 1.1.0's code built with Microsoft
-        // SEAL 4.6.1 and FlatBuffers 25.12.19, and are the same with Microsoft SEAL 4.7.0. Like
-        // Microsoft SEAL 4.0, Microsoft SEAL 4.7.0 records the serialization format version, 4.0,
+        // SEAL 4.6.1 and FlatBuffers 25.12.19, and are the same with Microsoft SEAL 4.7. Like
+        // Microsoft SEAL 4.0, Microsoft SEAL 4.7 records the serialization format version, 4.0,
         // in each Microsoft SEAL header; built with Microsoft SEAL 4.4, APSI 1.1.0 sends the same
         // bytes, except that each such header records 4.4. A version of Microsoft SEAL or
         // FlatBuffers that serializes any of this differently calls for recording the bytes again.

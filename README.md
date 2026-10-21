@@ -74,7 +74,7 @@ The second uses *match tags*, pseudorandom values that the receiver computes for
 Match tags, introduced in APSI 2.0, can make queries and responses smaller, but they are an alternative, not a replacement.
 [Choosing a Method](#choosing-a-method) explains how to choose between them.
 
-APSI 2.0 also bit-packs queries by default, sends a fingerprint of the parameters with every query, and requires Microsoft SEAL 4.7.0.
+APSI 2.0 also bit-packs queries by default, sends a fingerprint of the parameters with every query, and requires Microsoft SEAL 4.7 or a later 4.x release.
 [Upgrading from APSI 1.x](#upgrading-from-apsi-1x) explains what this means for an existing deployment.
 
 ## How APSI Works
@@ -1461,7 +1461,7 @@ A parameter request carries nothing to route by, so receivers of a shared endpoi
 
 ### Building and Interfaces
 
-- APSI 2.0 requires Microsoft SEAL 4.7.0 or a later 4.x release; see [Microsoft SEAL 4.7.0](#microsoft-seal-470).
+- APSI 2.0 requires Microsoft SEAL 4.7 or a later 4.x release; see [Microsoft SEAL](#microsoft-seal).
 - `network::Channel` has a new virtual function, `receive_result_for`, with a default implementation, but code built against the headers of APSI 1.x must be recompiled.
 - Code that loads result packages itself should use `network::Channel::receive_result_for`, or the overload of `network::ResultPackage::load` that takes the `PSIParams`.
 The overload without the `PSIParams` no longer refuses a package without a `psi_result`, since a result with match tags has none.
@@ -1515,11 +1515,11 @@ There is no separate "install dependencies" step.
 - CMake ≥ 3.25.
 - A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path. It has to contain the vcpkg commit that `vcpkg.json` names as its `builtin-baseline`, so `git pull` an older clone.
 
-#### Microsoft SEAL 4.7.0
+#### Microsoft SEAL
 
-`CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.7.0 or a later 4.x release.
+`CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.7 or a later 4.x release.
 `vcpkg.json` asks for it with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query uses.
-Its `builtin-baseline` is a vcpkg commit with Microsoft SEAL 4.7.0, so the configure step reports `Microsoft SEAL: found (4.7.0; zlib: ON, Zstandard: ON)`.
+Its `builtin-baseline` is a vcpkg commit with Microsoft SEAL 4.7.1, so the configure step reports `Microsoft SEAL: found (4.7.1; zlib: ON, Zstandard: ON)`.
 
 #### Configuring and building with CMake presets
 

@@ -4,7 +4,7 @@
 
 ### Breaking changes
 
-- Required Microsoft SEAL 4.7.0 or a newer 4.x release; see [Microsoft SEAL 4.7.0](README.md#microsoft-seal-470).
+- Required Microsoft SEAL 4.7 or a newer 4.x release; see [Microsoft SEAL](README.md#microsoft-seal).
 - Re-tuned every parameter set in `parameters/` under its old name, so a deployment that loads a shipped file by name gets new parameters. To keep its parameters, it must keep the file from APSI 1.1.0; to move to the new set, it must rebuild its `SenderDB` from the original items. 32 of the 36 sets use match tags, which APSI 1.x cannot use. See [Upgrading from APSI 1.x](README.md#upgrading-from-apsi-1x).
 - The receiver bit-packs its queries by default. A sender built with Microsoft SEAL older than 4.6, as APSI 1.x senders usually are, cannot load such a query and drops it, so the receiver waits out its timeout. To query such a sender, call `Receiver::set_compr_mode(seal::compr_mode_type::zstd)`, or pass `--compression zstd` to `receiver_cli`.
 - A query carries a fingerprint of the parameters it was created for, and a sender refuses a query created for other parameters. A query without a fingerprint, as receivers of APSI 1.x send, is still answered for parameters without match tags.
