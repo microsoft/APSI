@@ -1518,7 +1518,6 @@ There is no separate "install dependencies" step.
 #### Microsoft SEAL 4.7.0
 
 `CMakeLists.txt` checks at configure time that Microsoft SEAL is version 4.7.0 or a later 4.x release.
-Bit-packed serialization (see [Compression](#compression)) is new in Microsoft SEAL 4.6.0, 4.6.1 corrects the 64-bit multiplication with which 4.3.0 to 4.6.0 compute wrong results when built with MSVC for ARM64, 4.6.2 can be configured with an installed Microsoft GSL 5 (`SEAL_BUILD_DEPS=OFF`, as vcpkg builds it), and 4.7.0 makes the NTT, BFV multiplication and key switching, which a query uses throughout, faster.
 `vcpkg.json` asks for it with the `zlib` feature as well as `zstd` and `no-throw-tran`, since a sender answers each query in the compression mode the query uses.
 Its `builtin-baseline` is a vcpkg commit with Microsoft SEAL 4.7.0, so the configure step reports `Microsoft SEAL: found (4.7.0; zlib: ON, Zstandard: ON)`.
 
