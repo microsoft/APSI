@@ -217,6 +217,20 @@ namespace APSITests {
         }
 
         /**
+        Returns the power, depth and parents of each node of the query's PowersDag, in the order
+        PowersDag::apply visits them.
+        */
+        vector<array<uint32_t, 4>> pd_nodes(const Query &query)
+        {
+            vector<array<uint32_t, 4>> nodes;
+            query.pd().apply([&](const PowersDag::PowersNode &node) {
+                nodes.push_back(
+                    { node.power, node.depth, node.parents.first, node.parents.second });
+            });
+            return nodes;
+        }
+
+        /**
         Runs the query and returns the result packages it is answered with, as the sender writes
         them. They are sorted, since the order they are sent in depends on scheduling.
         */
@@ -511,7 +525,7 @@ namespace APSITests {
         ASSERT_EQ(query.compr_mode(), copy.compr_mode());
         ASSERT_EQ(saved_relin_keys(query), saved_relin_keys(copy));
         ASSERT_TRUE(copy.pd().is_configured());
-        ASSERT_EQ(query.pd().to_dot(), copy.pd().to_dot());
+        ASSERT_EQ(pd_nodes(query), pd_nodes(copy));
         ASSERT_EQ(query.params_fingerprint(), copy.params_fingerprint());
         ASSERT_EQ(saved_ciphertexts(query), saved_ciphertexts(copy));
         ASSERT_EQ(query.sender_db(), copy.sender_db());

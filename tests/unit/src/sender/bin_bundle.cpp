@@ -4794,7 +4794,7 @@ namespace APSITests {
         size_t saved_content_size(const string &saved)
         {
             constexpr size_t offset_size = sizeof(flatbuffers::uoffset_t);
-            auto vector_size = [](size_t count, size_t elem_size) {
+            auto vector_size = [&](size_t count, size_t elem_size) {
                 return offset_size + count * elem_size;
             };
             auto table_size = [](const void *table,
